@@ -1,10 +1,10 @@
 ---
-description: "Configure x-skills plugin — sets up omo-agent binding, detects dependencies, and offers to install missing ones"
+description: "Configure x-skills plugin — sets up omo-agent binding, detects dependencies, and offers to install missing ones. Safe to run repeatedly."
 ---
 
 # x-skills Setup
 
-Run the setup script and offer to install missing dependencies.
+Idempotent setup — safe to run any number of times. Each run detects current state and only acts on what's missing or changed.
 
 ## Step 1: Find and run setup
 
@@ -32,54 +32,85 @@ fi
 cat ~/.config/x-skills/capabilities.json 2>/dev/null
 ```
 
-## Step 3: Offer to install missing dependencies
+## Step 3: Decide what to do based on current state
 
-After reading capabilities, check what's missing and offer to install. Present the user with a numbered menu of missing items.
+Parse the capabilities JSON. There are three possible outcomes:
 
-**For missing CLI tools** (opencode, security tools):
-- Run the install command via Bash if user approves
-- Re-run `bin/setup` after installing to update capabilities
+### Case A: Everything is available
+All capabilities are `true`. Report "all skills at full capability" and stop. No action needed.
 
-**For missing Claude Code plugins**, offer to install each one. These are installed via shell commands using `claude` CLI plugin management:
+### Case B: Some dependencies missing
+Some capabilities are `false`. Present **only the missing items** as a numbered menu. Do NOT offer to install things that are already present.
 
-| Plugin | Marketplace | Install commands |
-|--------|------------|-----------------|
-| oh-my-claudecode | omc | Run in Bash: `claude plugin marketplace add Yeachan-Heo/oh-my-claudecode` then `claude plugin install oh-my-claudecode@omc` |
-| superpowers | superpowers-marketplace | Run in Bash: `claude plugin marketplace add obra/superpowers-marketplace` then `claude plugin install superpowers@superpowers-marketplace` |
-| claude-mem | thedotmack | Run in Bash: `claude plugin marketplace add thedotmack/claude-mem` then `claude plugin install claude-mem@thedotmack` |
+**Before offering to install a plugin**, check if it's already installed:
+```bash
+grep -c '"<plugin-name>' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json" 2>/dev/null
+```
+If the count is >0, the plugin is already installed — skip it from the menu.
 
-**IMPORTANT:** After installing any Claude Code plugins:
-1. Tell the user to run `/reload-plugins` for the new plugins to take effect
-2. Some plugins require their own setup — see Post-Install Setup below
+**Before offering to install a CLI tool**, check if it's on PATH:
+```bash
+command -v <tool> &>/dev/null && echo "installed" || echo "missing"
+```
 
-### Post-Install Setup (MANDATORY)
+### Case C: First run (no capabilities file before step 1)
+Same as Case B but the setup script just created the file in step 1.
 
-Some plugins require additional setup after installation. **You MUST inform the user about these steps:**
+## Step 4: Install missing dependencies (if user approves)
 
-| Plugin | Post-install command | Why |
-|--------|---------------------|-----|
-| oh-my-claudecode | Tell user to run: `/oh-my-claudecode:omc-setup` | Configures agents, state directories, hooks, and notepad. Without this, the 25+ agents and hooks loaded by OMC may not function correctly. |
-| claude-mem | Tell user to run: `/claude-mem:setup` or check claude-mem docs | Initializes memory database and MCP server configuration |
-| superpowers | None needed | Works immediately after install + reload |
+Only install what the user selected. Skip anything already present.
 
-**After installing oh-my-claudecode, always tell the user:**
-> OMC is installed. Run `/reload-plugins`, then run `/oh-my-claudecode:omc-setup` to complete the setup. This configures the agent catalog, state directories, and hooks that x-skills depends on.
+**For CLI tools** (opencode, security tools):
+- Run the install command via Bash
+- These are idempotent — reinstalling an existing tool is harmless but wasteful, so check first
 
-**For missing MCP servers**, these require manual configuration. Provide setup guidance:
+**For Claude Code plugins**, install via shell commands. Always check before installing:
+
+```bash
+# Check if already installed before attempting
+if ! grep -q '"oh-my-claudecode' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json" 2>/dev/null; then
+  claude plugin marketplace add Yeachan-Heo/oh-my-claudecode 2>&1
+  claude plugin install oh-my-claudecode@omc 2>&1
+fi
+```
+
+| Plugin | Check name | Marketplace | Install |
+|--------|-----------|------------|---------|
+| oh-my-claudecode | `oh-my-claudecode` | `Yeachan-Heo/oh-my-claudecode` | `oh-my-claudecode@omc` |
+| superpowers | `superpowers` | `obra/superpowers-marketplace` | `superpowers@superpowers-marketplace` |
+| claude-mem | `claude-mem` | `thedotmack/claude-mem` | `claude-mem@thedotmack` |
+
+**For MCP servers**, provide config guidance (cannot auto-install):
 - **perplexity**: Requires API key from perplexity.ai, configure in `.mcp.json`
 - **deepwiki**: Free, configure in `.mcp.json` with `npx -y @anthropic-ai/deepwiki-mcp`
 - **exa**: Requires API key from exa.ai, configure in `.mcp.json`
 - **context7**: Free, configure in `.mcp.json` with `npx -y @anthropic-ai/context7-mcp`
 - **morph**: Requires morph account, configure in `.mcp.json`
 
-## Step 4: Re-run setup if anything was installed
+## Step 5: Post-install actions
 
-If any dependencies were installed, re-run `bin/setup` to update the capabilities manifest:
+After installing anything:
 
+1. **Tell user to run `/reload-plugins`** if any plugins were installed
+
+2. **Check for required post-install setup** — only mention these for plugins that were JUST installed in this run, not for plugins that were already present:
+
+| Plugin | Post-install command | When to mention |
+|--------|---------------------|-----------------|
+| oh-my-claudecode | `/oh-my-claudecode:omc-setup` | Only if OMC was installed in THIS run |
+| claude-mem | Check claude-mem docs for MCP setup | Only if claude-mem was installed in THIS run |
+| superpowers | None needed | Never |
+
+3. **Re-run `bin/setup`** to update capabilities manifest with newly installed deps:
 ```bash
 "$PLUGIN_DIR/bin/setup"
 ```
 
-## Step 5: Report final state
+## Step 6: Report final state
 
-Summarize what's now available, what's still missing, and which skills are at full capability. Include any pending post-install setup commands the user still needs to run.
+Summarize concisely:
+- **If everything is available**: "All skills at full capability. No action needed."
+- **If some things were just installed**: List what was installed, what the user still needs to do (reload, post-setup commands), and remaining gaps.
+- **If things are still missing**: List remaining missing deps and their impact.
+
+Do NOT re-list things that are already working — only report changes and gaps.
