@@ -154,22 +154,49 @@ if command -v opencode &>/dev/null; then
   ok "opencode found: $OC_VERSION"
   cap_set opencode true
 
-  # Detect oh-my-opencode plugin:
-  # 1. Check if it's in opencode's node_modules
-  # 2. Check if oracle agent exists (added by oh-my-opencode)
+  # Detect oh-my-opencode/oh-my-openagent plugin:
+  # 1. Check opencode.json config for plugin registration
+  # 2. Check node_modules for the package
+  # 3. Check if role agents (oracle) appear in agent list
   OC_HOME="${OPENCODE_HOME:-$HOME/.opencode}"
-  if [[ -d "$OC_HOME/node_modules/oh-my-opencode" ]]; then
-    OMO_VER=$(node -p "require('$OC_HOME/node_modules/oh-my-opencode/package.json').version" 2>/dev/null || echo "")
-    ok "oh-my-opencode plugin detected${OMO_VER:+ (v$OMO_VER)}"
-    cap_set omo_plugin true
-  elif opencode agent list 2>/dev/null | grep -q "^oracle"; then
-    ok "oh-my-opencode plugin detected (oracle agent available)"
-    cap_set omo_plugin true
+  OC_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
+  OMO_FOUND=false
+
+  # Check opencode.json plugin array
+  if [[ -f "$OC_CONFIG" ]] && grep -qE '"oh-my-open(code|agent)"' "$OC_CONFIG" 2>/dev/null; then
+    OMO_PKG=$(grep -oE '"oh-my-open(code|agent)"' "$OC_CONFIG" | head -1 | tr -d '"')
+    ok "oh-my-openagent plugin configured ($OMO_PKG in opencode.json)"
+    OMO_FOUND=true
+  fi
+
+  # Check node_modules
+  if [[ "$OMO_FOUND" == "false" ]]; then
+    for pkg in oh-my-openagent oh-my-opencode; do
+      if [[ -d "$OC_HOME/node_modules/$pkg" ]]; then
+        OMO_VER=$(node -p "require('$OC_HOME/node_modules/$pkg/package.json').version" 2>/dev/null || echo "")
+        ok "$pkg plugin installed${OMO_VER:+ (v$OMO_VER)}"
+        OMO_FOUND=true
+        break
+      fi
+    done
+  fi
+
+  # Check if role agents actually work
+  if [[ "$OMO_FOUND" == "true" ]]; then
+    if opencode agent list 2>/dev/null | grep -q "^oracle"; then
+      ok "Role agents available (oracle, explore, librarian)"
+      cap_set omo_plugin true
+    else
+      warn "Plugin configured but role agents not resolved (known compat bug)"
+      info "Working agents: oracle, explore, librarian, multimodal-looker"
+      info "Broken agents: hephaestus, atlas, prometheus, metis, momus"
+      cap_set omo_plugin "partial"
+    fi
   else
-    warn "oh-my-opencode plugin not detected"
+    warn "oh-my-openagent plugin not detected"
     info "Model routing (--model flag) still works without the plugin"
     cap_set omo_plugin false
-    missing_add "cli" "oh-my-opencode" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin oh-my-opencode"
+    missing_add "cli" "oh-my-openagent" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin oh-my-openagent"
   fi
 
   MODELS=$(opencode models 2>/dev/null || true)
@@ -338,7 +365,7 @@ report_skill() {
     local met=false
     case "$dep" in
       opencode)       [[ "$(cap_get opencode)" == "true" ]] && met=true ;;
-      omo_plugin)     [[ "$(cap_get omo_plugin)" == "true" ]] && met=true ;;
+      omo_plugin)     [[ "$(cap_get omo_plugin)" == "true" || "$(cap_get omo_plugin)" == "partial" ]] && met=true ;;
       omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
       superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
       claude-mem)     [[ "$(cap_get plugin_claude-mem)" == "true" ]] && met=true ;;
