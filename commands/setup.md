@@ -48,7 +48,22 @@ After reading capabilities, check what's missing and offer to install. Present t
 | superpowers | superpowers-marketplace | Run in Bash: `claude plugin marketplace add obra/superpowers-marketplace` then `claude plugin install superpowers@superpowers-marketplace` |
 | claude-mem | thedotmack | Run in Bash: `claude plugin marketplace add thedotmack/claude-mem` then `claude plugin install claude-mem@thedotmack` |
 
-**IMPORTANT:** After installing any Claude Code plugins, tell the user they need to restart the session or run `/reload-plugins` for the new plugins to take effect.
+**IMPORTANT:** After installing any Claude Code plugins:
+1. Tell the user to run `/reload-plugins` for the new plugins to take effect
+2. Some plugins require their own setup — see Post-Install Setup below
+
+### Post-Install Setup (MANDATORY)
+
+Some plugins require additional setup after installation. **You MUST inform the user about these steps:**
+
+| Plugin | Post-install command | Why |
+|--------|---------------------|-----|
+| oh-my-claudecode | Tell user to run: `/oh-my-claudecode:omc-setup` | Configures agents, state directories, hooks, and notepad. Without this, the 25+ agents and hooks loaded by OMC may not function correctly. |
+| claude-mem | Tell user to run: `/claude-mem:setup` or check claude-mem docs | Initializes memory database and MCP server configuration |
+| superpowers | None needed | Works immediately after install + reload |
+
+**After installing oh-my-claudecode, always tell the user:**
+> OMC is installed. Run `/reload-plugins`, then run `/oh-my-claudecode:omc-setup` to complete the setup. This configures the agent catalog, state directories, and hooks that x-skills depends on.
 
 **For missing MCP servers**, these require manual configuration. Provide setup guidance:
 - **perplexity**: Requires API key from perplexity.ai, configure in `.mcp.json`
@@ -59,7 +74,7 @@ After reading capabilities, check what's missing and offer to install. Present t
 
 ## Step 4: Re-run setup if anything was installed
 
-If any CLI tools were installed, re-run `bin/setup` to update the capabilities manifest:
+If any dependencies were installed, re-run `bin/setup` to update the capabilities manifest:
 
 ```bash
 "$PLUGIN_DIR/bin/setup"
@@ -67,4 +82,4 @@ If any CLI tools were installed, re-run `bin/setup` to update the capabilities m
 
 ## Step 5: Report final state
 
-Summarize what's now available, what's still missing, and which skills are at full capability.
+Summarize what's now available, what's still missing, and which skills are at full capability. Include any pending post-install setup commands the user still needs to run.
