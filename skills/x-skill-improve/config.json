@@ -1,0 +1,24 @@
+{
+  "supported_skills": [
+    "x-do",
+    "x-research",
+    "x-review",
+    "x-skill-review",
+    "x-skill-improve",
+    "x-bugfix"
+  ],
+  "skills_dir": "../",
+  "shared_dir": "../x-shared",
+  "data_dir": "./data",
+  "capabilities_file": "~/.config/x-skills/capabilities.json",
+  "session_search": {
+    "discovery": {
+      "contextChars": 500,
+      "limit": 10
+    },
+    "extraction": {
+      "contextChars": 1000,
+      "limit": 20
+    }
+  }
+}

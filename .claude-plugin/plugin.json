@@ -1,0 +1,25 @@
+{
+  "name": "x-skills",
+  "version": "1.0.0",
+  "description": "Intelligent skill routers for execution, research, review, debugging, design, and security testing — with optional multi-model orchestration via OpenCode",
+  "author": {
+    "name": "Randy Tran"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "skills",
+    "router",
+    "multi-model",
+    "orchestration",
+    "research",
+    "debugging",
+    "code-review",
+    "design-system",
+    "api-pentest"
+  ],
+  "skills": "./skills/",
+  "homepage": "",
+  "repository": ""
+}

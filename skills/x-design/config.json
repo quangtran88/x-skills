@@ -1,0 +1,12 @@
+{
+  "source_repo": "VoltAgent/awesome-design-md",
+  "source_url": "https://github.com/VoltAgent/awesome-design-md",
+  "pinned_commit": "80bbbc2",
+  "pinned_at": "2026-04-07",
+  "raw_url_template": "https://raw.githubusercontent.com/{repo}/{commit}/design-md/{slug}/DESIGN.md",
+  "preview_url_template": "https://github.com/{repo}/tree/{commit}/design-md/{slug}/",
+  "default_target_filename": "DESIGN.md",
+  "auto_update_claude_md": false,
+  "site_count": 58,
+  "research_fallback_path": "~/.claude/research/design/awesome-design-md/repo/design-md/{slug}/DESIGN.md"
+}

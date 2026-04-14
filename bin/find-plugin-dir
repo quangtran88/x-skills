@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Resolves the x-skills plugin root directory from any context.
+# Used by commands/setup.md to find bin/setup at runtime.
+#
+# Resolution order:
+# 1. Capabilities file (written by previous setup run)
+# 2. omo-agent symlink target (resolves back to bin/)
+# 3. Claude Code plugin cache (glob match)
+# 4. Common manual install locations
+
+resolve() {
+  # 1. From capabilities file
+  if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/x-skills/capabilities.json" ]]; then
+    local dir
+    dir=$(grep '"plugin_dir"' "${XDG_CONFIG_HOME:-$HOME/.config}/x-skills/capabilities.json" 2>/dev/null | sed 's/.*: "//;s/".*//')
+    if [[ -n "$dir" && -f "$dir/bin/setup" ]]; then
+      echo "$dir"
+      return 0
+    fi
+  fi
+
+  # 2. From omo-agent symlink
+  if [[ -L "$HOME/.local/bin/omo-agent" ]]; then
+    local target
+    target=$(readlink "$HOME/.local/bin/omo-agent")
+    local dir
+    dir=$(dirname "$(dirname "$target")")
+    if [[ -f "$dir/bin/setup" ]]; then
+      echo "$dir"
+      return 0
+    fi
+  fi
+
+  # 3. From plugin cache
+  local cache_hit
+  cache_hit=$(find "$HOME/.claude/plugins/cache" -path "*/x-skills/*/bin/setup" 2>/dev/null | head -1)
+  if [[ -n "$cache_hit" ]]; then
+    echo "$(dirname "$(dirname "$cache_hit")")"
+    return 0
+  fi
+
+  # 4. Common manual locations
+  for candidate in "$HOME/x-skills" "$HOME/projects/x-skills" "$HOME/Code/x-skills"; do
+    if [[ -f "$candidate/bin/setup" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+resolve

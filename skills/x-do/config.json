@@ -1,0 +1,9 @@
+{
+  "omo_agent": "omo-agent",
+  "omo_agent_fallback": "../x-omo/omo-agent",
+  "capabilities_file": "~/.config/x-skills/capabilities.json",
+  "ralph_state": ".omc/state/ralph-state.json",
+  "plans_dir": "docs",
+  "specs_dir": "docs",
+  "state_dir": ".omc/state"
+}

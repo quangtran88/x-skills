@@ -1,0 +1,6 @@
+{
+  "omo_agent": "omo-agent",
+  "omo_agent_fallback": "../x-omo/omo-agent",
+  "capabilities_file": "~/.config/x-skills/capabilities.json",
+  "default_base_branch": "main"
+}

@@ -1,0 +1,540 @@
+#!/usr/bin/env bash
+# omo-agent — wrapper for opencode multi-model agents
+# Two modes:
+#   1. Role agents:  omo-agent <agent> "<prompt>"
+#   2. Model routing: omo-agent --model <alias|full-id> "<prompt>"
+#
+# Role agents use OMO's specialized prompts (librarian, explore, oracle, etc.)
+# Model routing uses OpenCode's default agent with the specified model.
+#
+# Model aliases resolved via `opencode models` (always accurate):
+#   - Short aliases (gemini-pro, codex, gpt) → fuzzy match available models
+#   - Partial IDs (gpt-5.3-codex, gemini-3.1-pro) → grep match
+#   - Full IDs (openai/gpt-5.4) → passthrough
+
+set -uo pipefail
+
+# --- Parse arguments ---
+AGENT=""
+MODEL_FLAG=""
+SKILL_DIRS=()
+EXTRA_FILES=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model)   MODEL_FLAG="${2:-}"; shift 2 || true ;;
+    --model=*) MODEL_FLAG="${1#--model=}"; shift ;;
+    --skill)   SKILL_DIRS+=("${2:-}"); shift 2 || true ;;
+    --skill=*) SKILL_DIRS+=("${1#--skill=}"); shift ;;
+    --file|-f) EXTRA_FILES+=("${2:-}"); shift 2 || true ;;
+    --file=*)  EXTRA_FILES+=("${1#--file=}"); shift ;;
+    -*)        echo "Error: Unknown flag: $1" >&2; exit 1 ;;
+    *)         break ;;
+  esac
+done
+
+# First positional = agent name (unless --model mode)
+if [[ -z "$MODEL_FLAG" && $# -gt 0 ]]; then
+  AGENT="$1"
+  shift
+fi
+
+PROMPT="${*:-}"
+
+# --- Usage ---
+if [[ -z "$AGENT" && -z "$MODEL_FLAG" ]] || [[ -z "$PROMPT" ]]; then
+  cat >&2 <<'EOF'
+Usage:
+  omo-agent <agent> "<prompt>"                                  # Role agent
+  omo-agent --model <alias> "<prompt>"                          # Model routing
+  omo-agent --skill /path/to/skill/ oracle "<prompt>"           # Attach skill dir
+  omo-agent --skill a/ --skill b/ -f extra.md oracle "<prompt>" # Multiple
+
+Options:
+  --skill <path>      Attach a skill directory (all files) or single file
+  -f, --file <path>   Attach individual file(s) to the prompt
+  --model <alias>     Route to a specific model instead of a role agent
+
+Role Agents:
+  [WORKING — verified in current local setup]
+  oracle            architecture review, debugging, second opinion
+  explore           deep codebase search
+  librarian         external docs, OSS research
+  multimodal-looker visual/multimodal analysis
+
+  [UNAVAILABLE — plugin compat bug, see gotchas.md; use --model as workaround]
+  hephaestus        deep autonomous implementation
+  atlas             plan execution
+  prometheus        plan building
+  momus             plan review, critique
+  metis             pre-planning consultation
+
+Model Aliases (resolved via `opencode models`):
+  gemini-pro        Gemini 3.1 Pro
+  gemini-flash      Gemini 3 Flash
+  codex             GPT-5.3 Codex
+  gpt               GPT-5.4
+  o3, o4-mini       Reasoning models
+  Or any partial/full model ID (e.g., gpt-5.3-codex, openai/gpt-5.4)
+EOF
+  exit 1
+fi
+
+# --- Resolve model alias via `opencode models` ---
+resolve_model() {
+  local alias="$1"
+
+  # Full ID passthrough (contains /)
+  if [[ "$alias" == */* ]]; then
+    echo "$alias"
+    return 0
+  fi
+
+  # Fetch available models (cached for this invocation)
+  local models
+  models=$(opencode models 2>/dev/null)
+  if [[ -z "$models" ]]; then
+    echo "Error: 'opencode models' returned no results" >&2
+    return 1
+  fi
+
+  # Alias → grep pattern (short names to specific models)
+  local pattern
+  case "$alias" in
+    gemini-pro)     pattern="gemini-3\.1.*pro" ;;
+    gemini-flash)   pattern="gemini.*flash" ;;
+    codex)          pattern="gpt-5\.3-codex$" ;;
+    gpt|gpt-5-4)    pattern="/gpt-5\.4$" ;;
+    o3)             pattern="/o3$" ;;
+    o3-pro)         pattern="/o3-pro$" ;;
+    o4-mini)        pattern="/o4-mini$" ;;
+    *)              pattern="$alias" ;;
+  esac
+
+  # Match against non-Claude models first (prefer openai/opencode providers)
+  local match
+  match=$(echo "$models" | grep -v 'anthropic/\|cloudflare' | grep -i "$pattern" | head -1)
+  if [[ -n "$match" ]]; then
+    echo "$match"
+    return 0
+  fi
+
+  # Fallback: match any provider
+  match=$(echo "$models" | grep -i "$pattern" | head -1)
+  if [[ -n "$match" ]]; then
+    echo "$match"
+    return 0
+  fi
+
+  echo "Error: No model matching '$alias' found in 'opencode models'" >&2
+  echo "Run 'opencode models' to see available models." >&2
+  return 1
+}
+
+# --- Agent name → OpenCode `--agent` value mapping ---
+# Empirical status in opencode 1.4.0 + oh-my-opencode 3.15.3 (verified 2026-04-09):
+#   WORKING — plugin registers these under the lowercase short-name key:
+#     oracle, explore, librarian, multimodal-looker
+#   BROKEN — plugin's remapAgentKeysToDisplayNames() renames the config key to
+#     a parenthesized display name (e.g. "Momus (Plan Critic)"), but opencode's
+#     CLI --agent lookup matches neither the short name nor the display name:
+#     hephaestus, atlas, prometheus, metis, momus
+#   See gotchas.md for details and upstream-fix tracking.
+#
+# For all agents (working or broken) we pass the short name — opencode matches
+# by config key, and for WORKING agents the key IS the short name. For BROKEN
+# agents we fail early (below) with a helpful message instead of the confusing
+# display-name fallback path that opencode can't resolve either.
+resolve_agent_name() {
+  case "$1" in
+    oracle|explore|librarian|multimodal-looker|\
+    hephaestus|atlas|prometheus|metis|momus) echo "$1" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Agents currently broken by the plugin/opencode compat bug (see resolve_agent_name).
+# Space-separated list — update when upstream fixes are confirmed.
+OMO_BROKEN_AGENTS="hephaestus atlas prometheus metis momus"
+
+is_broken_agent() {
+  case " $OMO_BROKEN_AGENTS " in
+    *" $1 "*) return 0 ;;
+    *)        return 1 ;;
+  esac
+}
+
+# --- Validate agent or resolve model ---
+if [[ -n "$MODEL_FLAG" ]]; then
+  MODEL_ID=$(resolve_model "$MODEL_FLAG") || exit 1
+  [[ -z "$MODEL_ID" ]] && exit 1
+  RUN_MODE="model"
+elif [[ -n "$AGENT" ]]; then
+  AGENT_DISPLAY=$(resolve_agent_name "$AGENT") || {
+    echo "Error: Unknown agent '$AGENT'" >&2
+    echo "Valid agents: oracle explore librarian multimodal-looker hephaestus atlas prometheus momus metis" >&2
+    echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
+    exit 1
+  }
+  # Fail fast if the caller hit a known-broken agent rather than letting
+  # opencode print a confusing "agent not found / default agent not found"
+  # cascade. See resolve_agent_name for the root cause and gotchas.md.
+  if is_broken_agent "$AGENT"; then
+    cat >&2 <<EOF
+Error: agent '$AGENT' is currently UNAVAILABLE due to a known opencode + oh-my-opencode
+       plugin compatibility bug. The plugin
+       remaps this agent's config key to a parenthesized display name
+       (e.g. "Momus (Plan Critic)"), which opencode's --agent lookup cannot resolve.
+
+Currently WORKING agents (safe to use):
+  oracle  explore  librarian  multimodal-looker
+
+Currently BROKEN agents (all parenthesized-display-name):
+  hephaestus  atlas  prometheus  metis  momus
+
+Workarounds:
+  - Use a working agent if it fits your task.
+  - Use \`omo-agent --model gpt "<prompt>"\` (or codex / gemini-pro) for raw model
+    access without the specialized agent prompt.
+  - Re-check after upgrading opencode or oh-my-opencode; see gotchas.md for
+    the last verified versions and re-probe commands.
+EOF
+    exit 1
+  fi
+  RUN_MODE="agent"
+fi
+
+# --- Momus path workaround (CURRENTLY UNREACHABLE) ---
+# momus fails early via is_broken_agent until the oh-my-opencode compat bug is
+# fixed upstream. Kept for when the fix lands — DO NOT delete. See gotchas.md.
+# Momus only accepts .sisyphus/plans/*.md paths (hard-coded in its system prompt).
+# If the prompt references a plan file outside that dir, auto-copy it there temporarily.
+# Uses ABSOLUTE paths to avoid CWD mismatches between omo-agent and opencode.
+MOMUS_TMP=""
+if [[ "$AGENT" == "momus" ]]; then
+  # Check if prompt already references .sisyphus/plans/
+  if [[ "$PROMPT" != *".sisyphus/plans/"* ]]; then
+    # Extract file path from prompt (first .md path found) or check EXTRA_FILES
+    PLAN_FILE=""
+    # Check EXTRA_FILES first
+    for f in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+      if [[ "$f" == *.md ]]; then
+        PLAN_FILE="$f"
+        break
+      fi
+    done
+    # If no extra file, try to extract path from prompt
+    if [[ -z "$PLAN_FILE" ]]; then
+      # First: check if the entire prompt (trimmed) is itself a file path
+      TRIMMED_PROMPT=$(echo "$PROMPT" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if [[ "$TRIMMED_PROMPT" == *.md && -f "$TRIMMED_PROMPT" ]]; then
+        PLAN_FILE="$TRIMMED_PROMPT"
+      else
+        # Fallback: try space-free regex (works for paths without spaces)
+        PLAN_FILE=$(echo "$PROMPT" | grep -oE '[^ ]*\.md' | head -1)
+      fi
+    fi
+    # Resolve to absolute path if relative
+    if [[ -n "$PLAN_FILE" && "$PLAN_FILE" != /* ]]; then
+      PLAN_FILE="$(pwd)/$PLAN_FILE"
+    fi
+    # If we found a plan file, copy it to .sisyphus/plans/ using absolute paths
+    if [[ -n "$PLAN_FILE" && -f "$PLAN_FILE" ]]; then
+      SISYPHUS_DIR="$(pwd)/.sisyphus/plans"
+      mkdir -p "$SISYPHUS_DIR"
+      MOMUS_TMP="$SISYPHUS_DIR/_review-tmp-$$.md"
+      cp "$PLAN_FILE" "$MOMUS_TMP"
+      # Replace the original path in prompt with the absolute tmp path
+      PROMPT="${PROMPT//$PLAN_FILE/$MOMUS_TMP}"
+      # Also handle if prompt had relative version of the path
+      REL_PLAN="${PLAN_FILE#$(pwd)/}"
+      if [[ "$REL_PLAN" != "$PLAN_FILE" ]]; then
+        PROMPT="${PROMPT//$REL_PLAN/$MOMUS_TMP}"
+      fi
+      # Remove from EXTRA_FILES since momus reads the file itself
+      NEW_EXTRA=()
+      for f in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+        [[ "$f" != "$PLAN_FILE" ]] && NEW_EXTRA+=("$f")
+      done
+      EXTRA_FILES=("${NEW_EXTRA[@]+"${NEW_EXTRA[@]}"}")
+      echo "[omo-agent] momus workaround: copied $(basename "$PLAN_FILE") → $MOMUS_TMP" >&2
+    elif [[ -n "$PLAN_FILE" && ! -f "$PLAN_FILE" ]]; then
+      echo "[omo-agent] momus workaround: file not found: $PLAN_FILE (passing as-is)" >&2
+    fi
+  fi
+fi
+
+# --- Resolve skill dirs + extra files into --file flags ---
+FILE_ARGS=()
+
+for dir in "${SKILL_DIRS[@]+"${SKILL_DIRS[@]}"}"; do
+  if [[ -f "$dir" ]]; then
+    # Single file passed — attach directly
+    FILE_ARGS+=(--file "$dir")
+  elif [[ -d "$dir" ]]; then
+    # Directory — discover all relevant files
+    while IFS= read -r f; do
+      FILE_ARGS+=(--file "$f")
+    done < <(find "$dir" -maxdepth 2 -type f \
+      \( -name '*.md' -o -name '*.txt' -o -name '*.ts' -o -name '*.js' \
+         -o -name '*.py' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \
+         -o -name '*.toml' \) \
+      ! -path '*/node_modules/*' ! -path '*/.git/*' \
+      | sort)
+  else
+    echo "Error: Skill path not found: $dir" >&2
+    exit 1
+  fi
+done
+
+for f in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+  if [[ ! -f "$f" ]]; then
+    echo "Error: File not found: $f" >&2
+    exit 1
+  fi
+  FILE_ARGS+=(--file "$f")
+done
+
+# --- Append output format to ALL agents ---
+# All agents get <result> tag wrapping so the extraction on lines below can
+# cleanly separate the final answer from tool output / diffs / grep results.
+# explore is the only exception — it uses <answer> tags (extracted separately).
+
+OUTPUT_SUFFIX=""
+case "${AGENT:-__model__}" in
+  oracle)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: Wrap your FINAL answer in <result></result> tags. Inside: structured markdown with severity-rated findings, ## headings, and file:line references. NOTHING outside <result> tags will be seen — all tool output, diffs, grep results, and intermediate analysis will be discarded. Only your synthesized review inside <result> tags is captured. REMINDER: Do NOT use call_omo_agent to delegate synthesis — write your <result> answer directly.' ;;
+  librarian)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: Wrap your FINAL answer in <result></result> tags. Inside the tags: structured markdown with ## headings, cite sources with GitHub permalinks. NOTHING outside <result> tags will be seen. Do NOT put raw tool output, directory listings, file contents, or intermediate findings inside the tags.' ;;
+  hephaestus)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: Wrap your FINAL answer in <result></result> tags. Inside: summary of changes, files modified/created, and key decisions. NOTHING outside <result> tags will be seen.' ;;
+  atlas|prometheus)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: Wrap your FINAL answer in <result></result> tags. Inside: structured markdown answer. NOTHING outside <result> tags will be seen.' ;;
+  momus)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: After your [OKAY] or [REJECT] verdict, wrap your FULL response in <result></result> tags. NOTHING outside <result> tags will be seen.' ;;
+  metis)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: Wrap your FINAL answer in <result></result> tags. Inside: structured markdown with directives and analysis. NOTHING outside <result> tags will be seen.' ;;
+  __model__)
+    OUTPUT_SUFFIX=$'\n\n[OUTPUT FORMAT]: Wrap your FINAL answer in <result></result> tags. Inside: structured markdown answer. NOTHING outside <result> tags will be seen. Do not delegate to other agents — answer directly.' ;;
+esac
+
+# --- Prepend budget instruction for agents that tend to over-explore ---
+# Agents like oracle can exhaust their context on greps/reads and never produce
+# a final answer. A brief prefix instruction ensures the model sees the constraint
+# BEFORE it starts exploring, not just as an easily-ignored suffix.
+OUTPUT_PREFIX=""
+case "${AGENT:-__model__}" in
+  oracle|momus|metis)
+    OUTPUT_PREFIX=$'[CRITICAL INSTRUCTION — READ BEFORE DOING ANYTHING ELSE]:\n1. You MUST produce a final answer wrapped in <result></result> tags YOURSELF.\n2. Do NOT use call_omo_agent, spawn_agent, or ANY agent delegation tool. You have all the information you need — synthesize it directly.\n3. Budget your exploration — stop reading files with 30% context remaining and write your <result> answer.\n4. An incomplete answer inside <result> tags is infinitely more valuable than exhaustive exploration with no answer.\n5. If you run out of context without <result> tags, your ENTIRE output is discarded and wasted.\n\n' ;;
+esac
+
+if [[ -n "$OUTPUT_PREFIX" ]]; then
+  PROMPT="${OUTPUT_PREFIX}${PROMPT}"
+fi
+if [[ -n "$OUTPUT_SUFFIX" ]]; then
+  PROMPT="${PROMPT}${OUTPUT_SUFFIX}"
+fi
+
+# --- Execute ---
+TMPFILE=$(mktemp /tmp/omo-agent-XXXXXXXX)
+CLEANFILE=$(mktemp /tmp/omo-agent-clean-XXXXXXXX)
+trap 'rm -f "$TMPFILE" "$CLEANFILE" "${CLEANFILE}."*; [[ -n "${MOMUS_TMP:-}" ]] && rm -f "$MOMUS_TMP"' EXIT
+
+# Internal timeout (seconds). Prevents opencode from hanging indefinitely when
+# Claude Code's Bash timeout doesn't reliably kill background tasks.
+# Default 900s (15 min) — background tasks bypass the Bash tool's 600s cap,
+# so the internal timeout is the effective limit for run_in_background calls.
+OMO_TIMEOUT="${OMO_TIMEOUT:-900}"
+
+START_TIME=$(date +%s)
+echo "[omo-agent] started ${AGENT:-model} at $(date +%H:%M:%S) (timeout=${OMO_TIMEOUT}s)" >&2
+
+
+# Prompt is piped via stdin instead of passed as a positional argv.
+# Reason: opencode 1.4.0 (and others) hangs indefinitely when the positional
+# `message` contains a blank line (`\n\n`) — the run starts, produces zero bytes
+# of stdout/stderr, and is killed only by $OMO_TIMEOUT. Stdin bypasses the bug
+# and works reliably for all prompt shapes. See gotchas.md for the full repro.
+if [[ "$RUN_MODE" == "model" ]]; then
+  LABEL="model:$(basename "$MODEL_ID")"
+  # --pure bypasses external plugins. Without it, opencode falls back to the
+  # plugin's default agent ("Sisyphus - Ultraworker"), which can't be resolved
+  # due to the same display-name bug that breaks 5 named agents. --pure skips
+  # the plugin entirely, which is fine for model mode (no agent prompt needed).
+  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --pure --model "$MODEL_ID" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
+else
+  LABEL="agent:$AGENT"
+  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --agent "$AGENT_DISPLAY" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
+fi
+EXIT_CODE=$?
+
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+# --- Detect silent agent fallback (OpenCode exits 0 but warns "agent not found" or "is a subagent") ---
+if [[ "$RUN_MODE" == "agent" ]] && grep -qiE 'agent.*not.*found.*falling back|is a subagent.*falling back' "$TMPFILE" 2>/dev/null; then
+  echo "Error: OpenCode does not recognize agent '$AGENT' → '$AGENT_DISPLAY' (silent fallback detected)" >&2
+  echo "Valid agents: oracle explore librarian multimodal-looker hephaestus atlas prometheus momus metis" >&2
+  echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
+  rm -f "$TMPFILE"
+  exit 1
+fi
+
+# --- Detect default-agent resolution failure (affects --model when plugin sets broken default) ---
+if grep -qiE 'default agent.*not found' "$TMPFILE" 2>/dev/null; then
+  echo "Error: OpenCode's default agent could not be resolved (plugin compatibility issue)" >&2
+  echo "This typically means the oh-my-opencode plugin set a display-name default agent." >&2
+  echo "Model mode should use --pure to bypass plugins. If you see this, the fix regressed." >&2
+  rm -f "$TMPFILE"
+  exit 1
+fi
+
+# --- Error classification ---
+ERROR_TYPE=""
+if [[ $EXIT_CODE -eq 124 ]]; then
+  # Exit code 124 = killed by `timeout` command
+  ERROR_TYPE="timeout"
+  echo "[omo-agent] ERROR: opencode killed after ${OMO_TIMEOUT}s timeout (exit 124)" >&2
+elif [[ $EXIT_CODE -ne 0 ]]; then
+  if grep -qi "rate.limit\|429\|quota" "$TMPFILE" 2>/dev/null; then
+    ERROR_TYPE="rate_limited"
+  elif grep -qi "not found\|agent.*not.*found" "$TMPFILE" 2>/dev/null; then
+    ERROR_TYPE="agent_not_found"
+  elif grep -qi "timeout\|timed.out" "$TMPFILE" 2>/dev/null; then
+    ERROR_TYPE="timeout"
+  else
+    ERROR_TYPE="unknown_error"
+  fi
+fi
+
+# --- Strip ANSI codes ---
+sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b\]633;[^\x07]*\x07//g' "$TMPFILE" > "$CLEANFILE"
+
+# --- Try <result> tag extraction first (most reliable) ---
+# Agents instructed via OUTPUT_SUFFIX wrap their answer in <result>...</result>.
+# If found, extract ONLY the content between tags — skip all heuristic filtering.
+if grep -q '<result>' "$CLEANFILE" 2>/dev/null; then
+  sed -n '/<result>/,/<\/result>/p' "$CLEANFILE" | sed '1s/.*<result>//; $s/<\/result>.*//' > "${CLEANFILE}.result"
+  if [[ -s "${CLEANFILE}.result" ]]; then
+    mv "${CLEANFILE}.result" "$CLEANFILE"
+    # Skip to truncation (no further extraction needed)
+    SKIP_EXTRACTION=1
+  else
+    rm -f "${CLEANFILE}.result"
+    SKIP_EXTRACTION=0
+  fi
+else
+  SKIP_EXTRACTION=0
+fi
+
+# --- Fallback: heuristic noise stripping (when no <result> tags) ---
+# Strip known noise patterns, keep everything else.
+# Preserves intermediate prose (findings between tool calls).
+if [[ "$SKIP_EXTRACTION" -eq 0 ]]; then
+
+awk '
+  BEGIN { in_cmd = 0; in_fence = 0 }
+  /^```/ { in_fence = !in_fence; print; next }
+  in_fence { print; next }
+  /^> [a-z_-]+ · / { next }
+  /^⚙ / { next }
+  /^→ / { next }
+  /^(fatal:|failed to run|✗ |Cloning into |Updating |Fast-forward)/ { next }
+  /^(From github|   [a-f0-9].*->)/ { next }
+  /^Error: Streamable/ { in_cmd = 1; next }
+  /^<!DOCTYPE/ { in_cmd = 1; next }
+  /^ [0-9]+ file.* changed,/ { next }
+  /^\$ / { in_cmd = 1; next }
+  in_cmd && /^[[:space:]]*$/ { next }
+  in_cmd && /^[[:space:]]*[{}\[\]"[:digit:]]/ { next }
+  in_cmd && /^(expected |Error:|error:|WARNING|fatal:|Unknown )/ { next }
+  in_cmd { in_cmd = 0 }
+  !in_cmd { print }
+' "$CLEANFILE" > "${CLEANFILE}.stripped"
+
+# Collapse runs of 3+ blank lines to 2
+awk 'NF{b=0} !NF{b++} b<=2' "${CLEANFILE}.stripped" > "${CLEANFILE}.final"
+
+# Safety: if extraction is suspiciously short (<200 chars), we stripped too much.
+RESULT_CHARS=$(wc -c < "${CLEANFILE}.final" 2>/dev/null | tr -d ' ')
+if [[ "${RESULT_CHARS:-0}" -lt 200 ]]; then
+  awk '!/^> [a-z_-]+ · / && !/^⚙ /' "$CLEANFILE" |
+    awk 'NF{b=0} !NF{b++} b<=2' > "${CLEANFILE}.final"
+fi
+
+if [[ -s "${CLEANFILE}.final" ]]; then
+  mv "${CLEANFILE}.final" "$CLEANFILE"
+fi
+rm -f "${CLEANFILE}.stripped" "${CLEANFILE}.final" 2>/dev/null
+
+# --- Extract structured content for agents that use XML tags (explore) ---
+# explore uses <answer> not <result>
+if grep -q '<answer>' "$CLEANFILE" 2>/dev/null; then
+  {
+    sed -n '/<files>/,/<\/files>/p' "$CLEANFILE"
+    echo ""
+    sed -n '/<answer>/,/<\/answer>/p' "$CLEANFILE" | sed 's/<\/?answer>//g'
+  } > "${CLEANFILE}.extracted"
+  if [[ -s "${CLEANFILE}.extracted" ]]; then
+    mv "${CLEANFILE}.extracted" "$CLEANFILE"
+  else
+    rm -f "${CLEANFILE}.extracted"
+  fi
+fi
+
+fi # end SKIP_EXTRACTION guard
+
+# --- Detect delegated-but-never-answered pattern ---
+# If an agent launched sub-agents (call_omo_agent) but never wrote a <result>,
+# the cleaned output is mostly raw grep/read noise, not a real answer.
+# Warn the caller so they know the output is unreliable.
+if [[ "$SKIP_EXTRACTION" -eq 0 ]] && grep -q 'call_omo_agent' "$TMPFILE" 2>/dev/null; then
+  echo "[omo-agent] WARNING: Agent delegated to sub-agent(s) via call_omo_agent but produced no <result> tags. Output below is raw tool noise, not a synthesized answer." >&2
+  {
+    echo "[WARNING: ${AGENT:-model} delegated synthesis to a sub-agent instead of answering directly. The output below is unprocessed tool output — not a final review. Re-run with a shorter/simpler prompt, or use a different agent.]"
+    echo ""
+    cat "$CLEANFILE"
+  } > "${CLEANFILE}.warned"
+  mv "${CLEANFILE}.warned" "$CLEANFILE"
+fi
+
+# --- Truncate if too long (~50k chars ≈ 12.5k tokens) ---
+# Use tail (keep END) not head (keep START) — the actual answer/findings are
+# always at the end, after tool output. head would keep diffs/greps and cut
+# the analysis. tail preserves the analysis and drops early tool noise.
+MAX_CHARS=50000
+FILE_CHARS=$(wc -c < "$CLEANFILE" | tr -d ' ')
+if [[ "$FILE_CHARS" -gt "$MAX_CHARS" ]]; then
+  printf '[omo-agent: truncated first %s of %s chars — showing tail]\n\n' "$((FILE_CHARS - MAX_CHARS))" "$FILE_CHARS" > "${CLEANFILE}.trunc"
+  tail -c "$MAX_CHARS" "$CLEANFILE" >> "${CLEANFILE}.trunc"
+  mv "${CLEANFILE}.trunc" "$CLEANFILE"
+fi
+
+# --- Structured output ---
+STATUS="success"
+[[ $EXIT_CODE -ne 0 ]] && STATUS="failed"
+[[ -n "$ERROR_TYPE" ]] && STATUS="$ERROR_TYPE"
+
+if [[ "$DURATION" -ge 60 ]]; then
+  DURATION_FMT="$((DURATION / 60))m $((DURATION % 60))s"
+else
+  DURATION_FMT="${DURATION}s"
+fi
+
+# Persist raw output for debugging (unique per execution, sorted by timestamp)
+DEBUG_TS=$(date +%Y%m%d-%H%M%S)
+DEBUG_LOG="/tmp/omo-agent-${DEBUG_TS}-${AGENT:-model}.log"
+cp "$TMPFILE" "$DEBUG_LOG" 2>/dev/null
+
+echo "[omo-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+
+# If cleaned output is empty, dump raw tail for diagnostics
+CLEAN_SIZE=$(wc -c < "$CLEANFILE" 2>/dev/null | tr -d ' ')
+if [[ "${CLEAN_SIZE:-0}" -lt 50 ]]; then
+  echo "[omo-agent] WARNING: output empty or near-empty (${CLEAN_SIZE} bytes). Raw tail:" >&2
+  tail -20 "$TMPFILE" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' >&2
+fi
+
+cat "$CLEANFILE"
+
+exit $EXIT_CODE

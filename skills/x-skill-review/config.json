@@ -1,0 +1,7 @@
+{
+  "skills_dirs": [
+    "../",
+    ".claude/skills"
+  ],
+  "capabilities_file": "~/.config/x-skills/capabilities.json"
+}

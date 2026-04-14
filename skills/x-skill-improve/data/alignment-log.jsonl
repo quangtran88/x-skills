@@ -1,0 +1,17 @@
+{"skill":"x-skill-review","sessionId":"cd6fca46","date":"2026-04-02","findings":4,"updateSkill":2,"complianceGap":2,"applied":true}
+{"skill":"x-research","sessionId":"071cfa7e-2339-49bb-8618-399c9a185713","date":"2026-04-02","findings":6,"updateSkill":3,"complianceGap":3,"applied":true}
+{"skill":"x-review","sessionId":"f7870c97","date":"2026-04-02","findings":4,"updateSkill":1,"complianceGap":3,"applied":true}
+{"skill":"x-review","sessionId":"58f1b09d","date":"2026-04-03","findings":7,"updateSkill":1,"complianceGap":6,"applied":true,"appliedCount":1}
+{"skill":"x-research","sessionId":"0aafdca7-e2e0-43c1-8fb0-16a2c84a5fe1","date":"2026-04-03","findings":2,"updateSkill":1,"complianceGap":1,"applied":true}
+{"skill":"x-review","sessionId":"823b7abf","date":"2026-04-03","findings":7,"updateSkill":1,"complianceGap":6,"applied":true}
+{"skill":"superpowers:writing-plans","sessionId":"6d755afe","date":"2026-04-04","findings":6,"updateSkill":2,"complianceGap":4,"applied":false,"note":"UPDATE SKILL findings are advisory only — external dependency (superpowers plugin cache)"}
+{"skill":"x-review","sessionId":"b0620f55","date":"2026-04-06","findings":7,"updateSkill":2,"complianceGap":5,"applied":true}
+{"skill":"x-review","sessionId":"8fb58c55","date":"2026-04-06","findings":7,"updateSkill":2,"complianceGap":5,"applied":true}
+{"skill":"x-review","sessionId":"72e911d0","date":"2026-04-06","findings":6,"updateSkill":2,"complianceGap":4,"applied":true}
+{"skill":"x-do","sessionId":"bb9bbb17","date":"2026-04-06","findings":6,"updateSkill":0,"complianceGap":6,"applied":true}
+{"skill":"x-review","sessionId":"93cf1604-f28e-4a16-ac3e-767a9be0d765","date":"2026-04-08","findings":5,"updateSkill":2,"complianceGap":3,"applied":true}
+{"skill":"x-review","sessionId":"fba1ec04","date":"2026-04-09","findings":5,"updateSkill":4,"complianceGap":1,"applied":true}
+{"skill":"x-review","sessionId":"ea578ff4","date":"2026-04-10","findings":6,"updateSkill":2,"complianceGap":4,"applied":true}
+{"skill":"x-do","sessionId":"08eb6853-9f7f-44e0-b82d-aa860ae172e5","date":"2026-04-10","findings":8,"updateSkill":3,"complianceGap":5,"applied":true}
+{"skill":"x-bugfix","sessionId":"b9f1c9ec","date":"2026-04-10","findings":8,"updateSkill":2,"complianceGap":6,"applied":true}
+{"skill":"x-research","sessionId":"26c9759b","date":"2026-04-11","findings":6,"updateSkill":2,"complianceGap":4,"applied":true,"note":"Type E morph-first principle violated; agents fired before morph. Bash-polled bg agents. Dismissive synthesis claim."}
