@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# x-skills setup — configure omo-agent binding and detect available capabilities
+#
+# Usage:
+#   ./bin/setup              Full setup (install binding + detect deps)
+#   ./bin/setup --check      Check-only mode (no modifications)
+#   ./bin/setup --uninstall  Remove omo-agent binding
+
+# --- Resolve paths ---
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
+OMO_AGENT_SRC="$PLUGIN_DIR/bin/omo-agent"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/x-skills"
+CAPS_FILE="$CONFIG_DIR/capabilities.json"
+LINK_DIR="$HOME/.local/bin"
+LINK_PATH="$LINK_DIR/omo-agent"
+
+# --- Colors ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+ok()   { printf "${GREEN}  %s${NC} %s\n" "✓" "$1"; }
+warn() { printf "${YELLOW}  %s${NC} %s\n" "!" "$1"; }
+fail() { printf "${RED}  %s${NC} %s\n" "✗" "$1"; }
+info() { printf "${BLUE}  %s${NC} %s\n" "→" "$1"; }
+header() { printf "\n${BOLD}%s${NC}\n" "$1"; }
+
+# --- Capability tracking (bash 3.x compatible — no associative arrays) ---
+CAPS_STORE=$(mktemp /tmp/x-skills-caps-XXXXXX)
+trap 'rm -f "$CAPS_STORE"' EXIT
+
+cap_set() { echo "$1=$2" >> "$CAPS_STORE"; }
+cap_get() {
+  local val
+  val=$(grep "^$1=" "$CAPS_STORE" 2>/dev/null | tail -1 | cut -d= -f2-)
+  echo "${val:-false}"
+}
+
+# --- Parse args ---
+MODE="setup"
+case "${1:-}" in
+  --check)     MODE="check" ;;
+  --uninstall) MODE="uninstall" ;;
+  --help|-h)
+    cat <<'EOF'
+x-skills setup — configure omo-agent binding and detect capabilities
+
+Usage:
+  ./bin/setup              Full setup (install binding + detect deps)
+  ./bin/setup --check      Check-only mode (no modifications)
+  ./bin/setup --uninstall  Remove omo-agent binding
+
+What it does:
+  1. Makes bin/omo-agent executable
+  2. Creates a symlink at ~/.local/bin/omo-agent (or updates existing)
+  3. Verifies opencode CLI is installed and reachable
+  4. Detects available MCP servers (perplexity, deepwiki, exa, context7, morph-mcp)
+  5. Detects peer plugins (oh-my-claudecode, superpowers, claude-mem)
+  6. Writes a capability manifest to ~/.config/x-skills/capabilities.json
+  7. Reports which skills are fully operational vs degraded
+
+The omo-agent binding is what enables x-do, x-research, x-review, and x-bugfix
+to dispatch work to non-Claude models (GPT, Gemini, Codex) via OpenCode.
+Without it, those skills fall back to Claude-only routing.
+EOF
+    exit 0
+    ;;
+esac
+
+# --- Uninstall ---
+if [[ "$MODE" == "uninstall" ]]; then
+  header "Uninstalling x-skills omo-agent binding"
+  if [[ -L "$LINK_PATH" ]]; then
+    rm "$LINK_PATH"
+    ok "Removed symlink $LINK_PATH"
+  else
+    info "No symlink found at $LINK_PATH"
+  fi
+  if [[ -f "$CAPS_FILE" ]]; then
+    rm "$CAPS_FILE"
+    ok "Removed capabilities file"
+  fi
+  exit 0
+fi
+
+# ============================================================
+# Dependency detection
+# ============================================================
+
+header "x-skills setup"
+echo "  Plugin root: $PLUGIN_DIR"
+echo ""
+
+# --- 1. omo-agent binary ---
+header "1. omo-agent binding"
+
+if [[ ! -f "$OMO_AGENT_SRC" ]]; then
+  fail "omo-agent not found at $OMO_AGENT_SRC"
+  exit 1
+fi
+
+chmod +x "$OMO_AGENT_SRC"
+[[ -f "$PLUGIN_DIR/skills/x-omo/omo-agent" ]] && chmod +x "$PLUGIN_DIR/skills/x-omo/omo-agent"
+ok "omo-agent is executable"
+
+if [[ "$MODE" == "setup" ]]; then
+  mkdir -p "$LINK_DIR"
+  if [[ -L "$LINK_PATH" ]]; then
+    EXISTING_TARGET="$(readlink "$LINK_PATH")"
+    if [[ "$EXISTING_TARGET" == "$OMO_AGENT_SRC" ]]; then
+      ok "Symlink already correct: $LINK_PATH → $OMO_AGENT_SRC"
+    else
+      ln -sf "$OMO_AGENT_SRC" "$LINK_PATH"
+      ok "Updated symlink: $LINK_PATH → $OMO_AGENT_SRC (was: $EXISTING_TARGET)"
+    fi
+  elif [[ -e "$LINK_PATH" ]]; then
+    warn "$LINK_PATH exists but is not a symlink — skipping (remove manually to fix)"
+  else
+    ln -s "$OMO_AGENT_SRC" "$LINK_PATH"
+    ok "Created symlink: $LINK_PATH → $OMO_AGENT_SRC"
+  fi
+
+  if echo "$PATH" | tr ':' '\n' | grep -qx "$LINK_DIR"; then
+    ok "$LINK_DIR is on PATH"
+  else
+    warn "$LINK_DIR is NOT on PATH"
+    info "Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
+  fi
+else
+  info "[check mode] Would create symlink: $LINK_PATH → $OMO_AGENT_SRC"
+fi
+
+# --- 2. OpenCode CLI ---
+header "2. OpenCode CLI"
+
+if command -v opencode &>/dev/null; then
+  OC_VERSION=$(opencode version 2>/dev/null || opencode --version 2>/dev/null || echo "unknown")
+  ok "opencode found: $OC_VERSION"
+  cap_set opencode true
+
+  if opencode plugin list 2>/dev/null | grep -qi "oh-my-opencode\|opencode-plugin" 2>/dev/null; then
+    ok "oh-my-opencode plugin detected"
+    cap_set omo_plugin true
+  else
+    if opencode run --agent oracle --help 2>/dev/null | grep -qi "oracle" 2>/dev/null; then
+      ok "OpenCode role agents available"
+      cap_set omo_plugin true
+    else
+      warn "oh-my-opencode plugin not detected — role agents (oracle, explore, librarian) may not work"
+      info "Install: see https://github.com/Yeachan-Heo/oh-my-opencode"
+      info "Model routing (--model flag) still works without the plugin"
+      cap_set omo_plugin false
+    fi
+  fi
+
+  MODELS=$(opencode models 2>/dev/null || true)
+  if [[ -n "$MODELS" ]]; then
+    MODEL_COUNT=$(echo "$MODELS" | wc -l | tr -d ' ')
+    ok "$MODEL_COUNT models available"
+    echo "$MODELS" | grep -qi "gpt-5" && ok "  GPT-5.x models available" || warn "  No GPT-5.x models found"
+    echo "$MODELS" | grep -qi "gemini" && ok "  Gemini models available" || warn "  No Gemini models found"
+    echo "$MODELS" | grep -qi "codex\|o3\|o4" && ok "  Reasoning models available" || info "  No reasoning models found (optional)"
+  else
+    warn "Could not list models — check opencode configuration"
+  fi
+else
+  fail "opencode not found"
+  info "Install: https://github.com/opencode-ai/opencode"
+  info "Skills will use Claude-only fallback routing (no multi-model dispatch)"
+  cap_set opencode false
+  cap_set omo_plugin false
+fi
+
+# --- 3. MCP Servers ---
+header "3. MCP Servers (checked via Claude Code settings)"
+
+check_mcp() {
+  local name="$1"
+  local desc="$2"
+  for f in "$HOME/.claude/settings.json" "$HOME/.claude/settings.local.json" "$HOME/.claude/.claude/settings.local.json" ".claude/settings.json" ".claude/settings.local.json"; do
+    if [[ -f "$f" ]] && grep -q "mcp__${name}__\|\"$name\"" "$f" 2>/dev/null; then
+      ok "$name — $desc"
+      cap_set "mcp_$name" true
+      return 0
+    fi
+  done
+  for f in "$HOME/.claude/.mcp.json" ".mcp.json"; do
+    if [[ -f "$f" ]] && grep -q "\"$name\"" "$f" 2>/dev/null; then
+      ok "$name — $desc"
+      cap_set "mcp_$name" true
+      return 0
+    fi
+  done
+  for mcp_file in "$HOME/.claude/plugins/cache"/*/*/*/.mcp.json "$HOME/.claude/plugins/marketplaces"/*/.mcp.json; do
+    if [[ -f "$mcp_file" ]] && grep -q "\"$name\"" "$mcp_file" 2>/dev/null; then
+      ok "$name — $desc (via plugin)"
+      cap_set "mcp_$name" true
+      return 0
+    fi
+  done
+  warn "$name — not detected ($desc)"
+  cap_set "mcp_$name" false
+  return 1
+}
+
+check_mcp "perplexity"  "web search + reasoning" || true
+check_mcp "deepwiki"    "OSS repo documentation" || true
+check_mcp "exa"         "code context + web crawling" || true
+check_mcp "context7"    "library API docs" || true
+check_mcp "morph"       "semantic codebase search + editing" || true
+
+# --- 4. Peer Plugins ---
+header "4. Peer Plugins"
+
+check_plugin() {
+  local name="$1"
+  local desc="$2"
+  local installed_file="$HOME/.claude/plugins/installed_plugins.json"
+  if [[ -f "$installed_file" ]] && grep -q "\"$name" "$installed_file" 2>/dev/null; then
+    ok "$name — $desc"
+    cap_set "plugin_$name" true
+    return 0
+  fi
+  warn "$name — not installed ($desc)"
+  cap_set "plugin_$name" false
+  return 1
+}
+
+check_plugin "oh-my-claudecode" "OMC multi-agent orchestration (executor, code-reviewer, debugger agents)" || true
+check_plugin "superpowers"      "workflow skills (brainstorming, TDD, writing-plans)" || true
+check_plugin "claude-mem"       "cross-session memory + search" || true
+
+# --- 5. External tools (for x-api-pentest) ---
+header "5. Security Tools (optional, for x-api-pentest)"
+
+for tool in schemathesis nuclei sqlmap spectral interactsh-client; do
+  if command -v "$tool" &>/dev/null; then
+    ok "$tool"
+    cap_set "tool_$tool" true
+  else
+    info "$tool — not installed (optional)"
+    cap_set "tool_$tool" false
+  fi
+done
+
+# ============================================================
+# Capability manifest
+# ============================================================
+
+header "6. Writing capability manifest"
+
+if [[ "$MODE" == "setup" ]]; then
+  mkdir -p "$CONFIG_DIR"
+
+  cat > "$CAPS_FILE" <<MANIFEST
+{
+  "version": "1.0.0",
+  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "plugin_dir": "$PLUGIN_DIR",
+  "omo_agent": "$OMO_AGENT_SRC",
+  "capabilities": {
+    "opencode": $(cap_get opencode),
+    "omo_plugin": $(cap_get omo_plugin),
+    "mcp": {
+      "perplexity": $(cap_get mcp_perplexity),
+      "deepwiki": $(cap_get mcp_deepwiki),
+      "exa": $(cap_get mcp_exa),
+      "context7": $(cap_get mcp_context7),
+      "morph": $(cap_get mcp_morph)
+    },
+    "plugins": {
+      "oh_my_claudecode": $(cap_get plugin_oh-my-claudecode),
+      "superpowers": $(cap_get plugin_superpowers),
+      "claude_mem": $(cap_get plugin_claude-mem)
+    },
+    "security_tools": {
+      "schemathesis": $(cap_get tool_schemathesis),
+      "nuclei": $(cap_get tool_nuclei),
+      "sqlmap": $(cap_get tool_sqlmap),
+      "spectral": $(cap_get tool_spectral),
+      "interactsh": $(cap_get tool_interactsh-client)
+    }
+  }
+}
+MANIFEST
+  ok "Written to $CAPS_FILE"
+else
+  info "[check mode] Would write to $CAPS_FILE"
+fi
+
+# ============================================================
+# Skill readiness report
+# ============================================================
+
+header "Skill Readiness"
+
+report_skill() {
+  local name="$1"
+  shift
+  local all_met=true
+  local missing=""
+  for dep in "$@"; do
+    local met=false
+    case "$dep" in
+      opencode)       [[ "$(cap_get opencode)" == "true" ]] && met=true ;;
+      omo_plugin)     [[ "$(cap_get omo_plugin)" == "true" ]] && met=true ;;
+      omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
+      superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
+      claude-mem)     [[ "$(cap_get plugin_claude-mem)" == "true" ]] && met=true ;;
+      morph)          [[ "$(cap_get mcp_morph)" == "true" ]] && met=true ;;
+      research-mcps)  for m in perplexity deepwiki exa context7; do
+                        [[ "$(cap_get "mcp_$m")" == "true" ]] && met=true
+                      done ;;
+      security-tools) for t in schemathesis nuclei sqlmap; do
+                        [[ "$(cap_get "tool_$t")" == "true" ]] && met=true
+                      done ;;
+    esac
+    if [[ "$met" == "false" ]]; then
+      all_met=false
+      missing="${missing:+$missing, }$dep"
+    fi
+  done
+
+  if [[ "$all_met" == "true" ]]; then
+    ok "$name — full capability"
+  else
+    warn "$name — degraded (missing: $missing)"
+  fi
+}
+
+report_skill "x-do"           opencode omo_plugin omc superpowers morph
+report_skill "x-research"     opencode omo_plugin research-mcps morph
+report_skill "x-review"       opencode omo_plugin omc superpowers morph
+report_skill "x-bugfix"       opencode omo_plugin omc morph
+report_skill "x-design"
+report_skill "x-api-pentest"  security-tools
+report_skill "x-omo"          opencode omo_plugin
+report_skill "x-skill-review" claude-mem
+report_skill "x-skill-improve" claude-mem
+report_skill "x-shared"
+
+# ============================================================
+# Summary
+# ============================================================
+
+header "Setup complete"
+
+if [[ "$(cap_get opencode)" == "true" ]]; then
+  echo ""
+  echo "  omo-agent binding: ACTIVE"
+  echo "  Multi-model dispatch: ENABLED"
+  echo ""
+  echo "  Test it:"
+  echo "    omo-agent explore \"what does this project do?\""
+  echo "    omo-agent --model gemini-flash \"summarize this file\" -f README.md"
+else
+  echo ""
+  echo "  omo-agent binding: INSTALLED (opencode not found)"
+  echo "  Multi-model dispatch: DISABLED (Claude-only fallback)"
+  echo ""
+  echo "  To enable multi-model:"
+  echo "    1. Install opencode: https://github.com/opencode-ai/opencode"
+  echo "    2. Re-run: $SCRIPT_DIR/setup"
+fi
+
+echo ""
