@@ -1,6 +1,6 @@
 ---
 name: x-skill-review
-description: Use when creating, editing, or auditing a Claude Code skill — reviews against Anthropic's published best practices and outputs actionable findings with severity ratings
+description: "Use when creating, editing, or auditing a Claude Code skill — reviews against Anthropic's published best practices and outputs actionable findings with severity ratings"
 ---
 
 # x-skill-review — Skill Best Practice Reviewer

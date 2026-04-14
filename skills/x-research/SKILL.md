@@ -1,6 +1,6 @@
 ---
 name: x-research
-description: Use when the user asks to research, investigate, look up, or understand something — auto-routes to OMO/OMC agents (explore, librarian, oracle, metis) with parallel execution and synthesis
+description: "Use when the user asks to research, investigate, look up, or understand something — auto-routes to OMO/OMC agents (explore, librarian, oracle, metis) with parallel execution and synthesis"
 ---
 
 # x-research — Universal Research Command

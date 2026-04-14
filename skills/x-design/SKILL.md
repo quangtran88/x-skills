@@ -1,6 +1,6 @@
 ---
 name: x-design
-description: Use when the user wants to apply a visual design system to a project, references a specific brand's style (Linear-like, Stripe-like, Claude-like), asks for a DESIGN.md, or describes aesthetic intent (warm editorial, dark minimal, stark futuristic) for AI UI generation
+description: "Use when the user wants to apply a visual design system to a project, references a specific brand's style (Linear-like, Stripe-like, Claude-like), asks for a DESIGN.md, or describes aesthetic intent (warm editorial, dark minimal, stark futuristic) for AI UI generation"
 ---
 
 # x-design — Visual Design System Router

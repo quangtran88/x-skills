@@ -1,6 +1,6 @@
 ---
 name: x-bugfix
-description: Use when the user reports a bug, error, test failure, or unexpected behavior — routes through investigation, hypothesis testing, and verified fix with structured evidence collection
+description: "Use when the user reports a bug, error, test failure, or unexpected behavior — routes through investigation, hypothesis testing, and verified fix with structured evidence collection"
 ---
 
 # x-bugfix — Universal Bugfix Command

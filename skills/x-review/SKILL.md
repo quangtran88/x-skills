@@ -1,6 +1,6 @@
 ---
 name: x-review
-description: Use when the user asks to review code, a plan, a PR, or a directory — auto-detects target and runs cross-model review by default (Claude + GPT perspectives)
+description: "Use when the user asks to review code, a plan, a PR, or a directory — auto-detects target and runs cross-model review by default (Claude + GPT perspectives)"
 role: reviewer
 ---
 

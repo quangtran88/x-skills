@@ -1,6 +1,6 @@
 ---
 name: x-skill-improve
-description: Use when the user wants to evaluate x-skill alignment and improve a skill based on real session usage — searches Claude Code session history automatically
+description: "Use when the user wants to evaluate x-skill alignment and improve a skill based on real session usage — searches Claude Code session history automatically"
 ---
 
 # x-skill-improve — Session-Based Skill Alignment Analyzer

@@ -1,6 +1,6 @@
 ---
 name: x-omo
-description: OpenCode multi-model agents — route to non-Claude models via opencode CLI
+description: "OpenCode multi-model agents — route to non-Claude models via opencode CLI"
 triggers:
   - "omo"
   - "opencode agent"
