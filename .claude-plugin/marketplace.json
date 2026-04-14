@@ -1,0 +1,33 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "x-skills-marketplace",
+  "description": "Intelligent skill routers for Claude Code — execution, research, review, debugging, design, and security testing",
+  "owner": {
+    "name": "Randy Tran"
+  },
+  "plugins": [
+    {
+      "name": "x-skills",
+      "description": "10 intelligent skill routers with optional multi-model orchestration via OpenCode. Skills: x-do, x-research, x-review, x-bugfix, x-design, x-api-pentest, x-omo, x-skill-review, x-skill-improve.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Randy Tran"
+      },
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/quangtran88/x-skills",
+      "tags": [
+        "skills",
+        "router",
+        "multi-model",
+        "research",
+        "debugging",
+        "code-review",
+        "design-system",
+        "api-pentest",
+        "orchestration"
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}
