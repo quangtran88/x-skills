@@ -154,19 +154,22 @@ if command -v opencode &>/dev/null; then
   ok "opencode found: $OC_VERSION"
   cap_set opencode true
 
-  if opencode plugin list 2>/dev/null | grep -qi "oh-my-opencode\|opencode-plugin" 2>/dev/null; then
-    ok "oh-my-opencode plugin detected"
+  # Detect oh-my-opencode plugin:
+  # 1. Check if it's in opencode's node_modules
+  # 2. Check if oracle agent exists (added by oh-my-opencode)
+  OC_HOME="${OPENCODE_HOME:-$HOME/.opencode}"
+  if [[ -d "$OC_HOME/node_modules/oh-my-opencode" ]]; then
+    OMO_VER=$(node -p "require('$OC_HOME/node_modules/oh-my-opencode/package.json').version" 2>/dev/null || echo "")
+    ok "oh-my-opencode plugin detected${OMO_VER:+ (v$OMO_VER)}"
+    cap_set omo_plugin true
+  elif opencode agent list 2>/dev/null | grep -q "^oracle"; then
+    ok "oh-my-opencode plugin detected (oracle agent available)"
     cap_set omo_plugin true
   else
-    if opencode run --agent oracle --help 2>/dev/null | grep -qi "oracle" 2>/dev/null; then
-      ok "OpenCode role agents available"
-      cap_set omo_plugin true
-    else
-      warn "oh-my-opencode plugin not detected"
-      info "Model routing (--model flag) still works without the plugin"
-      cap_set omo_plugin false
-      missing_add "cli" "oh-my-opencode" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin install oh-my-opencode"
-    fi
+    warn "oh-my-opencode plugin not detected"
+    info "Model routing (--model flag) still works without the plugin"
+    cap_set omo_plugin false
+    missing_add "cli" "oh-my-opencode" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin oh-my-opencode"
   fi
 
   MODELS=$(opencode models 2>/dev/null || true)
