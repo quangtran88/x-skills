@@ -4,9 +4,10 @@ set -euo pipefail
 # x-skills setup — configure omo-agent binding and detect available capabilities
 #
 # Usage:
-#   ./bin/setup              Full setup (install binding + detect deps)
-#   ./bin/setup --check      Check-only mode (no modifications)
-#   ./bin/setup --uninstall  Remove omo-agent binding
+#   ./bin/setup                Full setup (install binding + detect deps)
+#   ./bin/setup --check        Check-only mode (no modifications)
+#   ./bin/setup --fix          Setup + install missing CLI dependencies
+#   ./bin/setup --uninstall    Remove omo-agent binding
 
 # --- Resolve paths ---
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -31,9 +32,10 @@ fail() { printf "${RED}  %s${NC} %s\n" "✗" "$1"; }
 info() { printf "${BLUE}  %s${NC} %s\n" "→" "$1"; }
 header() { printf "\n${BOLD}%s${NC}\n" "$1"; }
 
-# --- Capability tracking (bash 3.x compatible — no associative arrays) ---
+# --- Capability tracking (bash 3.x compatible) ---
 CAPS_STORE=$(mktemp /tmp/x-skills-caps-XXXXXX)
-trap 'rm -f "$CAPS_STORE"' EXIT
+MISSING_STORE=$(mktemp /tmp/x-skills-missing-XXXXXX)
+trap 'rm -f "$CAPS_STORE" "$MISSING_STORE"' EXIT
 
 cap_set() { echo "$1=$2" >> "$CAPS_STORE"; }
 cap_get() {
@@ -41,11 +43,14 @@ cap_get() {
   val=$(grep "^$1=" "$CAPS_STORE" 2>/dev/null | tail -1 | cut -d= -f2-)
   echo "${val:-false}"
 }
+# Track missing deps: type|name|description|install_command
+missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
 
 # --- Parse args ---
 MODE="setup"
 case "${1:-}" in
   --check)     MODE="check" ;;
+  --fix)       MODE="fix" ;;
   --uninstall) MODE="uninstall" ;;
   --help|-h)
     cat <<'EOF'
@@ -54,6 +59,7 @@ x-skills setup — configure omo-agent binding and detect capabilities
 Usage:
   ./bin/setup              Full setup (install binding + detect deps)
   ./bin/setup --check      Check-only mode (no modifications)
+  ./bin/setup --fix        Setup + offer to install missing CLI dependencies
   ./bin/setup --uninstall  Remove omo-agent binding
 
 What it does:
@@ -64,6 +70,10 @@ What it does:
   5. Detects peer plugins (oh-my-claudecode, superpowers, claude-mem)
   6. Writes a capability manifest to ~/.config/x-skills/capabilities.json
   7. Reports which skills are fully operational vs degraded
+
+With --fix:
+  8. Offers to install missing CLI tools (opencode, security tools)
+  9. Outputs plugin install commands for missing Claude Code plugins
 
 The omo-agent binding is what enables x-do, x-research, x-review, and x-bugfix
 to dispatch work to non-Claude models (GPT, Gemini, Codex) via OpenCode.
@@ -109,7 +119,7 @@ chmod +x "$OMO_AGENT_SRC"
 [[ -f "$PLUGIN_DIR/skills/x-omo/omo-agent" ]] && chmod +x "$PLUGIN_DIR/skills/x-omo/omo-agent"
 ok "omo-agent is executable"
 
-if [[ "$MODE" == "setup" ]]; then
+if [[ "$MODE" != "check" ]]; then
   mkdir -p "$LINK_DIR"
   if [[ -L "$LINK_PATH" ]]; then
     EXISTING_TARGET="$(readlink "$LINK_PATH")"
@@ -152,10 +162,10 @@ if command -v opencode &>/dev/null; then
       ok "OpenCode role agents available"
       cap_set omo_plugin true
     else
-      warn "oh-my-opencode plugin not detected — role agents (oracle, explore, librarian) may not work"
-      info "Install: see https://github.com/Yeachan-Heo/oh-my-opencode"
+      warn "oh-my-opencode plugin not detected"
       info "Model routing (--model flag) still works without the plugin"
       cap_set omo_plugin false
+      missing_add "cli" "oh-my-opencode" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin install oh-my-opencode"
     fi
   fi
 
@@ -171,33 +181,35 @@ if command -v opencode &>/dev/null; then
   fi
 else
   fail "opencode not found"
-  info "Install: https://github.com/opencode-ai/opencode"
-  info "Skills will use Claude-only fallback routing (no multi-model dispatch)"
   cap_set opencode false
   cap_set omo_plugin false
+  missing_add "cli" "opencode" "Multi-model dispatch (GPT, Gemini, Codex)" "curl -fsSL https://opencode.ai/install | bash"
 fi
 
 # --- 3. MCP Servers ---
 header "3. MCP Servers (checked via Claude Code settings)"
 
+# Resolve CLAUDE_CONFIG_DIR for MCP detection
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
 check_mcp() {
   local name="$1"
   local desc="$2"
-  for f in "$HOME/.claude/settings.json" "$HOME/.claude/settings.local.json" "$HOME/.claude/.claude/settings.local.json" ".claude/settings.json" ".claude/settings.local.json"; do
+  for f in "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/.claude/settings.local.json" ".claude/settings.json" ".claude/settings.local.json"; do
     if [[ -f "$f" ]] && grep -q "mcp__${name}__\|\"$name\"" "$f" 2>/dev/null; then
       ok "$name — $desc"
       cap_set "mcp_$name" true
       return 0
     fi
   done
-  for f in "$HOME/.claude/.mcp.json" ".mcp.json"; do
+  for f in "$CLAUDE_DIR/.mcp.json" ".mcp.json"; do
     if [[ -f "$f" ]] && grep -q "\"$name\"" "$f" 2>/dev/null; then
       ok "$name — $desc"
       cap_set "mcp_$name" true
       return 0
     fi
   done
-  for mcp_file in "$HOME/.claude/plugins/cache"/*/*/*/.mcp.json "$HOME/.claude/plugins/marketplaces"/*/.mcp.json; do
+  for mcp_file in "$CLAUDE_DIR/plugins/cache"/*/*/*/.mcp.json "$CLAUDE_DIR/plugins/marketplaces"/*/.mcp.json; do
     if [[ -f "$mcp_file" ]] && grep -q "\"$name\"" "$mcp_file" 2>/dev/null; then
       ok "$name — $desc (via plugin)"
       cap_set "mcp_$name" true
@@ -221,7 +233,8 @@ header "4. Peer Plugins"
 check_plugin() {
   local name="$1"
   local desc="$2"
-  local installed_file="$HOME/.claude/plugins/installed_plugins.json"
+  local install_cmd="$3"
+  local installed_file="$CLAUDE_DIR/plugins/installed_plugins.json"
   if [[ -f "$installed_file" ]] && grep -q "\"$name" "$installed_file" 2>/dev/null; then
     ok "$name — $desc"
     cap_set "plugin_$name" true
@@ -229,25 +242,38 @@ check_plugin() {
   fi
   warn "$name — not installed ($desc)"
   cap_set "plugin_$name" false
+  missing_add "plugin" "$name" "$desc" "$install_cmd"
   return 1
 }
 
-check_plugin "oh-my-claudecode" "OMC multi-agent orchestration (executor, code-reviewer, debugger agents)" || true
-check_plugin "superpowers"      "workflow skills (brainstorming, TDD, writing-plans)" || true
-check_plugin "claude-mem"       "cross-session memory + search" || true
+check_plugin "oh-my-claudecode" "multi-agent orchestration (executor, code-reviewer, debugger)" \
+  "/plugin marketplace add Yeachan-Heo/oh-my-claudecode && /plugin install oh-my-claudecode@omc" || true
+check_plugin "superpowers" "workflow skills (brainstorming, TDD, writing-plans)" \
+  "/plugin marketplace add obra/superpowers-marketplace && /plugin install superpowers@superpowers-marketplace" || true
+check_plugin "claude-mem" "cross-session memory + search" \
+  "/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem@thedotmack" || true
 
 # --- 5. External tools (for x-api-pentest) ---
 header "5. Security Tools (optional, for x-api-pentest)"
 
-for tool in schemathesis nuclei sqlmap spectral interactsh-client; do
-  if command -v "$tool" &>/dev/null; then
-    ok "$tool"
-    cap_set "tool_$tool" true
+check_tool() {
+  local name="$1"
+  local install_cmd="$2"
+  if command -v "$name" &>/dev/null; then
+    ok "$name"
+    cap_set "tool_$name" true
   else
-    info "$tool — not installed (optional)"
-    cap_set "tool_$tool" false
+    info "$name — not installed (optional)"
+    cap_set "tool_$name" false
+    missing_add "tool" "$name" "Security testing tool" "$install_cmd"
   fi
-done
+}
+
+check_tool "schemathesis"    "pip install schemathesis"
+check_tool "nuclei"          "brew install nuclei || go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
+check_tool "sqlmap"          "pip install sqlmap"
+check_tool "spectral"        "npm install -g @stoplight/spectral-cli"
+check_tool "interactsh-client" "go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
 
 # ============================================================
 # Capability manifest
@@ -255,7 +281,7 @@ done
 
 header "6. Writing capability manifest"
 
-if [[ "$MODE" == "setup" ]]; then
+if [[ "$MODE" != "check" ]]; then
   mkdir -p "$CONFIG_DIR"
 
   cat > "$CAPS_FILE" <<MANIFEST
@@ -346,6 +372,107 @@ report_skill "x-skill-improve" claude-mem
 report_skill "x-shared"
 
 # ============================================================
+# Missing dependencies — offer to install
+# ============================================================
+
+MISSING_COUNT=$(wc -l < "$MISSING_STORE" 2>/dev/null | tr -d ' ')
+
+if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
+  header "Missing Dependencies"
+
+  # Separate by type
+  CLI_MISSING=$(grep "^cli|" "$MISSING_STORE" 2>/dev/null || true)
+  PLUGIN_MISSING=$(grep "^plugin|" "$MISSING_STORE" 2>/dev/null || true)
+  TOOL_MISSING=$(grep "^tool|" "$MISSING_STORE" 2>/dev/null || true)
+
+  if [[ -n "$CLI_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}CLI tools:${NC}\n"
+    echo "$CLI_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  if [[ -n "$PLUGIN_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}Claude Code plugins (run inside Claude Code):${NC}\n"
+    echo "$PLUGIN_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  if [[ -n "$TOOL_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}Security tools (optional):${NC}\n"
+    echo "$TOOL_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  # --fix mode: install CLI tools interactively
+  if [[ "$MODE" == "fix" ]]; then
+    echo ""
+
+    # Install CLI tools
+    if [[ -n "$CLI_MISSING" ]]; then
+      header "Installing CLI tools"
+      echo "$CLI_MISSING" | while IFS='|' read -r type name desc cmd; do
+        printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
+        printf "  Command: %s\n" "$cmd"
+        printf "  [y/N] "
+        read -r answer </dev/tty 2>/dev/null || answer="n"
+        if [[ "$answer" =~ ^[Yy] ]]; then
+          info "Running: $cmd"
+          if eval "$cmd"; then
+            ok "$name installed"
+          else
+            fail "$name installation failed"
+          fi
+        else
+          info "Skipped $name"
+        fi
+      done
+    fi
+
+    # Install security tools
+    if [[ -n "$TOOL_MISSING" ]]; then
+      printf "\n  Install missing security tools? [y/N] "
+      read -r answer </dev/tty 2>/dev/null || answer="n"
+      if [[ "$answer" =~ ^[Yy] ]]; then
+        header "Installing security tools"
+        echo "$TOOL_MISSING" | while IFS='|' read -r type name desc cmd; do
+          printf "  Installing ${BOLD}%s${NC}...\n" "$name"
+          if eval "$cmd" 2>/dev/null; then
+            ok "$name installed"
+          else
+            fail "$name installation failed — try manually: $cmd"
+          fi
+        done
+      else
+        info "Skipped security tools"
+      fi
+    fi
+
+    # Claude Code plugins can't be installed via shell — output commands
+    if [[ -n "$PLUGIN_MISSING" ]]; then
+      echo ""
+      printf "  ${BOLD}Claude Code plugins must be installed inside a Claude Code session.${NC}\n"
+      printf "  Copy and run these commands:\n\n"
+      echo "$PLUGIN_MISSING" | while IFS='|' read -r type name desc cmd; do
+        # Split on && to show each step
+        echo "$cmd" | tr '&' '\n' | sed 's/^ *//' | grep -v '^$' | while read -r subcmd; do
+          printf "    %s\n" "$subcmd"
+        done
+      done
+      echo ""
+    fi
+  fi
+fi
+
+# ============================================================
 # Summary
 # ============================================================
 
@@ -364,9 +491,13 @@ else
   echo "  omo-agent binding: INSTALLED (opencode not found)"
   echo "  Multi-model dispatch: DISABLED (Claude-only fallback)"
   echo ""
-  echo "  To enable multi-model:"
-  echo "    1. Install opencode: https://github.com/opencode-ai/opencode"
-  echo "    2. Re-run: $SCRIPT_DIR/setup"
+  echo "  To enable: ./bin/setup --fix"
+fi
+
+if [[ "${MISSING_COUNT:-0}" -gt 0 && "$MODE" != "fix" ]]; then
+  echo ""
+  echo "  ${MISSING_COUNT} missing dependencies found."
+  echo "  Run with --fix to install: $SCRIPT_DIR/setup --fix"
 fi
 
 echo ""
