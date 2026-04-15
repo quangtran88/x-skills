@@ -1,6 +1,6 @@
 # Prompt Blocks for OMO Agents
 
-Composable XML-tagged blocks for structuring prompts to OMO agents (oracle, hephaestus, etc.) and `--model` routing. Select blocks based on the task type. Wrap each in the XML tag shown in its heading.
+Composable XML-tagged blocks for structuring prompts to OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) and `--model` routing (e.g. `--model gpt`, `--model codex`). Select blocks based on the task type. Wrap each in the XML tag shown in its heading.
 
 ## When to Use
 
@@ -121,7 +121,7 @@ Prefer primary sources.
 
 ### `<action_safety>`
 
-Use for write-capable tasks (hephaestus, atlas).
+Use for write-capable tasks (`--model codex`, which replaces the UNAVAILABLE `hephaestus`/`atlas` role agents).
 
 ```xml
 <action_safety>

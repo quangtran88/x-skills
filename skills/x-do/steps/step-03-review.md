@@ -27,10 +27,10 @@ Review the plan for blockers before committing to execution.
 Launch all 3 reviewers in **ONE message** (ABS = Agent, Bash, Skill):
 
 1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `omo-agent momus "<plan-path>"`, `run_in_background: true`, `timeout: 600000` — GPT blocker-finder (OKAY/REJECT)
+2. **Bash tool:** `~/.claude/skills/x-omo/omo-agent --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT). *Note: this replaces the former `momus` role agent, which is UNAVAILABLE due to the oh-my-opencode plugin compat bug — see `~/.claude/skills/x-omo/gotchas.md`.*
 3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
 
-**Reduced review (1 reviewer: momus only):** Plans generated from comprehensive x-research (Type A comparison with 10+ sources).
+**Reduced review (1 reviewer: `--model gpt` blocker-finder only):** Plans generated from comprehensive x-research (Type A comparison with 10+ sources).
 
 4. **Collect ALL results** before proceeding.
 

@@ -2,6 +2,8 @@
 
 For the full agent catalog, cost tiers, and parallel patterns, see the [shared routing table](../../x-shared/omo-routing.md).
 
+> ⚠ **DO NOT DISPATCH to `hephaestus`, `atlas`, `prometheus`, `metis`, `momus`.** These 5 role agents are UNAVAILABLE (oh-my-opencode plugin compat bug). Use direct model routing instead — see the x-do-specific routing table below. Full writeup: `~/.claude/skills/x-omo/gotchas.md`.
+
 ## OMO Tool Access (Verified via `opencode mcp list`)
 
 OMO agents have these tools:
@@ -22,10 +24,10 @@ OMO agents have these tools:
 
 ## x-do-Specific Routing
 
-| Situation | Agent | Why |
+| Situation | Route | Why |
 |---|---|---|
-| Requirements are ambiguous or open-ended | `metis` | Intent classification before planning |
-| Need structured plan with tasks + deps | `prometheus` | After requirements are clear |
-| Review plan for blockers before execution | `momus` | Max 3 issues, OKAY/REJECT verdict |
-| 1-2 standalone complex implementation tasks | `hephaestus` | Autonomous deep worker, explores before acting |
+| Requirements are ambiguous or open-ended | `oracle` (or `superpowers:brainstorming`) | Strategic pre-plan consult on GPT-5.4 (replaces UNAVAILABLE `metis`) |
+| Need structured plan with tasks + deps | `--model gpt` with a plan-author prompt | GPT-5.4 raw for plan authoring (replaces UNAVAILABLE `prometheus`) |
+| Review plan for blockers before execution | `--model gpt` with a blocker-finder prompt | Max 3 issues, OKAY/REJECT verdict (replaces UNAVAILABLE `momus`) |
+| 1-2 standalone complex implementation tasks | `--model codex` | GPT-5.3 Codex for autonomous deep work (replaces UNAVAILABLE `hephaestus`) |
 | Fresh perspective after stalled debugging | `oracle` | Read-only strategic advice |

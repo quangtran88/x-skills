@@ -1,87 +1,19 @@
-# Prometheus — Strategic Planner
+# prometheus — UNAVAILABLE
 
-## Identity
+> ⚠ **DO NOT DISPATCH to `prometheus`.** This agent is currently UNAVAILABLE due to a known opencode + oh-my-opencode plugin compat bug. Any `omo-agent prometheus "..."` call will hard-fail fast with an error.
 
-Named after the Titan who gave fire to humanity. Prometheus is the strategic planner that creates detailed, executable work plans. It takes analyzed requirements (from Metis or direct input) and produces structured plans with tasks, dependencies, and verification criteria.
+## Replacement
 
-## Quick Reference
-
-| Field | Value |
-|---|---|
-| Short name | `prometheus` |
-| OpenCode display name | `Prometheus (Plan Builder)` |
-| Default model | `openai/gpt-5.4` |
-| Variant | `max` |
-| Mode | Planner (replaces OpenCode's default `plan` agent) |
-| Cost tier | EXPENSIVE |
-
-## When to Use
-
-- Creating work plans for multi-step features
-- After Metis analysis, to produce executable plan
-- When tasks need to be decomposed with dependencies
-- Before Atlas execution — Prometheus creates, Atlas executes
-
-## When NOT to Use
-
-- Single-step tasks that don't need a plan
-- Plan review (use `momus`)
-- Plan execution (use `atlas`)
-- Quick fixes
-
-## Prompt Template
+Use **`omo-agent --model gpt "<plan-author prompt>"`** for structured plan authoring. You're routing directly to GPT-5.4 — supply the plan-author framing (context, requirements, constraints, output structure with tasks + dependencies) in the prompt.
 
 ```bash
-omo-agent prometheus "Create an implementation plan for: [FEATURE DESCRIPTION]. Context: [codebase context, existing patterns, constraints]. Requirements: [specific requirements]. The plan will be executed by Atlas with category-based delegation."
+~/.claude/skills/x-omo/omo-agent --model gpt "Create an implementation plan for: <feature description>. Context: <codebase context, existing patterns, constraints>. Requirements: <specific requirements>. Output a task DAG with: task IDs, descriptions, dependencies, and verification steps for each task."
 ```
 
-## Example Prompt
+## Historical role
 
-```bash
-omo-agent prometheus "Create an implementation plan for adding real-time notifications to the dashboard. Context: Express API + React frontend, PostgreSQL, no existing notification system. Requirements: 1) Server-sent events for real-time delivery 2) Notification preferences per user 3) Read/unread tracking 4) Bell icon with unread count in header. Constraints: No WebSocket — use SSE. Must work with existing auth middleware."
-```
+`prometheus` was the OMO strategic-planner role agent: authored structured plans with task DAGs and dependencies, typically consumed by `atlas` for execution. That charter is now handled by `--model gpt` with an explicit plan-author prompt.
 
-## Output Format
+## Re-check
 
-Prometheus produces structured plans saved to `.sisyphus/plans/`:
-
-```markdown
-# Plan: [Feature Name]
-
-## Overview
-[1-2 sentence summary]
-
-## TODOs
-- [ ] Task 1: [specific deliverable]
-  - Acceptance: [executable verification]
-  - Files: [exact paths]
-  - Dependencies: none
-- [ ] Task 2: [specific deliverable]
-  - Acceptance: [executable verification]
-  - Dependencies: Task 1
-...
-
-## Final Verification Wave
-- [ ] F1: Code review
-- [ ] F2: Build verification
-- [ ] F3: Test coverage
-- [ ] F4: Integration test
-```
-
-## Relationship in the Pipeline
-
-```
-User Request → Metis (analyze) → Prometheus (plan) → Momus (review) → Atlas (execute)
-```
-
-- **Receives from Metis**: Intent classification, directives, risk analysis
-- **Reviewed by Momus**: Plan is checked for blocking issues before execution
-- **Executed by Atlas**: Atlas reads the plan and orchestrates task completion
-
-## Key Principles
-
-- Every task must have executable acceptance criteria (commands, not human actions)
-- Tasks should be atomic — one concern per task
-- Dependencies must be explicit
-- "Must NOT Have" sections prevent scope creep
-- QA scenarios must be specific (tool + steps + expected result)
+Re-probe with `cd /tmp && timeout 30 opencode run --agent prometheus "ping"` after any `opencode upgrade` or oh-my-opencode version bump. See `~/.claude/skills/x-omo/gotchas.md` for the full writeup.

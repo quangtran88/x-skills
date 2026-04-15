@@ -33,7 +33,7 @@ Analyzes media files (PDFs, images, diagrams) that require interpretation beyond
 ## Prompt Template
 
 ```bash
-omo-agent multimodal-looker --file /path/to/file.pdf "Extract the API endpoint specifications from this document. Focus on: URL patterns, HTTP methods, request/response schemas, and authentication requirements."
+~/.claude/skills/x-omo/omo-agent multimodal-looker --file /path/to/file.pdf "Extract the API endpoint specifications from this document. Focus on: URL patterns, HTTP methods, request/response schemas, and authentication requirements."
 ```
 
 **Key:** Always attach the file via `--file` flag and describe what to extract in the prompt.
@@ -42,17 +42,17 @@ omo-agent multimodal-looker --file /path/to/file.pdf "Extract the API endpoint s
 
 ### PDF Data Extraction
 ```bash
-omo-agent multimodal-looker --file docs/api-spec.pdf "Extract all REST API endpoints from this specification. Return as a markdown table with columns: Method, Path, Description, Auth Required."
+~/.claude/skills/x-omo/omo-agent multimodal-looker --file docs/api-spec.pdf "Extract all REST API endpoints from this specification. Return as a markdown table with columns: Method, Path, Description, Auth Required."
 ```
 
 ### UI Mockup Analysis
 ```bash
-omo-agent multimodal-looker --file designs/dashboard-v2.png "Describe this dashboard mockup in detail. List all UI components visible, their layout (grid positions), data they display, and any interactive elements (buttons, dropdowns, etc.). I need this to implement the frontend."
+~/.claude/skills/x-omo/omo-agent multimodal-looker --file designs/dashboard-v2.png "Describe this dashboard mockup in detail. List all UI components visible, their layout (grid positions), data they display, and any interactive elements (buttons, dropdowns, etc.). I need this to implement the frontend."
 ```
 
 ### Architecture Diagram
 ```bash
-omo-agent multimodal-looker --file docs/system-architecture.png "Describe this architecture diagram. List all services/components, their connections, data flow direction, and any labeled protocols or technologies. Return as structured markdown."
+~/.claude/skills/x-omo/omo-agent multimodal-looker --file docs/system-architecture.png "Describe this architecture diagram. List all services/components, their connections, data flow direction, and any labeled protocols or technologies. Return as structured markdown."
 ```
 
 ## Output Format

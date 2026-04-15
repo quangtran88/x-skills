@@ -4,9 +4,9 @@ Known failure patterns specific to x-research. For shared OMO patterns, see `../
 
 - **librarian sometimes returns tutorial content despite "skip tutorials" instruction.** If the output is too introductory, re-prompt with "production patterns only, assume expert audience."
 - **oracle is expensive and slow (1-5 min).** Don't use it for questions that explore or librarian can answer. Reserve for genuine architecture trade-offs.
-- **metis can over-scope requirements.** It tends to surface every possible edge case. Filter findings by actual project constraints before passing to prometheus.
+- **`oracle` pre-planning consults can over-scope requirements.** `oracle` tends to surface every possible edge case. Filter findings by actual project constraints before passing to the plan-author step (`--model gpt`, which replaces the UNAVAILABLE `prometheus` role agent). *(This tip formerly applied to the `metis` role agent, now UNAVAILABLE — `oracle` inherits the role.)*
 - **multimodal-looker needs specific prompts.** "Analyze this image" returns vague descriptions. Ask for specific things: "Extract the API endpoint URLs from this diagram."
-- **Check session context before re-running expensive queries.** If a similar question was researched earlier in this session, reference the prior findings instead of burning another oracle/metis call.
+- **Check session context before re-running expensive queries.** If a similar question was researched earlier in this session, reference the prior findings instead of burning another `oracle` / `--model gpt` call.
 - **Bootstrap must read the FULL OMO SKILL.md.** Partial reads (e.g., lines 1-30) miss the agent catalog, invocation patterns, and gotchas needed for correct routing. Always read the complete file.
 - **Local research repos don't need agent dispatch.** When the target is a local research repo and is small (<50 files), direct file reads are faster and more targeted than `explore`. This is a valid Type A deviation — not a compliance gap.
 - **OMO `explore` (Bash) vs OMC `Explore` (Agent tool) are different systems.** For single-repo research, x-research uses OMO agents invoked via Bash (`omo-agent explore "query"`). Do NOT dispatch via Agent tool with `subagent_type=Explore` for single-repo cases — that's the OMC agent, which uses a different model and prompt structure. Exceptions:

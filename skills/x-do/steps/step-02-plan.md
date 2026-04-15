@@ -23,7 +23,7 @@ Choose the planning tool based on preference and complexity:
 | Signal | Route | Why |
 |--------|-------|-----|
 | Implementation-focused (build features, write code) | `superpowers:writing-plans` | TDD-oriented, bite-sized tasks, saves to docs/ |
-| Complex dependency graph (ordering matters, integration points) | `prometheus` via Bash | Task DAG with dependencies, ordering constraints |
+| Complex dependency graph (ordering matters, integration points) | `--model gpt` with plan-author prompt (replaces UNAVAILABLE `prometheus`) via Bash | Task DAG with dependencies, ordering constraints |
 | Simple plan (2-3 tasks) | Write inline | No tool needed — just list the tasks |
 
 ## Execution
@@ -33,11 +33,11 @@ Choose the planning tool based on preference and complexity:
 2. Plan is saved to `docs/plan-YYYY-MM-DD-<feature>.md`
 
 ### Option B: Prometheus Plan
-1. Feed requirements summary to prometheus:
+1. Feed requirements summary to `--model gpt` (replaces UNAVAILABLE `prometheus`):
    ```
    Create a structured implementation plan for: {{requirements summary}}.
    Codebase context: {{explore findings}}.
-   Metis directives: {{metis findings}}.
+   Pre-planning directives: {{oracle findings}} (oracle replaces UNAVAILABLE `metis`).
    ```
 2. Capture the plan output
 

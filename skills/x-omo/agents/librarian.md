@@ -59,17 +59,17 @@ Librarian classifies every request before acting. You can help by prefixing with
 
 ### API Documentation (Type A)
 ```bash
-omo-agent librarian "[TYPE A]: [CONTEXT]: I'm implementing real-time notifications using Server-Sent Events in our Express API. [GOAL]: Understand the correct SSE implementation pattern with proper connection handling. [DOWNSTREAM]: I'll implement the SSE endpoint in src/api/notifications.ts. [REQUEST]: Find official MDN/Express docs on SSE, proper headers, connection lifecycle, and error recovery. Focus on production patterns, not hello-world examples. [OUTPUT FORMAT]: Structured markdown with ## headings, code examples, and MDN/Express doc links."
+~/.claude/skills/x-omo/omo-agent librarian "[TYPE A]: [CONTEXT]: I'm implementing real-time notifications using Server-Sent Events in our Express API. [GOAL]: Understand the correct SSE implementation pattern with proper connection handling. [DOWNSTREAM]: I'll implement the SSE endpoint in src/api/notifications.ts. [REQUEST]: Find official MDN/Express docs on SSE, proper headers, connection lifecycle, and error recovery. Focus on production patterns, not hello-world examples. [OUTPUT FORMAT]: Structured markdown with ## headings, code examples, and MDN/Express doc links."
 ```
 
 ### Source Code Investigation (Type B)
 ```bash
-omo-agent librarian "[TYPE B]: [CONTEXT]: I'm debugging why zustand's persist middleware loses state on page refresh in our Next.js app. [GOAL]: Understand how zustand persist actually serializes/deserializes and when hydration happens. [DOWNSTREAM]: I'll fix our persist config based on the actual implementation. [REQUEST]: Clone zustand repo, find the persist middleware source, trace the hydration flow. Show me the exact code with GitHub permalinks. [OUTPUT FORMAT]: Markdown with ## headings, code snippets from source with permalinks."
+~/.claude/skills/x-omo/omo-agent librarian "[TYPE B]: [CONTEXT]: I'm debugging why zustand's persist middleware loses state on page refresh in our Next.js app. [GOAL]: Understand how zustand persist actually serializes/deserializes and when hydration happens. [DOWNSTREAM]: I'll fix our persist config based on the actual implementation. [REQUEST]: Clone zustand repo, find the persist middleware source, trace the hydration flow. Show me the exact code with GitHub permalinks. [OUTPUT FORMAT]: Markdown with ## headings, code snippets from source with permalinks."
 ```
 
 ### Comprehensive Research (Type D)
 ```bash
-omo-agent librarian "[TYPE D]: [CONTEXT]: I need to understand what obra/superpowers is — purpose, architecture, features. [GOAL]: Decide whether to adopt it alongside other Claude Code plugins. [DOWNSTREAM]: Inform integration strategy. [REQUEST]: Find: README, feature list, architecture, plugin mechanism, recent releases. Focus on the GitHub repo. Skip shallow mentions. [OUTPUT FORMAT]: Structured markdown report with ## headings, tables for features, and evidence permalinks. No raw tool output."
+~/.claude/skills/x-omo/omo-agent librarian "[TYPE D]: [CONTEXT]: I need to understand what obra/superpowers is — purpose, architecture, features. [GOAL]: Decide whether to adopt it alongside other Claude Code plugins. [DOWNSTREAM]: Inform integration strategy. [REQUEST]: Find: README, feature list, architecture, plugin mechanism, recent releases. Focus on the GitHub repo. Skip shallow mentions. [OUTPUT FORMAT]: Structured markdown report with ## headings, tables for features, and evidence permalinks. No raw tool output."
 ```
 
 ## Output Format

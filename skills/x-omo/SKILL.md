@@ -1,6 +1,6 @@
 ---
 name: x-omo
-description: "OpenCode multi-model agents — route to non-Claude models via opencode CLI"
+description: OpenCode multi-model agents — route to non-Claude models via opencode CLI
 triggers:
   - "omo"
   - "opencode agent"
@@ -20,7 +20,7 @@ matching: fuzzy
 
 # OMO Agents — OpenCode Multi-Model Bridge
 
-OMO bridges Claude Code to non-Claude models via OpenCode's agent system. Each agent has a specialized role, prompt structure, and output format. Each agent has a specialized role, prompt structure, and output format. This skill routes by agent role, not by model.
+OMO bridges Claude Code to non-Claude models via OpenCode's agent system. Each agent has a specialized role, prompt structure, and output format. This skill routes by agent role, not by model.
 
 ## Quick Dispatch
 
@@ -34,22 +34,7 @@ If `{{ARGUMENTS}}` starts with an agent name or `--model`, invoke it immediately
 /omo                              → show agent catalog below for selection
 ```
 
-**Rule:** If the first arg matches an agent name (`oracle`, `explore`, `librarian`, `multimodal-looker`) or is `--model`/`--file`, run `omo-agent` with all args directly. Do not ask which agent — the user already chose.
-
-## Prerequisite Check
-
-Before dispatching any omo-agent command, verify opencode is available:
-
-```bash
-command -v opencode &>/dev/null && echo "available" || echo "unavailable"
-```
-
-If unavailable, inform the user:
-> OpenCode is not installed. OMO agents require the `opencode` CLI.
-> Install: https://github.com/opencode-ai/opencode
-> Run `bin/setup` after installing to configure the binding.
-
-If `omo-agent` is not found on PATH, try the fallback in this skill's directory: `./omo-agent` (same directory as this SKILL.md).
+**Rule:** If the first arg matches an agent name (`oracle`, `explore`, `librarian`, `multimodal-looker`) or is `--model`/`--file`, run `~/.claude/skills/x-omo/omo-agent` with all args directly. Do not ask which agent — the user already chose.
 
 ---
 
@@ -92,7 +77,7 @@ If `omo-agent` is not found on PATH, try the fallback in this skill's directory:
 Use when you need a **specific model** rather than a role-based agent.
 
 ```bash
-omo-agent --model <alias> "<prompt>"
+~/.claude/skills/x-omo/omo-agent --model <alias> "<prompt>"
 ```
 
 | Alias | Resolves To | Best For |
@@ -104,7 +89,7 @@ omo-agent --model <alias> "<prompt>"
 | Any partial ID | Fuzzy-matched via `opencode models` | e.g., `gpt-5.4-mini`, `big-pickle` |
 | Full `provider/model` | Passthrough | e.g., `openai/gpt-5.4` |
 
-See `./models-routing.md` for detailed task-to-model mapping.
+See `~/.claude/skills/x-omo/models-routing.md` for detailed task-to-model mapping.
 
 ---
 
@@ -116,16 +101,16 @@ All agents are invoked via Bash with the `omo-agent` wrapper. **Do not use `spaw
 
 ```bash
 # Role agent
-omo-agent <agent-name> "<prompt>"
+~/.claude/skills/x-omo/omo-agent <agent-name> "<prompt>"
 
 # Model routing
-omo-agent --model <alias> "<prompt>"
+~/.claude/skills/x-omo/omo-agent --model <alias> "<prompt>"
 
 # Attach files
-omo-agent --file /path/to/file.pdf oracle "<prompt>"
+~/.claude/skills/x-omo/omo-agent --file /path/to/file.pdf oracle "<prompt>"
 
 # Attach skill directory
-omo-agent --skill /path/to/skill/ oracle "<prompt>"
+~/.claude/skills/x-omo/omo-agent --skill /path/to/skill/ oracle "<prompt>"
 ```
 
 **Timeout:** Always set Bash timeout to **600000** (10 min). Agents routinely take 1-5 minutes.
@@ -144,8 +129,8 @@ Fire multiple Bash tool calls simultaneously with `run_in_background: true`. Alw
 
 ```bash
 # Example: parallel research
-omo-agent explore "<prompt>"    # run_in_background: true
-omo-agent librarian "<prompt>"  # run_in_background: true
+~/.claude/skills/x-omo/omo-agent explore "<prompt>"    # run_in_background: true
+~/.claude/skills/x-omo/omo-agent librarian "<prompt>"  # run_in_background: true
 # Collect both results before synthesizing
 ```
 
@@ -164,7 +149,7 @@ When invoking a single agent, choose execution mode based on the task shape:
 
 **User override:** If the user says `--background` or `--wait`, respect that over the heuristic.
 
-**x-skill default:** When an x-skill dispatches agents, it should use foreground for single-agent queries and background only for parallel dispatch or explicitly long-running agents (hephaestus, atlas).
+**x-skill default:** When an x-skill dispatches agents, it should use foreground for single-agent queries and background only for parallel dispatch or explicitly long-running runs (e.g. `--model codex` autonomous deep work).
 
 ### Model Routing Prompt Tips
 

@@ -6,7 +6,7 @@ Detailed instructions for each detection mode. Referenced from SKILL.md's detect
 
 1. Read the plan fully
 2. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Skip ONLY for trivial plans (< 3 tasks AND single module) OR **mechanical batches** (same structural change repeated across N files — e.g., remove an import + call site identically in 4 adapters). For everything else, launch all 3 reviewers immediately — do NOT ask the user for permission, just announce: *"N tasks across M files — running quick plan review (~90s) before executing."* Then launch reviewers in ONE message. If the user said "fix all" / "just do it" — that means execute everything, NOT skip the review. Collect all results before proceeding.
-   **Research-produced plan exception:** Plans generated from comprehensive x-research (Type A comparison with 10+ sources read) may use reduced plan review (1 reviewer: momus only) instead of full 3-reviewer ceremony. The research itself provides grounding that substitutes for broader review.
+   **Research-produced plan exception:** Plans generated from comprehensive x-research (Type A comparison with 10+ sources read) may use reduced plan review (1 reviewer: `--model gpt` blocker-finder only, replacing the UNAVAILABLE `momus` role agent) instead of full 3-reviewer ceremony. The research itself provides grounding that substitutes for broader review.
 3. Execute: `ralph` for 3+ tasks, direct execution for simpler plans. **"Fix all" with 3+ tasks = ralph, not manual batch edits.** Exception: **mechanical batches** (identical change across files) may use direct execution regardless of file count — ralph overhead exceeds the risk.
    **Surgical edit exception:** Direct execution is also acceptable for 3+ tasks when ALL are: (a) single-location edits or new files, (b) no dependencies between them, (c) each describable in 1 sentence, (d) total < 30 lines changed. This is distinct from mechanical batch (same pattern repeated) — it's about *task simplicity*.
 4. **Post-Implementation Review (cross-model, parallel):** Use the exact post-implementation review tool calls from `cross-model-review.md`. All 3 in one message.
@@ -23,7 +23,7 @@ Detailed instructions for each detection mode. Referenced from SKILL.md's detect
 3. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Same rules as Mode A step 2, including mechanical batch and research-produced plan exceptions.
 4. Execute based on scope:
    - 3+ tasks → `ralph` (persistence, TDD, verification loop) — **never manual batch edits**
-   - 1-2 tasks → OMO `hephaestus` or direct execution
+   - 1-2 tasks → OMO `--model codex` (GPT-5.3 Codex, replaces UNAVAILABLE `hephaestus`) or direct execution
    - **Mechanical batch** or **surgical edits** → direct execution regardless of count (same exceptions as Mode A step 3)
 5. **Post-Implementation Review (cross-model, parallel):** Same as Mode A step 4, including trivial/mechanical/parent-deference exceptions.
 6. Verify and finish branch

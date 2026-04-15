@@ -47,17 +47,17 @@ Named after the Oracle of Delphi. A read-only consultation agent for high-diffic
 
 ### Architecture Decision
 ```bash
-omo-agent oracle "We have a monolithic Express API serving 50k RPM. Auth uses sessions stored in Redis. We're seeing 2s P99 latency on authenticated endpoints. I've already ruled out DB queries (all <50ms) and network (ping <5ms). I suspect session lookup overhead at scale. Should we migrate to stateless JWT, add session caching tiers, or redesign the auth flow entirely? Consider backward compatibility — 200+ endpoints depend on req.session."
+~/.claude/skills/x-omo/omo-agent oracle "We have a monolithic Express API serving 50k RPM. Auth uses sessions stored in Redis. We're seeing 2s P99 latency on authenticated endpoints. I've already ruled out DB queries (all <50ms) and network (ping <5ms). I suspect session lookup overhead at scale. Should we migrate to stateless JWT, add session caching tiers, or redesign the auth flow entirely? Consider backward compatibility — 200+ endpoints depend on req.session."
 ```
 
 ### Debugging Escalation
 ```bash
-omo-agent oracle "I've been trying to fix a race condition in our WebSocket reconnection handler for 3 attempts. The symptom: duplicate messages after reconnect. Attempt 1: Added mutex — still duplicates. Attempt 2: Added message dedup by ID — reduces but doesn't eliminate. Attempt 3: Reset subscription state on disconnect — causes missed messages. The reconnection flow is in src/ws/client.ts:145-230. What am I missing?"
+~/.claude/skills/x-omo/omo-agent oracle "I've been trying to fix a race condition in our WebSocket reconnection handler for 3 attempts. The symptom: duplicate messages after reconnect. Attempt 1: Added mutex — still duplicates. Attempt 2: Added message dedup by ID — reduces but doesn't eliminate. Attempt 3: Reset subscription state on disconnect — causes missed messages. The reconnection flow is in src/ws/client.ts:145-230. What am I missing?"
 ```
 
 ### Code Review / Self-Review
 ```bash
-omo-agent oracle "I just implemented a new caching layer between our API and database. The code is in src/cache/tiered-cache.ts. Key design choices: LRU in-memory (1000 items) → Redis (5min TTL) → Postgres. Invalidation is event-driven via pub/sub. Review this architecture for: cache stampede risk, consistency guarantees, failure modes. The full implementation is attached."
+~/.claude/skills/x-omo/omo-agent oracle "I just implemented a new caching layer between our API and database. The code is in src/cache/tiered-cache.ts. Key design choices: LRU in-memory (1000 items) → Redis (5min TTL) → Postgres. Invalidation is event-driven via pub/sub. Review this architecture for: cache stampede risk, consistency guarantees, failure modes. The full implementation is attached."
 ```
 
 ## Output Format

@@ -81,7 +81,7 @@ If deepwiki returns an error (repo not indexed), report that clearly so we can f
 
 ## Type F: Pre-Planning Analysis
 
-For `metis`:
+For `oracle` (pre-planning consult — replaces UNAVAILABLE `metis`):
 ```
 Analyze this request before planning: {{user's request}}.
 Current codebase context: {{relevant files, stack, constraints}}.

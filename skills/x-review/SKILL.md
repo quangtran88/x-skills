@@ -1,6 +1,6 @@
 ---
 name: x-review
-description: "Use when the user asks to review code, a plan, a PR, or a directory — auto-detects target and runs cross-model review by default (Claude + GPT perspectives)"
+description: Use when the user asks to review code, a plan, a PR, or a directory — auto-detects target and runs cross-model review by default (Claude + GPT perspectives)
 role: reviewer
 ---
 
@@ -33,29 +33,8 @@ Smart review that detects what to review and how deep to go.
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-
-### 1. Feature Gate — detect capabilities
-
-```bash
-cat ~/.config/x-skills/capabilities.json 2>/dev/null || echo '{"capabilities":{}}'
-```
-
-Parse the result to determine available capabilities. If the file doesn't exist, assume Claude-only mode. See `../../lib/feature-gate.md` for the full fallback table.
-
-**Key checks:**
-- `capabilities.opencode == true` → OMO agents available, load x-omo catalog (step 2)
-- `capabilities.opencode == false` → Claude-only mode, use fallback routing:
-  - Replace `momus` → `Agent` tool with `model=opus` and plan-review prompt
-  - Replace `oracle` → `Agent` tool with `model=opus`
-  - Replace `code-reviewer` OMC agent → plain `Agent` tool with review prompt
-- `capabilities.plugins.superpowers == false` → inline review workflow instead of Skill invocations
-
-### 2. Load OMO catalog (skip if Claude-only)
-
-Read `config.json` in this skill directory to get the `omo_agent` path.
-Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (momus, oracle) via Bash — they are NOT OMC agents.
-
-The `omo-agent` command is resolved from config.json → `omo_agent` (PATH-based) or `omo_agent_fallback` (relative path).
+1. Read `config.json` in this skill directory to get the `omo_agent` path.
+2. Read the x-omo SKILL.md (at the parent directory of `omo_agent`) to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model gpt` (plan review / blocker-finder) or `--model codex` (autonomous implementation) instead. See `~/.claude/skills/x-omo/gotchas.md`.**
 
 ## Invocation
 

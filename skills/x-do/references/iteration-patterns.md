@@ -33,7 +33,7 @@ One iteration = one mutating tool call (`Edit`/`Write` or mutating `Bash`) + one
 | No-progress iterations | Action |
 |---|---|
 | 3 | **Pause.** Re-read last 5 tool outputs in full (no summarization). State the actual blocker in one sentence, plain English. If you can name a different approach, try it. |
-| 5 | **Pivot.** Delegate to `oracle` or `hephaestus` for a fresh perspective. State what you tried and why it failed. |
+| 5 | **Pivot.** Delegate to `oracle` or `--model codex` (replaces UNAVAILABLE `hephaestus`) for a fresh perspective. State what you tried and why it failed. |
 | 7 | **STOP.** Surface to user: state the blocker, list what was tried, propose 2-3 genuinely different alternatives. Wait for user input before continuing. |
 
 *Threshold rationale:* 3 is lenient enough to avoid false positives on slow-but-valid work. 7 is the hard stop — beyond that, the agent is burning tokens. If 3 triggers too often on healthy runs, raise to 4. If stagnation is caught too late, lower 7 to 5. Re-evaluate after one week of usage.

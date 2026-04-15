@@ -148,5 +148,5 @@ timeout 30 opencode run --agent oracle --dir "$(pwd)" $'Hello.\n\nReply with OK.
 # Wrapper regression check: exercises the stdin pipe in omo-agent.
 # Expected: succeeds in <30s with non-empty output.
 # If this hangs, the wrapper fix has regressed, or opencode has broken stdin input.
-OMO_TIMEOUT=60 omo-agent oracle "$(printf 'Hello.\n\nReply with OK.')"
+OMO_TIMEOUT=60 ~/.claude/skills/x-omo/omo-agent oracle "$(printf 'Hello.\n\nReply with OK.')"
 ```

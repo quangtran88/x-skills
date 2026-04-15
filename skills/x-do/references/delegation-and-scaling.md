@@ -7,7 +7,7 @@ During execution, Claude should autonomously delegate to OMO agents when it dete
 | Signal | Delegate To | Why |
 |---|---|---|
 | 2+ failed fix attempts on the same issue | `oracle` | Fresh perspective, different model reasoning |
-| Implementation stalled (see iteration-patterns.md §2 escalation ladder) | `oracle` at 5, `hephaestus` if oracle insufficient | Different model, different approach |
+| Implementation stalled (see iteration-patterns.md §2 escalation ladder) | `oracle` at 5, `--model codex` if oracle insufficient (replaces UNAVAILABLE `hephaestus`) | Different model, different approach |
 | Quick API syntax question mid-implementation | `context7` or `deepwiki` MCP directly | 5s lookup vs. 30-60s agent spawn. Use context7 for library API docs, deepwiki for repo internals |
 | Comprehensive library understanding needed | `librarian` | Multi-source research with GitHub permalinks. Use when quick lookup isn't enough |
 | Architecture uncertainty blocking a design choice | `oracle` | Read-only strategic advice |

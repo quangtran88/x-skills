@@ -56,18 +56,15 @@ Options:
   --model <alias>     Route to a specific model instead of a role agent
 
 Role Agents:
-  [WORKING — verified in current local setup]
   oracle            architecture review, debugging, second opinion
   explore           deep codebase search
   librarian         external docs, OSS research
   multimodal-looker visual/multimodal analysis
 
-  [UNAVAILABLE — plugin compat bug, see gotchas.md; use --model as workaround]
-  hephaestus        deep autonomous implementation
-  atlas             plan execution
-  prometheus        plan building
-  momus             plan review, critique
-  metis             pre-planning consultation
+  (Other OMO agents — hephaestus, atlas, prometheus, metis, momus — are
+   currently unavailable due to an opencode/oh-my-opencode plugin compat bug.
+   Use `omo-agent --model gpt|codex|gemini-pro "<prompt>"` as a workaround.
+   See ~/.claude/skills/x-omo/gotchas.md for details.)
 
 Model Aliases (resolved via `opencode models`):
   gemini-pro        Gemini 3.1 Pro
@@ -141,20 +138,22 @@ resolve_model() {
 #     hephaestus, atlas, prometheus, metis, momus
 #   See gotchas.md for details and upstream-fix tracking.
 #
-# For all agents (working or broken) we pass the short name — opencode matches
-# by config key, and for WORKING agents the key IS the short name. For BROKEN
-# agents we fail early (below) with a helpful message instead of the confusing
-# display-name fallback path that opencode can't resolve either.
+# Only WORKING agents are accepted here — broken agents are rejected with a
+# dedicated compat-bug error before reaching this resolver (see is_broken_agent
+# and the validation block below). Keeping the whitelist tight prevents callers
+# from silently hitting the confusing opencode "agent not found / default agent
+# not found" cascade.
 resolve_agent_name() {
   case "$1" in
-    oracle|explore|librarian|multimodal-looker|\
-    hephaestus|atlas|prometheus|metis|momus) echo "$1" ;;
+    oracle|explore|librarian|multimodal-looker) echo "$1" ;;
     *) return 1 ;;
   esac
 }
 
-# Agents currently broken by the plugin/opencode compat bug (see resolve_agent_name).
-# Space-separated list — update when upstream fixes are confirmed.
+# Agents currently broken by the plugin/opencode compat bug. Kept as a
+# separate list (not in resolve_agent_name) so we can emit a helpful,
+# bug-specific error instead of a generic "Unknown agent" message.
+# Space-separated — clear this list when upstream fixes are confirmed.
 OMO_BROKEN_AGENTS="hephaestus atlas prometheus metis momus"
 
 is_broken_agent() {
@@ -170,15 +169,8 @@ if [[ -n "$MODEL_FLAG" ]]; then
   [[ -z "$MODEL_ID" ]] && exit 1
   RUN_MODE="model"
 elif [[ -n "$AGENT" ]]; then
-  AGENT_DISPLAY=$(resolve_agent_name "$AGENT") || {
-    echo "Error: Unknown agent '$AGENT'" >&2
-    echo "Valid agents: oracle explore librarian multimodal-looker hephaestus atlas prometheus momus metis" >&2
-    echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
-    exit 1
-  }
-  # Fail fast if the caller hit a known-broken agent rather than letting
-  # opencode print a confusing "agent not found / default agent not found"
-  # cascade. See resolve_agent_name for the root cause and gotchas.md.
+  # Check known-broken agents first so users get the full compat explanation
+  # instead of a generic "Unknown agent" error.
   if is_broken_agent "$AGENT"; then
     cat >&2 <<EOF
 Error: agent '$AGENT' is currently UNAVAILABLE due to a known opencode + oh-my-opencode
@@ -201,6 +193,12 @@ Workarounds:
 EOF
     exit 1
   fi
+  AGENT_DISPLAY=$(resolve_agent_name "$AGENT") || {
+    echo "Error: Unknown agent '$AGENT'" >&2
+    echo "Valid agents: oracle explore librarian multimodal-looker" >&2
+    echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
+    exit 1
+  }
   RUN_MODE="agent"
 fi
 
@@ -374,7 +372,7 @@ DURATION=$((END_TIME - START_TIME))
 # --- Detect silent agent fallback (OpenCode exits 0 but warns "agent not found" or "is a subagent") ---
 if [[ "$RUN_MODE" == "agent" ]] && grep -qiE 'agent.*not.*found.*falling back|is a subagent.*falling back' "$TMPFILE" 2>/dev/null; then
   echo "Error: OpenCode does not recognize agent '$AGENT' → '$AGENT_DISPLAY' (silent fallback detected)" >&2
-  echo "Valid agents: oracle explore librarian multimodal-looker hephaestus atlas prometheus momus metis" >&2
+  echo "Valid agents: oracle explore librarian multimodal-looker" >&2
   echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
   rm -f "$TMPFILE"
   exit 1

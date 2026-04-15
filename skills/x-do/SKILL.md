@@ -1,6 +1,6 @@
 ---
 name: x-do
-description: "Use when the user asks to build, implement, fix, or execute a plan — detects context (existing plan, new feature, bug, quick task, visual input) and routes through brainstorming, planning, debugging, or execution workflows"
+description: Use when the user asks to build, implement, fix, or execute a plan — detects context (existing plan, new feature, bug, quick task, visual input) and routes through brainstorming, planning, debugging, or execution workflows
 role: router
 ---
 
@@ -20,7 +20,7 @@ role: router
 - `Read` for loading gotchas, config, referenced files
 - `Skill` tool for dispatching to x-research, writing-plans, etc.
 - `Agent` tool for launching executor / verifier subagents
-- `Bash` for dispatching OMO agents via `omo-agent` (if available)
+- `Bash` for dispatching OMO agents via `~/.claude/skills/x-omo/omo-agent`
 
 **Self-check (Modes A, B, E, F only):**
 If you're about to call `Edit`/`Write`/mutating `Bash` and you're NOT in Mode D, STOP.
@@ -33,29 +33,7 @@ Smart entry point that detects what to do and routes through the optimal workflo
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-
-### 1. Feature Gate — detect capabilities
-
-```bash
-cat ~/.config/x-skills/capabilities.json 2>/dev/null || echo '{"capabilities":{}}'
-```
-
-Parse the result to determine available capabilities. If the file doesn't exist, assume Claude-only mode. See `../../lib/feature-gate.md` for the full fallback table.
-
-**Key checks:**
-- `capabilities.opencode == true` → OMO agents available, load x-omo catalog (step 2)
-- `capabilities.opencode == false` → Claude-only mode, skip step 2, use fallback routing:
-  - Replace `oracle` → `Agent` tool with `model=opus`
-  - Replace `explore` → `Agent` tool with `subagent_type=Explore`
-  - Replace `executor` → `Agent` tool with `mode=auto`
-  - Replace `code-reviewer` → `Agent` tool with `subagent_type="superpowers:code-reviewer"` (if superpowers available) or plain `Agent`
-- `capabilities.plugins.superpowers == false` → inline workflow steps instead of Skill invocations
-
-### 2. Load OMO catalog (skip if Claude-only)
-
-Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (momus, oracle, hephaestus, etc.) via Bash — they are NOT OMC agents.
-
-The `omo-agent` command is resolved from config.json → `omo_agent` (PATH-based) or `omo_agent_fallback` (relative path).
+Read `~/.claude/skills/x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (plan review / planning) instead. See `~/.claude/skills/x-omo/gotchas.md`.**
 
 ## Invocation
 
@@ -131,7 +109,7 @@ See `references/available-tools.md` for the full tool table (MCP tools, skills, 
 
 ## Proactive OMO Delegation
 
-See `references/delegation-and-scaling.md` for signal→agent routing table and delegation rules. Key rule: after 2+ failed attempts, delegate to `oracle` or `hephaestus` — don't keep grinding.
+See `references/delegation-and-scaling.md` for signal→agent routing table and delegation rules. Key rule: after 2+ failed attempts, delegate to `oracle` or `--model codex` (replaces UNAVAILABLE `hephaestus`) — don't keep grinding.
 
 ## Cross-Model Review
 

@@ -15,7 +15,7 @@
 Launch these 3 in ONE message:
 
 1. **Agent tool:** `subagent_type: "superpowers:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `<omo_agent from config.json> momus "<plan-path>"`, `run_in_background: true`, `timeout: 600000` — GPT blocker-finder (OKAY/REJECT verdict)
+2. **Bash tool:** `<omo_agent from config.json> --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `~/.claude/skills/x-omo/gotchas.md`.*
 3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
 
 For architecture-sensitive plans, add a 4th reviewer:

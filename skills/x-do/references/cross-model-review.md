@@ -1,19 +1,19 @@
 # Cross-Model Review — Exact Tool Calls
 
-**CRITICAL:** OMO agents are NOT OMC agents. OMO agents run via **Bash** (`omo-agent`), NOT via the Agent tool.
+**CRITICAL:** OMO agents are NOT OMC agents. OMO agents run via **Bash** (`~/.claude/skills/x-omo/omo-agent`), NOT via the Agent tool.
 
 **MANDATORY:** Do NOT generate any synthesis until ALL reviewers complete and results are collected.
 
 ## Plan Review — launch these 3 in ONE message:
 
 1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `omo-agent momus "<plan-path>"`, `run_in_background: true`, `timeout: 600000` — GPT blocker-finder (OKAY/REJECT). Works with ANY path.
+2. **Bash tool:** `~/.claude/skills/x-omo/omo-agent --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT). Works with ANY path. *Replaces the UNAVAILABLE `momus` role agent — see `~/.claude/skills/x-omo/gotchas.md`.*
 3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
 
 ## Post-Implementation Review — launch these 3 in ONE message:
 
 1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `omo-agent oracle "<review prompt>"`, `run_in_background: true`, `timeout: 600000` — GPT perspective
+2. **Bash tool:** `~/.claude/skills/x-omo/omo-agent oracle "<review prompt>"`, `run_in_background: true`, `timeout: 600000` — GPT perspective
 3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
 
 ## After All Reviewers Return

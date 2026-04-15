@@ -45,17 +45,17 @@ A contextual grep agent for codebases. Answers "Where is X?", "Which file has Y?
 
 ### Pattern Discovery
 ```bash
-omo-agent explore "I'm implementing JWT auth for the REST API in src/api/routes/. I need to match existing auth conventions so my code fits seamlessly. I'll use this to decide middleware structure and token flow. Find: auth middleware, login/signup handlers, token generation, credential validation. Focus on src/ — skip tests. Return file paths with pattern descriptions."
+~/.claude/skills/x-omo/omo-agent explore "I'm implementing JWT auth for the REST API in src/api/routes/. I need to match existing auth conventions so my code fits seamlessly. I'll use this to decide middleware structure and token flow. Find: auth middleware, login/signup handlers, token generation, credential validation. Focus on src/ — skip tests. Return file paths with pattern descriptions."
 ```
 
 ### Cross-Layer Search
 ```bash
-omo-agent explore "I'm debugging a data inconsistency between the dashboard UI and the API response. The dashboard shows stale user counts. I need to trace the data flow from API → cache → frontend store. Find: the API endpoint that returns user counts, any caching layer in between, the frontend store/hook that consumes it, and any transform/mapping logic. Focus on src/ — return the full chain with file paths and line numbers."
+~/.claude/skills/x-omo/omo-agent explore "I'm debugging a data inconsistency between the dashboard UI and the API response. The dashboard shows stale user counts. I need to trace the data flow from API → cache → frontend store. Find: the API endpoint that returns user counts, any caching layer in between, the frontend store/hook that consumes it, and any transform/mapping logic. Focus on src/ — return the full chain with file paths and line numbers."
 ```
 
 ### Convention Mapping
 ```bash
-omo-agent explore "I'm about to add a new database migration for a 'teams' table. I need to follow the existing migration patterns exactly. Find: existing migration files, the migration runner/config, naming conventions, any seed data patterns, and how migrations are tested. Return file paths with explanations of the pattern to follow."
+~/.claude/skills/x-omo/omo-agent explore "I'm about to add a new database migration for a 'teams' table. I need to follow the existing migration patterns exactly. Find: existing migration files, the migration runner/config, naming conventions, any seed data patterns, and how migrations are tested. Return file paths with explanations of the pattern to follow."
 ```
 
 ## Output Format

@@ -1,6 +1,6 @@
 ---
 name: x-bugfix
-description: "Use when the user reports a bug, error, test failure, or unexpected behavior — routes through investigation, hypothesis testing, and verified fix with structured evidence collection"
+description: Use when the user reports a bug, error, test failure, or unexpected behavior — routes through investigation, hypothesis testing, and verified fix with structured evidence collection
 ---
 
 # x-bugfix — Universal Bugfix Command
@@ -10,29 +10,7 @@ Smart entry point for bugs and investigations. Detects severity, routes through 
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-
-### 1. Feature Gate — detect capabilities
-
-```bash
-cat ~/.config/x-skills/capabilities.json 2>/dev/null || echo '{"capabilities":{}}'
-```
-
-Parse the result to determine available capabilities. If the file doesn't exist, assume Claude-only mode. See `../../lib/feature-gate.md` for the full fallback table.
-
-**Key checks:**
-- `capabilities.opencode == true` → OMO agents available, load x-omo catalog (step 2)
-- `capabilities.opencode == false` → Claude-only mode, use fallback routing:
-  - Replace `oracle` → `Agent` tool with `model=opus`
-  - Replace `explore` → `Agent` tool with `subagent_type=Explore`
-  - Replace `debugger` → `Agent` tool with debug prompt
-  - Replace `hephaestus` → `Agent` tool with `model=opus` and implementation prompt
-- `capabilities.plugins.oh_my_claudecode == false` → replace OMC agents with plain Agent tool
-
-### 2. Load OMO catalog (skip if Claude-only)
-
-Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (oracle, explore, hephaestus, etc.) via Bash — they are NOT OMC agents.
-
-The `omo-agent` command is resolved from config.json → `omo_agent` (PATH-based) or `omo_agent_fallback` (relative path).
+Read `~/.claude/skills/x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `~/.claude/skills/x-omo/gotchas.md`.**
 
 ## Invocation
 
@@ -41,14 +19,14 @@ For how to invoke skills, OMO agents, and OMC agents, see `../x-shared/invocatio
 ## Dependencies
 
 This skill references shared infrastructure and sibling skills:
-- `../x-omo/SKILL.md` — OMO agent catalog (loaded in Bootstrap, skip if Claude-only)
+- `~/.claude/skills/x-omo/SKILL.md` — OMO agent catalog (loaded in Bootstrap)
 - `../x-shared/invocation-guide.md` — tool invocation patterns
 - `../x-shared/workflow-chains.md` — cross-skill chaining (handoff to `/x-review`)
 - `../x-shared/context-envelope.md` — handoff context block format
 - `../x-do/references/iteration-patterns.md` — iteration definitions for the 3-Strike Rule and Instrumentation Pivot
 - `references/{mode-b-deep,mode-c-system,backward-tracing,pattern-catalog,prevention-gate,debug-report-template,evidence-hierarchy}.md` — mode routes, protocols, and templates
 - `gotchas.md` — known failure patterns
-- `config.json` — `omo_agent` path, `capabilities_file`, and `state_dir` for `debug-log.jsonl`
+- `config.json` — `omo_agent` path and `state_dir` for `debug-log.jsonl`
 
 ## Iron Law
 
@@ -145,7 +123,7 @@ Skip: hypothesis testing, pattern catalog, OMO delegation, debug report. Still r
 | 3+ failed hypotheses (after instrumentation) | `oracle` | Fresh perspective from a different model |
 | Codebase search needed (simple) | `morph-mcp codebase_search` | Semantic search, no agent overhead |
 | Codebase search needed (complex, multi-tool) | `explore` | Parallel multi-tool search |
-| Stalled >3 iterations (per iteration-patterns.md §2 definitions) | `hephaestus` | Deep autonomous worker |
+| Stalled >3 iterations (per iteration-patterns.md §2 definitions) | `--model codex` | Deep autonomous worker (replaces UNAVAILABLE `hephaestus`) |
 | Unfamiliar library in stack | `librarian` | External docs specialist |
 
 ## Red Flags — STOP and Reinvestigate

@@ -20,7 +20,7 @@ After x-research (Type F: Pre-Planning):
 ## Handoff Context
 - **From:** x-research | **Type:** F (Pre-Planning)
 - **Key finding:** Auth system needs RBAC, current implementation only has binary auth
-- **Agents used:** metis, explore
+- **Agents used:** oracle, explore
 - **Recommendation:** x-do Mode B (new feature)
 - **Artifacts:** none (findings synthesized above)
 ```

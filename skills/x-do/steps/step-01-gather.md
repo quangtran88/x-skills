@@ -24,13 +24,13 @@ Gather requirements analysis and codebase context in parallel before planning.
 - **x-research handoff exists** → requirements already collected via `/x-research`, go to step-02-plan.md
 - Requirements are already clear and scoped → go to step-02-plan.md
 - User already brainstormed in a prior session → go to step-02-plan.md
-- Single-task work → skip the pipeline entirely, use hephaestus or direct execution
+- Single-task work → skip the pipeline entirely, use `--model codex` (replaces UNAVAILABLE `hephaestus`) or direct execution
 
 ## Execution
 
 1. **Fire two agents in parallel** (`run_in_background: true`):
 
-   **Agent A — metis** (requirements analysis via Bash/OMO):
+   **Agent A — oracle** (pre-planning strategic consult via Bash/OMO, replaces UNAVAILABLE `metis`):
    ```
    Analyze this request before planning: {{user's request}}.
    Current codebase context: {{relevant files, stack, constraints}}.
@@ -51,7 +51,7 @@ Gather requirements analysis and codebase context in parallel before planning.
 2. **Collect both results** before proceeding. Never synthesize from partial results.
 
 3. **Synthesize findings** into a brief summary:
-   - Requirements: what metis identified (scope, risks, hidden requirements)
+   - Requirements: what oracle identified (scope, risks, hidden requirements)
    - Context: what explore found (related code, conventions, patterns to follow)
    - Constraints: anything that limits the approach
 

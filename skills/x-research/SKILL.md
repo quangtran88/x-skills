@@ -1,6 +1,6 @@
 ---
 name: x-research
-description: "Use when the user asks to research, investigate, look up, or understand something — auto-routes to OMO/OMC agents (explore, librarian, oracle, metis) with parallel execution and synthesis"
+description: Use when the user asks to research, investigate, look up, or understand something — auto-routes to OMO/OMC agents (explore, librarian, oracle) with parallel execution and synthesis
 ---
 
 # x-research — Universal Research Command
@@ -10,36 +10,15 @@ Smart research that classifies the question and routes to the optimal agent(s).
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
+Read the OMO skill file (path in `config.json` → `omo_skill`) **and** `gotchas.md` to load the full agent catalog, invocation commands, model routing, and known failure patterns. This ensures you know how to invoke OMO agents (`explore`, `librarian`, `oracle`, `multimodal-looker`) via Bash — they are NOT OMC agents — and avoid recurring pitfalls. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. See `~/.claude/skills/x-omo/gotchas.md`.**
 
-### 1. Feature Gate — detect capabilities
-
-```bash
-cat ~/.config/x-skills/capabilities.json 2>/dev/null || echo '{"capabilities":{}}'
-```
-
-Parse the result to determine available capabilities. If the file doesn't exist, assume Claude-only mode. See `../../lib/feature-gate.md` for the full fallback table.
-
-**Key checks:**
-- `capabilities.opencode == true` → OMO agents available, load x-omo catalog (step 2)
-- `capabilities.opencode == false` → Claude-only mode, use fallback routing:
-  - Replace `explore` → `Agent` tool with `subagent_type=Explore`
-  - Replace `librarian` → `Agent` tool with web search MCP tools (perplexity, exa)
-  - Replace `oracle` → `Agent` tool with `model=opus`
-  - Replace `multimodal-looker` → `Read` tool directly (Claude is multimodal)
-- MCP availability is checked per-server — degrade gracefully per missing MCP
-
-### 2. Load OMO catalog (skip if Claude-only)
-
-Read the OMO skill file (`config.json` → `omo_skill`) **and** `gotchas.md` to load the full agent catalog, invocation commands, model routing, and known failure patterns. This ensures you know how to invoke OMO agents (explore, librarian, oracle, metis, multimodal-looker) via Bash — they are NOT OMC agents — and avoid recurring pitfalls.
-
-**Exception — when OMO bootstrap can be skipped:**
+**Exception — when bootstrap can be skipped:**
 
 | Scenario | Bootstrap needed? |
 |----------|-------------------|
 | Type A direct reads, no agents dispatched | No — Claude reads files directly |
 | Multi-repo Type A with OMC Explore agents | No — OMC agents don't use OMO config |
 | Type E with OMC Explore + deepwiki MCP | No — OMC agents don't use OMO config |
-| Claude-only mode (opencode unavailable) | No — all routing uses native Agent tool |
 | Any workflow dispatching OMO agents | **Yes** — always bootstrap first |
 
 ## Invocation
@@ -75,7 +54,7 @@ Classify the user's question:
 | **C: Architecture** | Trade-offs, system design, "should we" | `oracle` |
 | **D: Both** | Codebase + external best practices | `morph-mcp codebase_search` + `librarian` parallel |
 | **E: OSS Internals** | How an open-source project implements something | `morph-mcp github_codebase_search` first; OMC Explore w/ `deepwiki` MCP for deeper understanding (see note below) |
-| **F: Pre-Planning** | Requirements, scope, risks before building | `metis` + `morph-mcp codebase_search` parallel |
+| **F: Pre-Planning** | Requirements, scope, risks before building | `oracle` + `morph-mcp codebase_search` parallel (oracle replaces UNAVAILABLE `metis`) |
 | **G: Visual** | Image, PDF, diagram, screenshot analysis | `multimodal-looker` |
 
 **Morph-first principle:** For Types A, D, E, and F, try `morph-mcp codebase_search` (or `github_codebase_search` for external repos) before spawning agents. It's semantic, instant, and free — no agent overhead. Escalate to explore/librarian agents only when morph results are insufficient (too broad, need multi-tool investigation, or require cross-referencing with external docs).
@@ -100,13 +79,13 @@ For Type A variants (local repos, multi-repo, comparison, version upgrade), see 
 
 ## Parallel Execution
 
-Any dispatch of 2+ agents fires simultaneously (`run_in_background: true`). Common multi-agent combos: D (explore + librarian), F (metis + explore), multi-repo Type A, and mixed types like B+C (librarian + oracle).
+Any dispatch of 2+ agents fires simultaneously (`run_in_background: true`). Common multi-agent combos: D (explore + librarian), F (oracle + explore), multi-repo Type A, and mixed types like B+C (librarian + oracle).
 
 **⛔ MANDATORY — wait for every agent to reach a terminal state before synthesizing.** A terminal state is one of: **complete** (notification received, output collected), **error** (agent returned a failure), or **timeout** (no response after 5+ minutes). Do NOT generate synthesis while any agent is still in "running" state. See `../x-shared/invocation-guide.md` § "Collect All Background Results."
 
 When synthesizing after a failure/timeout, include **only** the succeeded agents' findings, note which agents failed and what information is missing, and offer to retry the failed agent or answer without it. Partial synthesis is allowed, but only after each dispatched agent has a known terminal state.
 
-Example: `omo-agent explore "find auth patterns"` (Bash tool, timeout 600000)
+Example: `~/.claude/skills/x-omo/omo-agent explore "find auth patterns"` (Bash tool, timeout 600000)
 
 ## Model Routing
 
