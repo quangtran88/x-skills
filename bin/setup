@@ -43,6 +43,16 @@ cap_get() {
   val=$(grep "^$1=" "$CAPS_STORE" 2>/dev/null | tail -1 | cut -d= -f2-)
   echo "${val:-false}"
 }
+# JSON output variant: true/false as literals, everything else quoted.
+# Values must be simple tokens (no embedded quotes, backslashes, or newlines).
+cap_json() {
+  local val
+  val=$(cap_get "$1")
+  case "$val" in
+    true|false) echo "$val" ;;
+    *)          echo "\"$val\"" ;;
+  esac
+}
 # Track missing deps: type|name|description|install_command
 missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
 
@@ -285,7 +295,11 @@ fi
 header "2. OpenCode CLI"
 
 if command -v opencode &>/dev/null; then
-  OC_VERSION=$(opencode version 2>/dev/null || opencode --version 2>/dev/null || echo "unknown")
+  OC_VERSION=$(opencode version 2>/dev/null) || true
+  if [[ -z "$OC_VERSION" ]]; then
+    OC_VERSION=$(opencode --version 2>/dev/null) || true
+  fi
+  [[ -z "$OC_VERSION" ]] && OC_VERSION="unknown"
   ok "opencode found: $OC_VERSION"
   cap_set opencode true
 
@@ -360,30 +374,48 @@ header "3. MCP Servers (checked via Claude Code settings)"
 # Resolve CLAUDE_CONFIG_DIR for MCP detection
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
+# Cache claude mcp list output once (runs health checks, takes seconds)
+CLAUDE_MCP_CACHE=""
+if command -v claude &>/dev/null; then
+  CLAUDE_MCP_CACHE=$(claude mcp list 2>/dev/null || true)
+fi
+
 check_mcp() {
   local name="$1"
   local desc="$2"
-  for f in "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/.claude/settings.local.json" ".claude/settings.json" ".claude/settings.local.json"; do
-    if [[ -f "$f" ]] && grep -q "mcp__${name}__\|\"$name\"" "$f" 2>/dev/null; then
+  # Some MCP servers register under a different name (e.g., "morph-mcp" vs "morph").
+  # Build a grep pattern that matches both the short name and common variants.
+  local grep_pattern="mcp__${name}__\|mcp__${name}-mcp__\|\"$name\"\|\"${name}-mcp\""
+  for f in "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.local.json" ".claude/settings.json" ".claude/settings.local.json"; do
+    if [[ -f "$f" ]] && grep -q "$grep_pattern" "$f" 2>/dev/null; then
       ok "$name — $desc"
       cap_set "mcp_$name" true
       return 0
     fi
   done
   for f in "$CLAUDE_DIR/.mcp.json" ".mcp.json"; do
-    if [[ -f "$f" ]] && grep -q "\"$name\"" "$f" 2>/dev/null; then
+    if [[ -f "$f" ]] && grep -qE "\"${name}(-mcp)?\"" "$f" 2>/dev/null; then
       ok "$name — $desc"
       cap_set "mcp_$name" true
       return 0
     fi
   done
   for mcp_file in "$CLAUDE_DIR/plugins/cache"/*/*/*/.mcp.json "$CLAUDE_DIR/plugins/marketplaces"/*/.mcp.json; do
-    if [[ -f "$mcp_file" ]] && grep -q "\"$name\"" "$mcp_file" 2>/dev/null; then
+    if [[ -f "$mcp_file" ]] && grep -qE "\"${name}(-mcp)?\"" "$mcp_file" 2>/dev/null; then
       ok "$name — $desc (via plugin)"
       cap_set "mcp_$name" true
       return 0
     fi
   done
+  # Fallback: check cached claude mcp list (catches servers added via `claude mcp add`)
+  if [[ -n "$CLAUDE_MCP_CACHE" ]]; then
+    # Format: "name: <cmd> - ✓ Connected" (observed in Claude Code CLI 1.x)
+    if echo "$CLAUDE_MCP_CACHE" | grep -qiE "^${name}(-mcp)?:.*\bConnected\b"; then
+      ok "$name — $desc (via claude mcp)"
+      cap_set "mcp_$name" true
+      return 0
+    fi
+  fi
   warn "$name — not detected ($desc)"
   cap_set "mcp_$name" false
   return 1
@@ -459,27 +491,27 @@ if [[ "$MODE" != "check" ]]; then
   "plugin_dir": "$PLUGIN_DIR",
   "omo_agent": "$OMO_AGENT_SRC",
   "capabilities": {
-    "opencode": $(cap_get opencode),
-    "omo_plugin": $(cap_get omo_plugin),
-    "omo_mode_all": $(cap_get omo_mode_all),
+    "opencode": $(cap_json opencode),
+    "omo_plugin": $(cap_json omo_plugin),
+    "omo_mode_all": $(cap_json omo_mode_all),
     "mcp": {
-      "perplexity": $(cap_get mcp_perplexity),
-      "deepwiki": $(cap_get mcp_deepwiki),
-      "exa": $(cap_get mcp_exa),
-      "context7": $(cap_get mcp_context7),
-      "morph": $(cap_get mcp_morph)
+      "perplexity": $(cap_json mcp_perplexity),
+      "deepwiki": $(cap_json mcp_deepwiki),
+      "exa": $(cap_json mcp_exa),
+      "context7": $(cap_json mcp_context7),
+      "morph": $(cap_json mcp_morph)
     },
     "plugins": {
-      "oh_my_claudecode": $(cap_get plugin_oh-my-claudecode),
-      "superpowers": $(cap_get plugin_superpowers),
-      "claude_mem": $(cap_get plugin_claude-mem)
+      "oh_my_claudecode": $(cap_json plugin_oh-my-claudecode),
+      "superpowers": $(cap_json plugin_superpowers),
+      "claude_mem": $(cap_json plugin_claude-mem)
     },
     "security_tools": {
-      "schemathesis": $(cap_get tool_schemathesis),
-      "nuclei": $(cap_get tool_nuclei),
-      "sqlmap": $(cap_get tool_sqlmap),
-      "spectral": $(cap_get tool_spectral),
-      "interactsh": $(cap_get tool_interactsh-client)
+      "schemathesis": $(cap_json tool_schemathesis),
+      "nuclei": $(cap_json tool_nuclei),
+      "sqlmap": $(cap_json tool_sqlmap),
+      "spectral": $(cap_json tool_spectral),
+      "interactsh": $(cap_json tool_interactsh-client)
     }
   }
 }
