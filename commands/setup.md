@@ -9,7 +9,7 @@ Idempotent setup — safe to run any number of times. Each run detects current s
 **What `bin/setup` checks (at a glance):**
 - omo-agent symlink at `~/.local/bin/omo-agent`
 - opencode CLI + `oh-my-openagent` plugin registration
-- **Every agent in `oh-my-openagent.json` has `"mode": "all"`** — without it, `opencode run --agent <name>` fails or silently falls back. The audit lists offenders and offers to patch them (writes a timestamped `.bak` first).
+- **Role agents in `~/.config/opencode/oh-my-openagent.json` have `"mode": "all"`** — `oracle`, `explore`, `librarian`, `multimodal-looker` default to `mode: "subagent"` in the plugin, so `opencode run --agent <name>` silently fails unless the user config bumps them to `"all"`. The audit seeds the file if it's missing, adds missing entries, and patches wrong-mode entries — writes a timestamped `.bak` before touching an existing file.
 - MCP servers (perplexity, deepwiki, exa, context7, morph)
 - Peer plugins (oh-my-claudecode, superpowers, claude-mem)
 - Optional security tools (schemathesis, nuclei, sqlmap, …)
@@ -50,13 +50,13 @@ All capabilities are `true`. Report "all skills at full capability" and stop. No
 ### Case B: Some dependencies missing
 Some capabilities are `false`. Present **only the missing items** as a numbered menu. Do NOT offer to install things that are already present.
 
-**Special case — `omo_mode_all: false`:** `bin/setup` already prints each offending agent name and (in interactive TTY mode) prompts `[Y/n]` to patch. If the user said no at that prompt, surface it here as "Patch oh-my-openagent.json agents to mode=all" and on accept run:
+**Special case — `omo_mode_all: false`:** `bin/setup` already prints each offending role agent and (in interactive TTY mode) prompts `[Y/n]` to create/patch the file. If the user said no at that prompt, surface it here as "Ensure role agents in oh-my-openagent.json are at mode=all" and on accept run:
 
 ```bash
 "$PLUGIN_DIR/bin/setup" --fix
 ```
 
-`--fix` is non-interactive for this audit — it patches every agent with a timestamped backup next to the original file.
+`--fix` is non-interactive for this audit. On a fresh install it creates `~/.config/opencode/oh-my-openagent.json` seeded with the 4 role agents at `mode: "all"`. If the file already exists, it merges in any missing agents and patches wrong-mode entries, writing a timestamped `.bak` first. Only `oh-my-openagent.json` is supported — `.jsonc` and legacy `oh-my-opencode.*` filenames are intentionally out of scope.
 
 **Before offering to install a plugin**, check if it's already installed:
 ```bash

@@ -47,73 +47,137 @@ cap_get() {
 missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
 
 # --- oh-my-openagent mode=all audit ---
-# Every role agent must have `"mode": "all"` in oh-my-openagent.json or
-# `opencode run --agent <name>` will fail / silently fall back because the
-# plugin restricts the agent to subagent-only. Scans the file, lists offenders,
-# and (outside --check) offers to patch them with a timestamped backup.
+# Built-in role agents (oracle/explore/librarian/multimodal-looker) default to
+# `mode: "subagent"` in the plugin, so `opencode run --agent <name>` fails
+# (silent fallback) unless the user config explicitly bumps them to `mode: "all"`.
+# Scope (confirmed with user):
+#   - Only handles $HOME/.config/opencode/oh-my-openagent.json (ignores .jsonc
+#     and the legacy oh-my-opencode.* filenames).
+#   - Only ensures the 4 known-working role agents have mode=all — currently
+#     broken display-name agents (hephaestus/atlas/prometheus/metis/momus) are
+#     skipped because they won't dispatch even with mode=all.
+# Behavior:
+#   - File missing → offer to create with seed (interactive) or auto (--fix).
+#   - File present, any of the 4 missing or mode!="all" → offer to patch.
+#   - Patches preserve existing fields (model/variant/compaction/…) and add
+#     missing agents with just {"mode": "all"} (plugin fills in the rest).
 check_omo_mode_all() {
   local config="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
-
-  if [[ ! -f "$config" ]]; then
-    info "oh-my-openagent.json not found at $config — skipping"
-    cap_set omo_mode_all "n/a"
-    return 0
-  fi
+  local required_agents=(oracle explore librarian multimodal-looker)
+  local a
 
   if ! command -v jq &>/dev/null; then
-    warn "jq not installed — cannot audit agent mode=all (install: brew install jq)"
+    warn "jq not installed — cannot audit agent mode=all"
     cap_set omo_mode_all "unknown"
     missing_add "cli" "jq" "JSON processor (needed for mode=all audit)" "brew install jq"
     return 0
   fi
 
-  local missing
-  missing=$(jq -r '.agents // {} | to_entries[] | select(.value.mode != "all") | .key' "$config" 2>/dev/null)
+  # Diagnose current state: list required agents that are missing or have mode != "all"
+  local offenders=""
+  local file_missing=0
+  if [[ ! -f "$config" ]]; then
+    file_missing=1
+    for a in "${required_agents[@]}"; do
+      offenders+="$a:MISSING "
+    done
+  else
+    for a in "${required_agents[@]}"; do
+      local mode
+      mode=$(jq -r --arg a "$a" '.agents[$a].mode // "MISSING"' "$config" 2>/dev/null)
+      if [[ "$mode" != "all" ]]; then
+        offenders+="$a:$mode "
+      fi
+    done
+  fi
 
-  if [[ -z "$missing" ]]; then
-    ok "All agents in oh-my-openagent.json have mode=all"
+  if [[ -z "$offenders" ]]; then
+    ok "Role agents (${required_agents[*]}) all have mode=all in oh-my-openagent.json"
     cap_set omo_mode_all true
     return 0
   fi
 
-  warn "Agents missing mode=all (will not dispatch via \`opencode run --agent\`):"
-  while IFS= read -r a; do
-    [[ -n "$a" ]] && printf "      %s\n" "$a"
-  done <<< "$missing"
   cap_set omo_mode_all false
 
+  if [[ "$file_missing" -eq 1 ]]; then
+    warn "oh-my-openagent.json not found at $config"
+    info "Plugin role agents default to mode=subagent — will not dispatch via 'opencode run --agent'"
+  else
+    warn "Role agents missing mode=all in oh-my-openagent.json:"
+    local entry name mode_val
+    for entry in $offenders; do
+      name="${entry%:*}"
+      mode_val="${entry#*:}"
+      printf "      %s (current: %s)\n" "$name" "$mode_val"
+    done
+  fi
+
   if [[ "$MODE" == "check" ]]; then
-    info "[check mode] run with --fix to patch"
-    missing_add "config" "oh-my-openagent-mode-all" "Agents in $config need mode=all" "$SCRIPT_DIR/setup --fix"
+    info "[check mode] run with --fix to apply"
+    missing_add "config" "oh-my-openagent-mode-all" "Role agents in $config need mode=all" "$SCRIPT_DIR/setup --fix"
     return 0
   fi
 
-  local do_patch="n"
-  if [[ "$MODE" == "fix" ]]; then
-    do_patch="y"
-  elif [[ -t 0 ]]; then
-    printf "  Patch all agents to mode=all now? [Y/n] "
-    read -r do_patch </dev/tty 2>/dev/null || do_patch="n"
-    [[ -z "$do_patch" ]] && do_patch="y"
+  # Ask for confirmation (or auto-accept under --fix)
+  local do_fix="n"
+  local prompt_text
+  if [[ "$file_missing" -eq 1 ]]; then
+    prompt_text="Create $config with role agents at mode=all? [Y/n] "
+  else
+    prompt_text="Patch role agents to mode=all in oh-my-openagent.json? [Y/n] "
   fi
 
-  if [[ "$do_patch" =~ ^[Yy] ]]; then
-    local bak="${config}.bak.$(date -u +%Y-%m-%dT%H-%M-%SZ)"
-    cp "$config" "$bak"
-    local tmp
-    tmp=$(mktemp "${config}.XXXXXX")
-    if jq '.agents |= with_entries(.value.mode = "all")' "$config" > "$tmp" && [[ -s "$tmp" ]]; then
+  if [[ "$MODE" == "fix" ]]; then
+    do_fix="y"
+  elif [[ -t 0 ]]; then
+    printf "  %s" "$prompt_text"
+    read -r do_fix </dev/tty 2>/dev/null || do_fix="n"
+    [[ -z "$do_fix" ]] && do_fix="y"
+  fi
+
+  if [[ ! "$do_fix" =~ ^[Yy] ]]; then
+    info "Skipped — re-run '$SCRIPT_DIR/setup --fix' to apply later"
+    missing_add "config" "oh-my-openagent-mode-all" "Role agents in $config need mode=all" "$SCRIPT_DIR/setup --fix"
+    return 0
+  fi
+
+  # Build jq filter: for each required agent, merge {"mode":"all"} into the
+  # existing entry (or create a new entry). jq auto-creates .agents if absent.
+  local patch_filter='.'
+  for a in "${required_agents[@]}"; do
+    patch_filter+=" | .agents[\"$a\"] = ((.agents[\"$a\"] // {}) + {\"mode\": \"all\"})"
+  done
+
+  local tmp
+  if [[ "$file_missing" -eq 1 ]]; then
+    mkdir -p "$(dirname "$config")"
+    tmp=$(mktemp "${config}.XXXXXX") || {
+      fail "Could not create tmp file next to $config"
+      return 0
+    }
+    if echo '{"agents":{}}' | jq "$patch_filter" > "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
       mv "$tmp" "$config"
-      ok "Patched mode=all on all agents (backup: $(basename "$bak"))"
+      ok "Created $config with mode=all for: ${required_agents[*]}"
       cap_set omo_mode_all true
     else
       rm -f "$tmp"
-      rm -f "$bak"
-      fail "jq patch failed — $config unchanged"
+      fail "jq failed to create $config"
     fi
   else
-    info "Skipped — re-run '$SCRIPT_DIR/setup --fix' to patch later"
-    missing_add "config" "oh-my-openagent-mode-all" "Agents in $config need mode=all" "$SCRIPT_DIR/setup --fix"
+    tmp=$(mktemp "${config}.XXXXXX") || {
+      fail "Could not create tmp file next to $config"
+      return 0
+    }
+    local bak="${config}.bak.$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+    cp "$config" "$bak"
+    if jq "$patch_filter" "$config" > "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+      mv "$tmp" "$config"
+      ok "Patched role agents to mode=all (backup: $(basename "$bak"))"
+      cap_set omo_mode_all true
+    else
+      rm -f "$tmp" "$bak"
+      fail "jq patch failed — $config unchanged"
+    fi
   fi
 }
 
