@@ -6,6 +6,14 @@ description: "Configure x-skills plugin — sets up omo-agent binding, detects d
 
 Idempotent setup — safe to run any number of times. Each run detects current state and only acts on what's missing or changed.
 
+**What `bin/setup` checks (at a glance):**
+- omo-agent symlink at `~/.local/bin/omo-agent`
+- opencode CLI + `oh-my-openagent` plugin registration
+- **Every agent in `oh-my-openagent.json` has `"mode": "all"`** — without it, `opencode run --agent <name>` fails or silently falls back. The audit lists offenders and offers to patch them (writes a timestamped `.bak` first).
+- MCP servers (perplexity, deepwiki, exa, context7, morph)
+- Peer plugins (oh-my-claudecode, superpowers, claude-mem)
+- Optional security tools (schemathesis, nuclei, sqlmap, …)
+
 ## Step 1: Find and run setup
 
 Locate the plugin directory and run `bin/setup`:
@@ -41,6 +49,14 @@ All capabilities are `true`. Report "all skills at full capability" and stop. No
 
 ### Case B: Some dependencies missing
 Some capabilities are `false`. Present **only the missing items** as a numbered menu. Do NOT offer to install things that are already present.
+
+**Special case — `omo_mode_all: false`:** `bin/setup` already prints each offending agent name and (in interactive TTY mode) prompts `[Y/n]` to patch. If the user said no at that prompt, surface it here as "Patch oh-my-openagent.json agents to mode=all" and on accept run:
+
+```bash
+"$PLUGIN_DIR/bin/setup" --fix
+```
+
+`--fix` is non-interactive for this audit — it patches every agent with a timestamped backup next to the original file.
 
 **Before offering to install a plugin**, check if it's already installed:
 ```bash

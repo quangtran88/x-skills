@@ -46,6 +46,77 @@ cap_get() {
 # Track missing deps: type|name|description|install_command
 missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
 
+# --- oh-my-openagent mode=all audit ---
+# Every role agent must have `"mode": "all"` in oh-my-openagent.json or
+# `opencode run --agent <name>` will fail / silently fall back because the
+# plugin restricts the agent to subagent-only. Scans the file, lists offenders,
+# and (outside --check) offers to patch them with a timestamped backup.
+check_omo_mode_all() {
+  local config="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
+
+  if [[ ! -f "$config" ]]; then
+    info "oh-my-openagent.json not found at $config — skipping"
+    cap_set omo_mode_all "n/a"
+    return 0
+  fi
+
+  if ! command -v jq &>/dev/null; then
+    warn "jq not installed — cannot audit agent mode=all (install: brew install jq)"
+    cap_set omo_mode_all "unknown"
+    missing_add "cli" "jq" "JSON processor (needed for mode=all audit)" "brew install jq"
+    return 0
+  fi
+
+  local missing
+  missing=$(jq -r '.agents // {} | to_entries[] | select(.value.mode != "all") | .key' "$config" 2>/dev/null)
+
+  if [[ -z "$missing" ]]; then
+    ok "All agents in oh-my-openagent.json have mode=all"
+    cap_set omo_mode_all true
+    return 0
+  fi
+
+  warn "Agents missing mode=all (will not dispatch via \`opencode run --agent\`):"
+  while IFS= read -r a; do
+    [[ -n "$a" ]] && printf "      %s\n" "$a"
+  done <<< "$missing"
+  cap_set omo_mode_all false
+
+  if [[ "$MODE" == "check" ]]; then
+    info "[check mode] run with --fix to patch"
+    missing_add "config" "oh-my-openagent-mode-all" "Agents in $config need mode=all" "$SCRIPT_DIR/setup --fix"
+    return 0
+  fi
+
+  local do_patch="n"
+  if [[ "$MODE" == "fix" ]]; then
+    do_patch="y"
+  elif [[ -t 0 ]]; then
+    printf "  Patch all agents to mode=all now? [Y/n] "
+    read -r do_patch </dev/tty 2>/dev/null || do_patch="n"
+    [[ -z "$do_patch" ]] && do_patch="y"
+  fi
+
+  if [[ "$do_patch" =~ ^[Yy] ]]; then
+    local bak="${config}.bak.$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+    cp "$config" "$bak"
+    local tmp
+    tmp=$(mktemp "${config}.XXXXXX")
+    if jq '.agents |= with_entries(.value.mode = "all")' "$config" > "$tmp" && [[ -s "$tmp" ]]; then
+      mv "$tmp" "$config"
+      ok "Patched mode=all on all agents (backup: $(basename "$bak"))"
+      cap_set omo_mode_all true
+    else
+      rm -f "$tmp"
+      rm -f "$bak"
+      fail "jq patch failed — $config unchanged"
+    fi
+  else
+    info "Skipped — re-run '$SCRIPT_DIR/setup --fix' to patch later"
+    missing_add "config" "oh-my-openagent-mode-all" "Agents in $config need mode=all" "$SCRIPT_DIR/setup --fix"
+  fi
+}
+
 # --- Parse args ---
 MODE="setup"
 case "${1:-}" in
@@ -199,6 +270,9 @@ if command -v opencode &>/dev/null; then
     missing_add "cli" "oh-my-openagent" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin oh-my-openagent"
   fi
 
+  # Audit mode=all on every agent — prereq for `opencode run --agent <name>`
+  check_omo_mode_all
+
   MODELS=$(opencode models 2>/dev/null || true)
   if [[ -n "$MODELS" ]]; then
     MODEL_COUNT=$(echo "$MODELS" | wc -l | tr -d ' ')
@@ -323,6 +397,7 @@ if [[ "$MODE" != "check" ]]; then
   "capabilities": {
     "opencode": $(cap_get opencode),
     "omo_plugin": $(cap_get omo_plugin),
+    "omo_mode_all": $(cap_get omo_mode_all),
     "mcp": {
       "perplexity": $(cap_get mcp_perplexity),
       "deepwiki": $(cap_get mcp_deepwiki),
