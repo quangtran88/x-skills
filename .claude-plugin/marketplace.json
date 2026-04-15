@@ -1,7 +1,5 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "x-skills-marketplace",
-  "description": "Intelligent skill routers for Claude Code — execution, research, review, debugging, design, and security testing",
   "owner": {
     "name": "Randy Tran"
   },
@@ -28,6 +26,5 @@
         "orchestration"
       ]
     }
-  ],
-  "version": "1.1.0"
+  ]
 }
