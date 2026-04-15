@@ -2,7 +2,7 @@
 
 For the full agent catalog, cost tiers, and parallel patterns, see the [shared routing table](../../x-shared/omo-routing.md).
 
-> ⚠ **DO NOT DISPATCH to `hephaestus`, `atlas`, `prometheus`, `metis`, `momus`.** These 5 role agents are UNAVAILABLE (oh-my-opencode plugin compat bug). Use direct model routing instead — see the x-do-specific routing table below. Full writeup: `~/.claude/skills/x-omo/gotchas.md`.
+> ⚠ **DO NOT DISPATCH to `hephaestus`, `atlas`, `prometheus`, `metis`, `momus`.** These 5 role agents are UNAVAILABLE (oh-my-opencode plugin compat bug). Use direct model routing instead — see the x-do-specific routing table below. Full writeup: `../../x-omo/gotchas.md`.
 
 ## OMO Tool Access (Verified via `opencode mcp list`)
 

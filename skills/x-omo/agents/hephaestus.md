@@ -7,7 +7,7 @@
 Use **`omo-agent --model codex "<structured prompt>"`** for autonomous deep implementation work. This gets you the same underlying model (GPT-5.3 Codex) without the broken plugin shim. Pass the full context, goal, constraints, existing code, expected output, verification steps, and output format in the prompt.
 
 ```bash
-~/.claude/skills/x-omo/omo-agent --model codex "<structured prompt>"
+omo-agent --model codex "<structured prompt>"
 ```
 
 ## Historical role
@@ -16,4 +16,4 @@ Use **`omo-agent --model codex "<structured prompt>"`** for autonomous deep impl
 
 ## Re-check
 
-Re-probe with `cd /tmp && timeout 30 opencode run --agent hephaestus "ping"` after any `opencode upgrade` or oh-my-opencode version bump. If it returns successfully, clear the `OMO_BROKEN_AGENTS` entry in `~/.claude/skills/x-omo/omo-agent` and remove this stub. See `~/.claude/skills/x-omo/gotchas.md` for the full writeup.
+Re-probe with `cd /tmp && timeout 30 opencode run --agent hephaestus "ping"` after any `opencode upgrade` or oh-my-opencode version bump. If it returns successfully, clear the `OMO_BROKEN_AGENTS` entry in `omo-agent` and remove this stub. See `../gotchas.md` for the full writeup.

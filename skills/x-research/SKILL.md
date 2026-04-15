@@ -10,7 +10,7 @@ Smart research that classifies the question and routes to the optimal agent(s).
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-Read the OMO skill file (path in `config.json` → `omo_skill`) **and** `gotchas.md` to load the full agent catalog, invocation commands, model routing, and known failure patterns. This ensures you know how to invoke OMO agents (`explore`, `librarian`, `oracle`, `multimodal-looker`) via Bash — they are NOT OMC agents — and avoid recurring pitfalls. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. See `~/.claude/skills/x-omo/gotchas.md`.**
+Read the OMO skill file (path in `config.json` → `omo_skill`) **and** `gotchas.md` to load the full agent catalog, invocation commands, model routing, and known failure patterns. This ensures you know how to invoke OMO agents (`explore`, `librarian`, `oracle`, `multimodal-looker`) via Bash — they are NOT OMC agents — and avoid recurring pitfalls. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. See `../x-omo/gotchas.md`.**
 
 **Exception — when bootstrap can be skipped:**
 
@@ -85,7 +85,7 @@ Any dispatch of 2+ agents fires simultaneously (`run_in_background: true`). Comm
 
 When synthesizing after a failure/timeout, include **only** the succeeded agents' findings, note which agents failed and what information is missing, and offer to retry the failed agent or answer without it. Partial synthesis is allowed, but only after each dispatched agent has a known terminal state.
 
-Example: `~/.claude/skills/x-omo/omo-agent explore "find auth patterns"` (Bash tool, timeout 600000)
+Example: `omo-agent explore "find auth patterns"` (Bash tool, timeout 600000)
 
 ## Model Routing
 

@@ -64,7 +64,7 @@ Role Agents:
   (Other OMO agents — hephaestus, atlas, prometheus, metis, momus — are
    currently unavailable due to an opencode/oh-my-opencode plugin compat bug.
    Use `omo-agent --model gpt|codex|gemini-pro "<prompt>"` as a workaround.
-   See ~/.claude/skills/x-omo/gotchas.md for details.)
+   See the x-omo skill gotchas.md for details.)
 
 Model Aliases (resolved via `opencode models`):
   gemini-pro        Gemini 3.1 Pro

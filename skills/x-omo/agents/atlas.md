@@ -7,7 +7,7 @@
 Use **`omo-agent --model codex "<structured plan execution prompt>"`** for plan execution / multi-task orchestration. You'll need to structure the prompt with the plan path, task list, and execution order yourself — `--model codex` does not auto-load `.sisyphus/plans/` paths.
 
 ```bash
-~/.claude/skills/x-omo/omo-agent --model codex "<plan execution prompt with embedded plan content>"
+omo-agent --model codex "<plan execution prompt with embedded plan content>"
 ```
 
 For plans with many independent tasks, prefer `oh-my-claudecode:ralph` (persistence loop with TDD/verification per story) or `superpowers:subagent-driven-development` (fresh subagent per task).
@@ -18,4 +18,4 @@ For plans with many independent tasks, prefer `oh-my-claudecode:ralph` (persiste
 
 ## Re-check
 
-Re-probe with `cd /tmp && timeout 30 opencode run --agent atlas "ping"` after any `opencode upgrade` or oh-my-opencode version bump. See `~/.claude/skills/x-omo/gotchas.md` for the full writeup.
+Re-probe with `cd /tmp && timeout 30 opencode run --agent atlas "ping"` after any `opencode upgrade` or oh-my-opencode version bump. See `../gotchas.md` for the full writeup.

@@ -34,7 +34,7 @@ If `{{ARGUMENTS}}` starts with an agent name or `--model`, invoke it immediately
 /omo                              → show agent catalog below for selection
 ```
 
-**Rule:** If the first arg matches an agent name (`oracle`, `explore`, `librarian`, `multimodal-looker`) or is `--model`/`--file`, run `~/.claude/skills/x-omo/omo-agent` with all args directly. Do not ask which agent — the user already chose.
+**Rule:** If the first arg matches an agent name (`oracle`, `explore`, `librarian`, `multimodal-looker`) or is `--model`/`--file`, run `omo-agent` with all args directly. Do not ask which agent — the user already chose.
 
 ---
 
@@ -77,7 +77,7 @@ If `{{ARGUMENTS}}` starts with an agent name or `--model`, invoke it immediately
 Use when you need a **specific model** rather than a role-based agent.
 
 ```bash
-~/.claude/skills/x-omo/omo-agent --model <alias> "<prompt>"
+omo-agent --model <alias> "<prompt>"
 ```
 
 | Alias | Resolves To | Best For |
@@ -89,7 +89,7 @@ Use when you need a **specific model** rather than a role-based agent.
 | Any partial ID | Fuzzy-matched via `opencode models` | e.g., `gpt-5.4-mini`, `big-pickle` |
 | Full `provider/model` | Passthrough | e.g., `openai/gpt-5.4` |
 
-See `~/.claude/skills/x-omo/models-routing.md` for detailed task-to-model mapping.
+See `models-routing.md` for detailed task-to-model mapping.
 
 ---
 
@@ -101,16 +101,16 @@ All agents are invoked via Bash with the `omo-agent` wrapper. **Do not use `spaw
 
 ```bash
 # Role agent
-~/.claude/skills/x-omo/omo-agent <agent-name> "<prompt>"
+omo-agent <agent-name> "<prompt>"
 
 # Model routing
-~/.claude/skills/x-omo/omo-agent --model <alias> "<prompt>"
+omo-agent --model <alias> "<prompt>"
 
 # Attach files
-~/.claude/skills/x-omo/omo-agent --file /path/to/file.pdf oracle "<prompt>"
+omo-agent --file /path/to/file.pdf oracle "<prompt>"
 
 # Attach skill directory
-~/.claude/skills/x-omo/omo-agent --skill /path/to/skill/ oracle "<prompt>"
+omo-agent --skill /path/to/skill/ oracle "<prompt>"
 ```
 
 **Timeout:** Always set Bash timeout to **600000** (10 min). Agents routinely take 1-5 minutes.
@@ -129,8 +129,8 @@ Fire multiple Bash tool calls simultaneously with `run_in_background: true`. Alw
 
 ```bash
 # Example: parallel research
-~/.claude/skills/x-omo/omo-agent explore "<prompt>"    # run_in_background: true
-~/.claude/skills/x-omo/omo-agent librarian "<prompt>"  # run_in_background: true
+omo-agent explore "<prompt>"    # run_in_background: true
+omo-agent librarian "<prompt>"  # run_in_background: true
 # Collect both results before synthesizing
 ```
 

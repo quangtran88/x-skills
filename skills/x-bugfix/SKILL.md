@@ -10,7 +10,7 @@ Smart entry point for bugs and investigations. Detects severity, routes through 
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-Read `~/.claude/skills/x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `~/.claude/skills/x-omo/gotchas.md`.**
+Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `../x-omo/gotchas.md`.**
 
 ## Invocation
 
@@ -19,7 +19,7 @@ For how to invoke skills, OMO agents, and OMC agents, see `../x-shared/invocatio
 ## Dependencies
 
 This skill references shared infrastructure and sibling skills:
-- `~/.claude/skills/x-omo/SKILL.md` — OMO agent catalog (loaded in Bootstrap)
+- `../x-omo/SKILL.md` — OMO agent catalog (loaded in Bootstrap)
 - `../x-shared/invocation-guide.md` — tool invocation patterns
 - `../x-shared/workflow-chains.md` — cross-skill chaining (handoff to `/x-review`)
 - `../x-shared/context-envelope.md` — handoff context block format

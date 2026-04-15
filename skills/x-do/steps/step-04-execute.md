@@ -16,7 +16,7 @@ Execute the reviewed plan and verify completion.
 | Signal | Route | Why |
 |--------|-------|-----|
 | 3+ tasks | `oh-my-claudecode:ralph` | Persistence loop, TDD, verification per story |
-| 1-2 complex tasks | OMO `--model codex` | GPT-5.3 Codex for autonomous deep work (replaces the UNAVAILABLE `hephaestus` role agent — see `~/.claude/skills/x-omo/gotchas.md`) |
+| 1-2 complex tasks | OMO `--model codex` | GPT-5.3 Codex for autonomous deep work (replaces the UNAVAILABLE `hephaestus` role agent — see `../../x-omo/gotchas.md`) |
 | 1-2 simple tasks | Direct execution via OMC `executor` | Fastest path |
 | Plan is a superpowers plan | `superpowers:subagent-driven-development` | Fresh subagent per task |
 
@@ -36,7 +36,7 @@ Format as a brief `[CONSTRAINTS]` block at the top of the execution prompt. This
 
 2. **Execute.**
    - For ralph: `Skill` tool → `oh-my-claudecode:ralph` with the plan
-   - For OMO codex (autonomous deep work): `Bash` tool → `~/.claude/skills/x-omo/omo-agent --model codex "<structured prompt>"`, `timeout: 600000`
+   - For OMO codex (autonomous deep work): `Bash` tool → `omo-agent --model codex "<structured prompt>"`, `timeout: 600000`
    - For executor: `Agent` tool → `subagent_type="oh-my-claudecode:executor"`
    - For subagent-driven: `Skill` tool → `superpowers:subagent-driven-development`
    - For direct execution (Mode D / surgical edits): Use `morph-mcp edit_file` for edits, `morph-mcp codebase_search` to locate targets

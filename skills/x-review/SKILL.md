@@ -34,7 +34,7 @@ Smart review that detects what to review and how deep to go.
 
 **MANDATORY first step — do this BEFORE anything else:**
 1. Read `config.json` in this skill directory to get the `omo_agent` path.
-2. Read the x-omo SKILL.md (at the parent directory of `omo_agent`) to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model gpt` (plan review / blocker-finder) or `--model codex` (autonomous implementation) instead. See `~/.claude/skills/x-omo/gotchas.md`.**
+2. Read the x-omo SKILL.md (at the parent directory of `omo_agent`) to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model gpt` (plan review / blocker-finder) or `--model codex` (autonomous implementation) instead. See `../x-omo/gotchas.md`.**
 
 ## Invocation
 

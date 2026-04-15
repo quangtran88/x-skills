@@ -20,7 +20,7 @@ role: router
 - `Read` for loading gotchas, config, referenced files
 - `Skill` tool for dispatching to x-research, writing-plans, etc.
 - `Agent` tool for launching executor / verifier subagents
-- `Bash` for dispatching OMO agents via `~/.claude/skills/x-omo/omo-agent`
+- `Bash` for dispatching OMO agents via `omo-agent`
 
 **Self-check (Modes A, B, E, F only):**
 If you're about to call `Edit`/`Write`/mutating `Bash` and you're NOT in Mode D, STOP.
@@ -33,7 +33,7 @@ Smart entry point that detects what to do and routes through the optimal workflo
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-Read `~/.claude/skills/x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (plan review / planning) instead. See `~/.claude/skills/x-omo/gotchas.md`.**
+Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (plan review / planning) instead. See `../x-omo/gotchas.md`.**
 
 ## Invocation
 
