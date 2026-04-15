@@ -7,7 +7,7 @@
     {
       "name": "x-skills",
       "description": "10 intelligent skill routers with optional multi-model orchestration via OpenCode. Skills: x-do, x-research, x-review, x-bugfix, x-design, x-api-pentest, x-omo, x-skill-review, x-skill-improve.",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "Randy Tran"
       },
