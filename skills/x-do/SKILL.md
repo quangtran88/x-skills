@@ -4,7 +4,7 @@ description: Use when the user asks to build, implement, fix, or execute a plan 
 role: router
 slots:
   workspace: current-dir                   # Override to `worktree` per-task for isolation
-  verifier: verification-before-completion # x-do's Completion section dispatches x-verify, which internally runs this cascade
+  verifier: x-verify                       # x-verify internally runs the cascade from completion-cascade.md
 reactions:
   research-needed:
     action: route
@@ -20,13 +20,16 @@ reactions:
     retries: 2
     auto: true
   lint-failed:
-    action: inline-fix
+    action: route
+    to: x-bugfix
     auto: true
   typecheck-failed:
-    action: inline-fix
+    action: route
+    to: x-bugfix
     auto: true
   verification-failed:
     action: re-review
+    to: x-verify
     auto: true
   implementation-complete:
     action: menu
@@ -76,6 +79,8 @@ x-verify runs the completion cascade (see `../x-shared/completion-cascade.md`). 
 - `verdict: done` → proceed to the handoff menu
 - `verdict: failed` → fire `verification-failed` reaction (routes to re-review, then re-execute if approved)
 - `verdict: needs-user-review` → surface x-verify's menu to the user, wait for input
+- `verdict: aborted` → exit the current workflow immediately; do not proceed to the handoff menu. Report the abort reason (`user-abort` or `stagnation-option-D`) to the user.
+- `verdict: waiting-for-user` → surface x-verify's menu (e.g., stagnation A/B/C/D) and pause. Do NOT loop or re-dispatch until the user answers.
 
 **Do not claim done without calling x-verify.** This is the single biggest compliance-gap closer.
 
