@@ -1,6 +1,6 @@
 {
   "name": "x-skills",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Intelligent skill routers for execution, research, review, debugging, design, and security testing — with optional multi-model orchestration via OpenCode",
   "author": {
     "name": "Randy Tran"
