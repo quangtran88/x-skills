@@ -14,8 +14,6 @@ Before dispatching any cascade step, check whether the invocation has verifiable
 - **Code project, but fresh/no-op test config** — Does `package.json` exist, but its `test` script is the default no-op pattern (`echo "Error: no test specified" && exit 1` or similar literal placeholder)? → return `done` with note "test script is the default npm-init placeholder; treat as no-config". Same rule for `pyproject.toml` with no configured runner, `Cargo.toml` with no test targets, etc.
 - **Code project with real config** — Has code-project markers AND at least one of {configured test command, configured lint command, configured typecheck command} → **proceed to step 1.**
 
-**Rationale:** The mandatory step 4 fallback exists to catch code projects whose verification commands silently fail to run. It should not fire on a docs PR, a scratch directory, a plain-text repo, or a fresh `npm init -y` project that hasn't been wired up yet. An earlier draft embedded this as a mid-cascade "step 3.5" substep; it was promoted to a leading scope gate after cross-model review flagged that a sub-numbered step reads as optional refinement, while this check is load-bearing — the cascade is actively harmful without it.
-
 ## The cascade (execute in order, first match wins)
 
 ### 1. ABORT check
@@ -44,10 +42,18 @@ This protocol prevents 01+06 from being wired inconsistently. x-verify step 1 re
 
 ### 3. VERIFICATION check (primary)
 
-- Call the project's canonical verification commands in order:
-  1. **Test** — `npm test` / `pytest` / project-specific. If not configured (including "default placeholder" detected by the SCOPE GATE above), mark "test: no-config" and continue.
-  2. **Lint** — `eslint` / `ruff` / project-specific. If not configured, mark "lint: no-config" and continue.
-  3. **Typecheck** — `tsc --noEmit` / `mypy`. If not configured, mark "typecheck: no-config" and continue.
+**Command discovery (first match wins per tool):**
+1. `package.json` `scripts.<test|lint|typecheck>` — if present, use it (e.g., `npm test`, `npm run lint`, `npm run typecheck`).
+2. Project-specific config detected — fall through to the direct command:
+   - test: `pytest` (pytest.ini, pyproject.toml `[tool.pytest]`), `cargo test` (Cargo.toml), `go test ./...` (go.mod).
+   - lint: `eslint <changed-files>` (eslint.config.* or .eslintrc.*), `ruff check` (ruff config), `golangci-lint run` (golangci config).
+   - typecheck: `tsc --noEmit` (tsconfig.json), `mypy` (mypy config), `pyright` (pyrightconfig.json).
+3. Neither present — mark "<tool>: no-config" and continue. Do **not** invent a command.
+
+Call the resolved verification commands in order:
+  1. **Test** — If no command resolves (or the SCOPE GATE flagged a placeholder), mark "test: no-config" and continue.
+  2. **Lint** — Same rule.
+  3. **Typecheck** — Same rule.
 - If any ran and returned non-zero → return `failed`.
 - If all ran clean → return `done`.
 - **Special case: all three returned "no-config"** → go to step 4. (The SCOPE GATE already ruled out projects where this would cause menu fatigue — any un-tooled project that reaches step 3 is one that has real code-project markers AND real code surface, so step 4 is appropriate.)
@@ -56,9 +62,9 @@ This protocol prevents 01+06 from being wired inconsistently. x-verify step 1 re
 
 This is the step that closes the silent-failure hole.
 
-**Initial ship (this application):** dispatch `code-reviewer` directly via `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`. Hard-coded. Do not invent a `verifier` slot yet — proposal 05 v1 hasn't shipped.
+**Primary dispatch:** `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`. Hard-coded target; retrofit to the `verifier` slot (declared in skill frontmatter) is a deferred follow-up. The slot is typed `skill-or-agent` since `code-reviewer` is an OMC agent, not a skill.
 
-**Later retrofit (post-05 v1):** route through the `verifier` slot (declared in skill frontmatter). Slot type will need to be `skill-or-agent` since `code-reviewer` is an OMC agent, not a skill — resolve that in the 05 v1 spec, not here.
+**Claude-only fallback (OMC unavailable):** If the `oh-my-claudecode:code-reviewer` subagent is not resolvable in the current harness, fall back to `Agent` tool with a generic review prompt (no `subagent_type`, `mode: auto`) per CLAUDE.md § "Claude-Only Fallback Routing". Note the fallback inline ("Used Claude-only fallback — OMC code-reviewer unavailable") so the user can see which path was taken.
 
 The verifier reads the diff and performs semantic verification by inspection:
 - Are the changes internally consistent?
@@ -109,5 +115,5 @@ Wait for user input. Do not silently claim done.
 - **Canonical definition:** this file (`x-shared/completion-cascade.md`).
 - **x-verify role:** a thin dispatcher skill that invokes the cascade in order. x-verify does NOT re-document the cascade — it references this file. If you find yourself duplicating a step description in x-verify, stop and link here instead.
 - **Per-skill invocation:** each long-running skill references `x-verify` in its "Completion" section. They do not reimplement the cascade locally.
-- **Verifier dispatch (step 4):** hard-coded `code-reviewer` via `Agent` tool for the initial ship. Retrofit to the `verifier` slot once 05 v1 is stable.
+- **Verifier dispatch (step 4):** hard-coded `code-reviewer` via `Agent` tool; retrofit to the `verifier` slot is a deferred follow-up.
 - **SCOPE GATE behavior:** runs before step 1; short-circuits when the project has no verifiable surface (no code markers, docs-only, only-reads).

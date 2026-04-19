@@ -29,9 +29,7 @@ High-level shape (pointer only, full detail in the canonical file):
 1. **SCOPE GATE** — un-tooled or docs-only invocation short-circuits to `done`
 2. **ABORT** → **EXPLICIT FAILURE** → **VERIFICATION** → **MANDATORY FALLBACK** → **HUMAN-APPROVAL**
 
-**Verifier dispatch (step 4, initial ship):** call `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`. Hard-coded. A future retrofit will route this through the `verifier` slot once proposal 05 v1 ships.
-
-Drift between this pointer and the canonical file is a bug. `x-skill-review` should grep this skill for any expanded re-documentation of cascade steps and flag it (follow-up, since x-skill-review is external to this repo).
+**Verifier dispatch (step 4):** call `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`. Claude-only fallback when OMC is unavailable: `Agent` tool with a generic review prompt (no `subagent_type`). See the canonical file for the fallback contract.
 
 ## Output format
 
@@ -55,6 +53,19 @@ details:
   lint: clean
   typecheck: clean
   findings: [ ... ]
+```
+
+```yaml
+verdict: aborted
+reason: user-abort           # or stagnation-option-D
+details: { ... }
+```
+
+```yaml
+verdict: waiting-for-user
+reason: stagnation-menu-open # or human-approval-needed
+details: { ... }
+menu: [A] alternative-A, [B] alternative-B, [C] alternative-C, [D] abort
 ```
 
 ```yaml
