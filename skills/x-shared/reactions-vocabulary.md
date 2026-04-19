@@ -34,25 +34,25 @@ Not every trigger applies to every skill. Use this table to find which triggers 
 
 | Trigger | Required for | Optional for | N/A for |
 |---|---|---|---|
-| `research-needed` | router, orchestrator | — | reviewer, verifier |
-| `plan-needed` | router, orchestrator | — | reviewer, verifier, researcher |
-| `research-complete` | orchestrator | router | reviewer, verifier |
-| `plan-complete` | orchestrator | router | reviewer, verifier |
-| `plan-approved` | orchestrator | router | reviewer, verifier |
-| `implementation-complete` | router, orchestrator | — | researcher, verifier |
-| `test-failed` | router, orchestrator, bugfixer | — | researcher |
-| `test-passed` | router, orchestrator, bugfixer | verifier | researcher |
-| `lint-failed` | router, orchestrator | — | researcher |
-| `typecheck-failed` | router, orchestrator | — | researcher |
-| `verification-failed` | router, orchestrator | — | researcher |
-| `verification-passed` | router, orchestrator | verifier | researcher |
-| `review-approved` | reviewer | router, orchestrator | researcher, verifier |
-| `review-changes-requested` | reviewer | router, orchestrator | researcher, verifier |
-| `stagnation-detected` | router, orchestrator, bugfixer | — | reviewer, researcher |
+| `research-needed` | router | — | reviewer, verifier |
+| `plan-needed` | router | — | reviewer, verifier, researcher |
+| `research-complete` | router | — | reviewer, verifier |
+| `plan-complete` | router | — | reviewer, verifier |
+| `plan-approved` | router | — | reviewer, verifier |
+| `implementation-complete` | router | — | researcher, verifier |
+| `test-failed` | router | — | researcher |
+| `test-passed` | router | verifier | researcher |
+| `lint-failed` | router | — | researcher |
+| `typecheck-failed` | router | — | researcher |
+| `verification-failed` | router | — | researcher |
+| `verification-passed` | router | verifier | researcher |
+| `review-approved` | reviewer | router | researcher, verifier |
+| `review-changes-requested` | reviewer | router | researcher, verifier |
+| `stagnation-detected` | router | — | reviewer, researcher |
 | `human-approval-needed` | all roles | — | — |
 | `skill-done` | all roles | — | — |
 
-**Guidance for new skills:** start with triggers marked "Required for" your role. Add "Optional for" triggers only when your workflow explicitly references them. Ignore "N/A" triggers — declaring them in your reactions block is noise.
+**Guidance for new skills:** start with triggers marked "Required for" your role. Add "Optional for" triggers only when your workflow explicitly references them. Ignore "N/A" triggers — declaring them in your reactions block is noise. Role taxonomy is currently `router | reviewer | verifier`; additional roles (e.g., orchestrator, bugfixer) will be added to this table when declared by a live skill.
 
 ## Reaction schema (for reference)
 

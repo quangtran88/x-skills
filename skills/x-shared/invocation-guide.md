@@ -4,7 +4,8 @@ How to invoke tools from any x-skill.
 
 | What | Tool | Notes |
 |------|------|-------|
-| **Skills** (superpowers, oh-my-claudecode, x-*) | `Skill` tool | Never `Read` on skill files — Skill tool loads them properly |
+| **Invoking a skill** (superpowers, oh-my-claudecode, x-*) | `Skill` tool | Never `Read` to *invoke* a skill — Skill tool loads it properly and runs its workflow |
+| **Loading a skill file as reference** (e.g., x-omo agent catalog during bootstrap) | `Read` tool | Allowed — reads the markdown for inline reference without triggering invocation |
 | **OMO agents** (explore, oracle, etc.) | `Bash` tool, timeout **600000** | Never Agent/Task tool — silently downgrades to Claude instead of using the target model |
 | **OMC agents** (code-reviewer, executor, etc.) | `Agent` tool with `subagent_type` | e.g., `subagent_type="oh-my-claudecode:code-reviewer"` |
 
@@ -190,7 +191,7 @@ This makes slot resolution observable by surfacing the resolution source in the 
 
 If a slot resolves to a value not in `slot-schema.md` (typo, unknown skill), the skill cannot "refuse to load" — the harness has already loaded it. What it *can* do is surface the error inline and ask the user before dispatching:
 
-> "🔴 Slot `verifier` resolved to `veriifcation-before-completion` (typo?). Valid values: verification-before-completion, x-verify, x-skill-review, code-reviewer, custom:<skill>, none. Which did you mean?"
+> "🔴 Slot `verifier` resolved to `veriifcation-before-completion` (typo?). Valid values: verification-before-completion, x-verify, x-skill-review, code-reviewer, custom:<skill>. Which did you mean?"
 
 Do not silently fall back to a different slot when the resolution is ambiguous — pause and ask.
 

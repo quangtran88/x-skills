@@ -38,18 +38,14 @@ Skills declare their pluggable dependencies via frontmatter `slots:` block. v1 h
 - `x-skill-review` — when verifying a skill modification (skill, external — dispatch via `Skill` tool)
 - `code-reviewer` — OMC agent (dispatch via `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`)
 - `custom:<skill-name>` — project-specific verifier (skill — dispatch via `Skill` tool)
-- `none` — skip verification (DANGEROUS; requires explicit user approval inline before proceeding)
 
 ### `reviewer` slot (vocabulary only — not emitted in v1)
-- `code-reviewer` — OMC code-reviewer subagent (default for code)
-- `x-review` — full x-review skill with cross-model
-- `cross-model-review` — shorthand for x-review with cross-model mandatory
-- `none` — skip review (only for read-only research tasks)
+
+Valid values will be defined when the first consumer lands. Until then, no skill declares this slot.
 
 ### `executor` slot (vocabulary only — not emitted in v1)
-- `executor` — dispatch to OMC executor subagent (**default**; routers cannot apply edits inline per proposal 04's role forbids)
-- `inline` — current session applies edits. **⚠ Currently not usable by any x-skill.** Proposal 04 declares "No x-skill should declare `role: executor`" — therefore no x-skill can legally carry a role that permits `inline`. This value is retained in the vocabulary for future executor-role skills (if any are ever introduced). Setting `executor: inline` on a router, reviewer, or any other current x-skill is a **hard contradiction**: the skill must surface the conflict inline and refuse to dispatch. `x-skill-review` (external) should flag any `executor: inline` declaration as a role/slot conflict.
-- `x-omo:<model>` — route edits through a non-Claude CLI (rare)
+
+Valid values will be defined when the first consumer lands. Until then, no skill declares this slot. Per proposal 04, no x-skill may declare `role: executor`, so router/reviewer/verifier skills cannot legally carry an `executor: inline` value.
 
 ## Slot precedence (v1 — 3-layer cascade)
 
@@ -75,10 +71,10 @@ Resolution:
 - workspace: `current-dir` (from skill frontmatter; no user override)
 - verifier: `verification-before-completion` (from skill frontmatter; no user override)
 
-User prompt: "refactor this module, but skip the verifier this time"
+User prompt: "refactor this module, but use x-review this time"
 Resolution:
 - workspace: `current-dir` (from skill frontmatter)
-- verifier: `none` (user-in-prompt override — requires x-do to surface the "DANGEROUS; explicit approval needed" prompt before proceeding)
+- verifier: `x-review` (user-in-prompt override; x-do surfaces the override inline before dispatching)
 
 ## v2 reference — project CLAUDE.md mechanism
 

@@ -79,12 +79,10 @@ Run `bin/setup` after installation to configure the omo-agent binding and detect
 ./bin/setup --uninstall
 ```
 
-Or invoke the setup skill: `/x-skills-setup`
+Or invoke the setup skill: `/x-skills:setup`
 
 ## Instruction Precedence
 
 The skills in this repo resolve conflicting instructions via the precedence ladder in `skills/x-shared/invocation-guide.md` § "Prompt Assembly — Precedence Ladder".
 
 TL;DR: inviolable principles > user in-prompt > project `CLAUDE.md` > **this file** > advisory memory > `~/.claude/CLAUDE.md` > skill frontmatter > skill body > harness.
-
-When editing this file, remember it sits at priority 3 — specific enough to override a user's global defaults for anyone working on this repo, weak enough that a single project can override for its own needs.
