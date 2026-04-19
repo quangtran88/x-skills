@@ -75,7 +75,7 @@ Your existing memory file lists 6 recurring x-review compliance gaps. One **prim
 | Verification-before-completion skipped | **06** — mandatory completion cascade with fallback | 02 — names the `verification-failed` event but does NOT close the gap alone |
 | Handoff context missing | **03** — context envelope citation at `03-orchestration-primitives.md:70` (already written) | — |
 | Passes menu not offered | **02** — declares `implementation-complete: { action: menu }` | — |
-| Re-review after changes not triggered | **02** — declares `changes-requested: re-review` | — |
+| Re-review after changes not triggered | **02** — declares `review-changes-requested: re-review` | — |
 
 **Six gaps, one primary per gap.** Tally by owner: **02** owns 2, **03** owns 2, **04** owns 1, **06** owns 1.
 
@@ -101,7 +101,7 @@ If 02 Phase 2 never ships, these two gaps remain open — the declarative block 
 
 6. **06 (state cascade) with hard-coded `code-reviewer` fallback** — **applied 2026-04-19.** Builds on 02's reaction vocabulary. Step 4 dispatches `code-reviewer` via `Agent` tool directly, NOT routed through a `verifier` slot (because 05 hasn't landed yet). This is the intended intermediate state; 06's `Depends on: 05` header is for the final slot-aware form, not the initial ship. **SCOPE GATE (leading short-circuit for un-tooled / docs-only / only-reads invocations) is MANDATORY** — without it, step 4 fires on every docs PR. Initial ship: `skills/x-shared/completion-cascade.md` + `skills/x-verify/SKILL.md` + x-do Completion section + `CLAUDE.md` table. Rollout to `x-bugfix`/`x-design` and the `verifier` slot retrofit are deferred.
 
-7. **05 v1 only (plugin slots, frontmatter-defaults)** — **applied 2026-04-19.** Shipped the slot schema (`skills/x-shared/slot-schema.md`), skill-frontmatter defaults on x-do (`workspace: current-dir`, `verifier: verification-before-completion`), and the Slot Resolution self-check section in `invocation-guide.md`. Project-CLAUDE.md override story deferred to v2 per all three reviewers' consensus (see 05 Part A — Enforcement honesty). Other slots (`model`, `reviewer`, `executor`, `researcher`, `planner`) remain in the vocabulary but are NOT emitted by any skill in v1. Retrofit of 06 step 4 to use the `verifier` slot is a deferred post-v1 follow-up.
+7. **05 v1 only (plugin slots, frontmatter-defaults)** — **applied 2026-04-19.** Shipped the slot schema (`skills/x-shared/slot-schema.md`), skill-frontmatter defaults on x-do (`workspace: current-dir`, `verifier: x-verify`), and the Slot Resolution self-check section in `invocation-guide.md`. Project-CLAUDE.md override story deferred to v2 per all three reviewers' consensus (see 05 Part A — Enforcement honesty). Other slots (`model`, `reviewer`, `executor`, `researcher`, `planner`) remain in the vocabulary but are NOT emitted by any skill in v1. Retrofit of 06 step 4 to use the `verifier` slot is a deferred post-v1 follow-up.
 
 8. **Later (Tier 3 — only after everything above has a real-session track record):** 02 Phase 2 (execution contract with retries/depth/terminal states), 05 v2 (project overrides via CLAUDE.md), full 04 rollout to the remaining skills, full 03 retrofit across all dispatch sites, any fallback sub-phases for proposals whose Phase 1 didn't hold.
 
@@ -126,7 +126,7 @@ description: One-line description of what this skill routes
 role: router
 slots:
   workspace: current-dir
-  verifier: verification-before-completion
+  verifier: x-verify
 reactions:
   implementation-complete:
     action: menu
@@ -142,7 +142,7 @@ reactions:
 > **HARD RULE:** This skill MUST NOT call `Edit`, `Write`, or mutating `Bash`.
 > If you are about to, STOP — dispatch to an executor subagent via `Agent` tool.
 
-See `../x-shared/role-vocabulary.md` for the full contract.
+_Role vocabulary is currently defined inline per skill. `role-vocabulary.md` is deferred — see `04-role-separation.md`. Valid values today: `router`, `reviewer`, `verifier`._
 
 ## Completion
 

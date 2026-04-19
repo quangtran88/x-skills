@@ -230,7 +230,7 @@ description: Use when the user asks to build, implement, fix, or execute a plan 
 role: router
 slots:
   workspace: current-dir                   # Override to `worktree` per-task for isolation
-  verifier: verification-before-completion # x-do's Completion section dispatches x-verify, which internally runs this cascade
+  verifier: x-verify                       # x-verify internally runs the cascade from completion-cascade.md
 reactions:
   research-needed:
     action: route
@@ -242,7 +242,7 @@ reactions:
 
 **Notes:**
 - v1 emits only `workspace` and `verifier`. Do not add the other 5 slots.
-- The `verifier` value declares intent — x-do's Completion section still dispatches `x-verify` (per 06), and x-verify internally runs `verification-before-completion` as step 3 of the cascade. Retrofit of 06 step 4 to resolve through this slot is explicitly deferred to the post-v1 rollout.
+- The `verifier` value points at the x-verify skill, which internally runs the cascade from `completion-cascade.md` (step 3 dispatches `verification-before-completion`-equivalent checks). Retrofit of 06 step 4 to resolve through this slot is explicitly deferred to the post-v1 rollout.
 - No body edits. The slot block is declarative; it does not change x-do's workflow prose in v1.
 
 **Other skills (x-research, x-review, x-bugfix, x-design, x-verify, x-api-pentest, x-omo, x-skill-review, x-skill-improve, x-shared):** no changes in v1. They will receive slot blocks in the v2 rollout.

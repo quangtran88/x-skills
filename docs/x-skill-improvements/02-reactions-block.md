@@ -34,7 +34,7 @@ reactions:
     auto: true
     action: send-to-agent
     retries: 2
-  changes-requested:
+  review-changes-requested:
     auto: true
     action: send-to-agent
     escalateAfter: 30m
@@ -48,7 +48,7 @@ The Lifecycle Manager consults this table on every state change and dispatches a
 1. **Declarative** — the full automation surface is readable in one block.
 2. **Overridable per project** — the yaml lives in `agent-orchestrator.yaml` which is per-project.
 3. **Safety levers built in** — `auto: false` lets you start in "notify only" mode and promote to `auto: true` once trusted.
-4. **Named triggers** — `ci-failed`, `changes-requested`, `approved-and-green` are a stable vocabulary.
+4. **Named triggers** — `ci-failed`, `review-changes-requested`, `approved-and-green` are a stable vocabulary.
 
 We borrow this pattern into x-skill frontmatter. The x-skill equivalent runs entirely in markdown + Claude Code's existing tool dispatch — no runtime changes needed.
 
@@ -274,7 +274,7 @@ reactions:
 **`x-review`:**
 ```yaml
 reactions:
-  changes-requested:
+  review-changes-requested:
     action: re-review
     to: x-do
     retries: 3
@@ -322,7 +322,7 @@ The behavior tests below require Phase 2's execution contract and CANNOT be sati
 
 - **Reaction fires correctly:** run x-do on a task where tests will fail. Expected: test failure detected, x-do fires `test-failed: route to x-bugfix` (or explicitly menus user), retry budget respected.
 - **`auto: false` respected:** `human-approval-needed` pauses for approval.
-- **Compliance gaps closed:** `review-approved` fires the menu (closes "passes menu not offered"), `changes-requested` routes back to x-do (closes "re-review after changes not triggered"). **Note:** these are Phase 2 gap closures. Phase 1 closes zero gaps.
+- **Compliance gaps closed:** `review-approved` fires the menu (closes "passes menu not offered"), `review-changes-requested` routes back to x-do (closes "re-review after changes not triggered"). **Note:** these are Phase 2 gap closures. Phase 1 closes zero gaps.
 - **Overridable per project:** requires proposals 07 (applied ✓) AND 05 v2 (project override, deferred Tier 3) to work end-to-end.
 
 ### Split success metrics by phase
