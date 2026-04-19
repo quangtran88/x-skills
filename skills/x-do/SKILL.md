@@ -2,6 +2,43 @@
 name: x-do
 description: Use when the user asks to build, implement, fix, or execute a plan — detects context (existing plan, new feature, bug, quick task, visual input) and routes through brainstorming, planning, debugging, or execution workflows
 role: router
+slots:
+  workspace: current-dir                   # Override to `worktree` per-task for isolation
+  verifier: verification-before-completion # x-do's Completion section dispatches x-verify, which internally runs this cascade
+reactions:
+  research-needed:
+    action: route
+    to: x-research
+    auto: true
+  plan-needed:
+    action: route
+    to: superpowers:writing-plans
+    auto: true
+  test-failed:
+    action: route
+    to: x-bugfix
+    retries: 2
+    auto: true
+  lint-failed:
+    action: inline-fix
+    auto: true
+  typecheck-failed:
+    action: inline-fix
+    auto: true
+  verification-failed:
+    action: re-review
+    auto: true
+  implementation-complete:
+    action: menu
+    options: [commit, x-review, plan-next, done]
+    auto: false
+  stagnation-detected:
+    action: menu
+    options: [alternative-A, alternative-B, alternative-C, abort]
+    auto: false
+  human-approval-needed:
+    action: notify
+    auto: false
 ---
 
 ## Role: router
@@ -25,6 +62,22 @@ role: router
 **Self-check (Modes A, B, E, F only):**
 If you're about to call `Edit`/`Write`/mutating `Bash` and you're NOT in Mode D, STOP.
 x-do routes. It does not execute. Dispatch to an executor subagent via `Agent` tool.
+
+## Completion (MANDATORY)
+
+Before claiming done, dispatch x-verify via the Skill tool:
+
+```
+Skill tool: x-verify
+```
+
+x-verify runs the completion cascade (see `../x-shared/completion-cascade.md`). Honor its verdict:
+
+- `verdict: done` → proceed to the handoff menu
+- `verdict: failed` → fire `verification-failed` reaction (routes to re-review, then re-execute if approved)
+- `verdict: needs-user-review` → surface x-verify's menu to the user, wait for input
+
+**Do not claim done without calling x-verify.** This is the single biggest compliance-gap closer.
 
 # x-do — Universal Work Command
 

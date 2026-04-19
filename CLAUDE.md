@@ -1,6 +1,6 @@
 # x-skills — Intelligent Skill Routers for Claude Code
 
-10 skills that classify user intent and route to the optimal executor. Ships with optional multi-model orchestration via OpenCode.
+11 skills that classify user intent and route to the optimal executor. Ships with optional multi-model orchestration via OpenCode.
 
 ## Skills
 
@@ -9,6 +9,7 @@
 | **x-do** | Build, implement, fix, execute | Best with: opencode, OMC, superpowers |
 | **x-research** | Research, investigate, understand | Best with: opencode, MCP servers |
 | **x-review** | Code review, plan review, PR review | Best with: opencode, OMC, superpowers |
+| **x-verify** | Run the completion cascade ("am I done?") | Standalone |
 | **x-bugfix** | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
 | **x-design** | Apply visual design systems | Standalone |
 | **x-api-pentest** | API security testing (OWASP Top 10) | External security CLIs |
@@ -79,3 +80,11 @@ Run `bin/setup` after installation to configure the omo-agent binding and detect
 ```
 
 Or invoke the setup skill: `/x-skills-setup`
+
+## Instruction Precedence
+
+The skills in this repo resolve conflicting instructions via the precedence ladder in `skills/x-shared/invocation-guide.md` § "Prompt Assembly — Precedence Ladder".
+
+TL;DR: inviolable principles > user in-prompt > project `CLAUDE.md` > **this file** > advisory memory > `~/.claude/CLAUDE.md` > skill frontmatter > skill body > harness.
+
+When editing this file, remember it sits at priority 3 — specific enough to override a user's global defaults for anyone working on this repo, weak enough that a single project can override for its own needs.

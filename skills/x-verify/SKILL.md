@@ -1,0 +1,74 @@
+---
+name: x-verify
+description: Use when a long-running skill needs to check "am I done?" — runs the canonical completion cascade with mandatory fallback to prevent silent success claims
+role: verifier
+---
+
+# x-verify — Completion Cascade
+
+## Purpose
+
+Single entry point for answering "am I done?" reliably. Every long-running x-skill dispatches here instead of running its own ad-hoc checks.
+
+See `../x-shared/completion-cascade.md` for the full cascade specification.
+
+## Role: verifier
+
+**This skill is a verifier.** It reports completion status; it does not apply fixes.
+
+**x-verify MUST NOT:**
+- Call `Edit` or `Write` — if fixes are needed, return findings and let the caller route to an executor
+- Call mutating `Bash` commands — only read-only verification (tests, lint, typecheck, git log)
+- Claim "done" when the verification cascade didn't actually complete
+
+## Execution
+
+Run the cascade from `../x-shared/completion-cascade.md` in order. **Do not re-document the cascade here** — that file is the single source of truth. If you are editing this file to change cascade logic, stop: edit `completion-cascade.md` instead.
+
+High-level shape (pointer only, full detail in the canonical file):
+1. **SCOPE GATE** — un-tooled or docs-only invocation short-circuits to `done`
+2. **ABORT** → **EXPLICIT FAILURE** → **VERIFICATION** → **MANDATORY FALLBACK** → **HUMAN-APPROVAL**
+
+**Verifier dispatch (step 4, initial ship):** call `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`. Hard-coded. A future retrofit will route this through the `verifier` slot once proposal 05 v1 ships.
+
+Drift between this pointer and the canonical file is a bug. `x-skill-review` should grep this skill for any expanded re-documentation of cascade steps and flag it (follow-up, since x-skill-review is external to this repo).
+
+## Output format
+
+Return one of these verdicts:
+
+```yaml
+verdict: done
+reason: all-checks-passed
+details:
+  test: passed
+  lint: clean
+  typecheck: clean
+  fallback: (not invoked)
+```
+
+```yaml
+verdict: failed
+reason: test-failed
+details:
+  test: FAIL (3 failures)
+  lint: clean
+  typecheck: clean
+  findings: [ ... ]
+```
+
+```yaml
+verdict: needs-user-review
+reason: all-verification-inconclusive
+details:
+  test: no-config
+  lint: no-config
+  typecheck: no-config
+  fallback: uncertain (see findings)
+  findings: [ ... ]
+menu: [A] mark done, [B] re-verify, [C] abort
+```
+
+## Rationale
+
+Closes the "verification-before-completion skipped" compliance gap documented in `feedback_xreview_compliance.md`. The mandatory fallback prevents skills from claiming done when they have no actual verification signal.
