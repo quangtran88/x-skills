@@ -39,10 +39,15 @@ Launch these 3 in ONE message — all tool calls in a single response, not seque
 If you just sent a message with only ONE tool call, STOP — you already failed this rule. Delete nothing, just add the missing tool calls in your next message and note the deviation.
 
 **Pre-launch self-check (run BEFORE sending the message):**
+
+*Presence checks (all 3 reviewers in one message):*
 1. Is `Agent(subagent_type="superpowers:code-reviewer", ...)` in the call list? If no → STOP, add it.
 2. Is `Bash(command="<omo_agent> ...")` in the call list? If no → STOP, add it.
 3. Is `Skill(skill="superpowers:requesting-code-review")` in the call list? If no → STOP, add it.
 4. Are all 3 in the SAME message? If no → STOP, batch them.
+
+*Content checks (right command for the target):*
+5. **Target-routing check:** If target is B/C/D (code/files/diff) and your Bash command contains `--model gpt`, STOP — switch to `oracle`. `--model gpt` is the plan-only blocker-finder (Target A). Code/diff review uses `<omo_agent> oracle "..."`. Mixing them is a known compliance gap (sessions 9ba4f817, 1ba866d1).
 
 Self-verification by reading files / running grep is NOT a substitute for the Agent code-reviewer dispatch. The Agent runs in a separate context window — its findings differ from yours.
 

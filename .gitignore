@@ -1,3 +1,6 @@
 # OMC session state — may contain pasted credentials, tool error dumps,
 # and transcripts. Never force-add (git add -f) without review.
 .omc/
+
+# Skill runtime state (alignment logs, caches) — per-user, not source
+skills/*/data/

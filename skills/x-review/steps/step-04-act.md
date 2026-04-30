@@ -24,6 +24,25 @@ S, P, X are read-only and can run in parallel. D modifies files — run it last,
 - "1) Apply all fixes  2) HIGH-only  3) Stop" — invented fix-flow menu, skips the passes gate entirely
 - Inlining only S/P/X — partial menu robs the user of [C]/[V]/[D]/[A]/[N] options
 - Jumping straight to "Want me to fix?" — skips the menu altogether
+- "[D] Fix Mode  [F] Finish  [N] Done" — letter-redefinition: `[D]` is Deslop, NOT Fix Mode. `[F]` belongs to APPROVE branch (finishing-a-development-branch), not the passes menu. Evidence: session 9ba4f817.
+
+**Letter assignments are fixed. Do not redefine them.** `[S]=Security`, `[P]=Performance`, `[C]=Complexity`, `[X]=Cross-model`, `[V]=Visual`, `[D]=Deslop`, `[A]=All of S/P/C/D`, `[N]=Done`. Any other meaning for these letters is a deviation.
+
+**Paste-verbatim rule.** Copy the menu block from `references/review-passes.md` exactly as written. Do not summarize, reorder, or substitute. If you are tempted to "tailor" the menu to the findings (e.g., "they only need [D]"), STOP — the user picks; the skill presents.
+
+**Canonical menu (copy this block verbatim — do NOT re-derive):**
+
+```
+Additional passes available:
+[S] Security — threat modeling (STRIDE/OWASP)
+[P] Performance — path tracing (hot paths, complexity analysis)
+[C] Complexity — structural analysis (function sizes, coupling, duplication)
+[X] Cross-model — adversarial (skip if oracle already ran in primary pass; use [C] instead)
+[V] Visual — compare screenshots to specs
+[D] Deslop — code archaeology (AI pattern detection, modifies files — run last)
+[A] All of S, P, C, D
+[N] Done
+```
 
 The exact menu from `references/review-passes.md` is the only valid form. If you find yourself drafting a numbered fix menu, STOP — show the lettered passes menu first and wait for user input.
 
