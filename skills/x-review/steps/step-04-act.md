@@ -20,6 +20,13 @@ S, P, X are read-only and can run in parallel. D modifies files — run it last,
 
 **NEVER skip this gate.** Even if the verdict is REQUEST_CHANGES with obvious fixes, the user may want additional passes first. Auto-invoking `receiving-code-review` without offering this menu is a known compliance gap.
 
+**Do NOT replace this menu with a custom one.** Wrong patterns seen in the wild:
+- "1) Apply all fixes  2) HIGH-only  3) Stop" — invented fix-flow menu, skips the passes gate entirely
+- Inlining only S/P/X — partial menu robs the user of [C]/[V]/[D]/[A]/[N] options
+- Jumping straight to "Want me to fix?" — skips the menu altogether
+
+The exact menu from `references/review-passes.md` is the only valid form. If you find yourself drafting a numbered fix menu, STOP — show the lettered passes menu first and wait for user input.
+
 ## Act on Verdict
 
 ### APPROVE

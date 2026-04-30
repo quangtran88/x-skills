@@ -12,7 +12,7 @@
 
 ## Plan Review (Target A)
 
-Launch these 3 in ONE message:
+Launch these 3 in ONE message. **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.
 
 1. **Agent tool:** `subagent_type: "superpowers:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
 2. **Bash tool:** `<omo_agent from config.json> --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `../../x-omo/gotchas.md`.*
@@ -37,6 +37,14 @@ Launch these 3 in ONE message — all tool calls in a single response, not seque
   Tool: Skill(skill="superpowers:requesting-code-review")
 ```
 If you just sent a message with only ONE tool call, STOP — you already failed this rule. Delete nothing, just add the missing tool calls in your next message and note the deviation.
+
+**Pre-launch self-check (run BEFORE sending the message):**
+1. Is `Agent(subagent_type="superpowers:code-reviewer", ...)` in the call list? If no → STOP, add it.
+2. Is `Bash(command="<omo_agent> ...")` in the call list? If no → STOP, add it.
+3. Is `Skill(skill="superpowers:requesting-code-review")` in the call list? If no → STOP, add it.
+4. Are all 3 in the SAME message? If no → STOP, batch them.
+
+Self-verification by reading files / running grep is NOT a substitute for the Agent code-reviewer dispatch. The Agent runs in a separate context window — its findings differ from yours.
 
 ## Collecting Results
 

@@ -31,6 +31,8 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 
 ## Present Findings
 
+**Two valid verdicts only: APPROVE or REQUEST_CHANGES.** Do NOT invent intermediate states like `APPROVE_WITH_FIXES`, `APPROVE_WITH_CONCERNS`, or `CONDITIONAL_APPROVE`. If any blocker (CRITICAL or HIGH) exists, the verdict is REQUEST_CHANGES — severity tiers in the findings table communicate the rest.
+
 ```
 ### Review: [target description]
 **Verdict:** APPROVE | REQUEST_CHANGES
