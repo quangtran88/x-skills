@@ -372,7 +372,12 @@ END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
 # --- Detect silent agent fallback (OpenCode exits 0 but warns "agent not found" or "is a subagent") ---
-if [[ "$RUN_MODE" == "agent" ]] && grep -qiE 'agent.*not.*found.*falling back|is a subagent.*falling back' "$TMPFILE" 2>/dev/null; then
+# Skip when output contains call_omo_agent — that's oracle delegating to a subagent,
+# not opencode falling back. The fallback regex would otherwise match the delegation
+# text and produce a false positive.
+if [[ "$RUN_MODE" == "agent" ]] \
+   && ! grep -q 'call_omo_agent' "$TMPFILE" 2>/dev/null \
+   && grep -qiE 'agent.*not.*found.*falling back|is a subagent.*falling back' "$TMPFILE" 2>/dev/null; then
   echo "Error: OpenCode does not recognize agent '$AGENT' → '$AGENT_DISPLAY' (silent fallback detected)" >&2
   echo "Valid agents: oracle explore librarian multimodal-looker" >&2
   echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
