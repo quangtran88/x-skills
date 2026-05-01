@@ -43,8 +43,8 @@ If `{{ARGUMENTS}}` starts with an agent name or `--model`, invoke it immediately
 | Agent | Role | Model | Cost | Reference |
 |---|---|---|---|---|
 | `oracle` | Read-only strategic advisor | GPT-5.4 max | EXPENSIVE | [agents/oracle.md](agents/oracle.md) |
-| `explore` | Contextual codebase search | Gemini 3 Flash | FREE | [agents/explore.md](agents/explore.md) |
-| `librarian` | External docs & OSS research | Gemini 3 Flash | CHEAP | [agents/librarian.md](agents/librarian.md) |
+| `explore` | Contextual codebase search | Configured in `oh-my-openagent.json` | FREE | [agents/explore.md](agents/explore.md) |
+| `librarian` | External docs & OSS research | Configured in `oh-my-openagent.json` | CHEAP | [agents/librarian.md](agents/librarian.md) |
 | `multimodal-looker` | Visual & document analysis | Gemini 3.1 Pro | CHEAP | [agents/multimodal-looker.md](agents/multimodal-looker.md) |
 
 ---

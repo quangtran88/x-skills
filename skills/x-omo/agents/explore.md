@@ -10,7 +10,7 @@ A contextual grep agent for codebases. Answers "Where is X?", "Which file has Y?
 |---|---|
 | Short name | `explore` |
 | OpenCode display name | `explore` |
-| Default model | `openai/gemini-3-flash-preview` |
+| Default model | Configured in `oh-my-openagent.json` (override per user setup) |
 | Mode | Read-only (no write/edit/apply_patch/task/call_omo_agent) |
 | Temperature | 0.1 |
 | Cost tier | FREE |
