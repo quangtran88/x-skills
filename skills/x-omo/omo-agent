@@ -355,11 +355,13 @@ echo "[omo-agent] started ${AGENT:-model} at $(date +%H:%M:%S) (timeout=${OMO_TI
 # and works reliably for all prompt shapes. See gotchas.md for the full repro.
 if [[ "$RUN_MODE" == "model" ]]; then
   LABEL="model:$(basename "$MODEL_ID")"
-  # --pure bypasses external plugins. Without it, opencode falls back to the
-  # plugin's default agent ("Sisyphus - Ultraworker"), which can't be resolved
-  # due to the same display-name bug that breaks 5 named agents. --pure skips
-  # the plugin entirely, which is fine for model mode (no agent prompt needed).
-  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --pure --model "$MODEL_ID" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
+  # --pure bypasses external plugins (avoids the display-name bug that broke
+  # 5 named agents). --agent build pins the built-in "build" agent so opencode
+  # does NOT try to resolve a config-level default_agent (e.g. "sisyphus") that
+  # only exists inside the stripped plugin. Both flags together are required:
+  # --pure alone fails when ~/.config/opencode/opencode.json sets default_agent
+  # to a plugin-provided name.
+  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --pure --agent build --model "$MODEL_ID" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
 else
   LABEL="agent:$AGENT"
   printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --agent "$AGENT_DISPLAY" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
@@ -381,8 +383,9 @@ fi
 # --- Detect default-agent resolution failure (affects --model when plugin sets broken default) ---
 if grep -qiE 'default agent.*not found' "$TMPFILE" 2>/dev/null; then
   echo "Error: OpenCode's default agent could not be resolved (plugin compatibility issue)" >&2
-  echo "This typically means the oh-my-opencode plugin set a display-name default agent." >&2
-  echo "Model mode should use --pure to bypass plugins. If you see this, the fix regressed." >&2
+  echo "Likely cause: ~/.config/opencode/opencode.json sets default_agent to a plugin-provided" >&2
+  echo "name (e.g. 'sisyphus') that --pure strips. Model mode pins --agent build to bypass." >&2
+  echo "If you see this, the fix regressed." >&2
   rm -f "$TMPFILE"
   exit 1
 fi
