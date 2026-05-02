@@ -1,16 +1,13 @@
-# Feature Gate — Runtime Dependency Detection
+# Feature Gate — Per-Capability Fallback Recipes
 
-This document is loaded by x-skills at bootstrap to determine which capabilities are available. Skills read this to decide routing paths.
+This file is the **runtime fallback reference** — recipes for what to do when a specific capability is missing. The bootstrap contract (when to read the manifest, how to merge project overrides, drift handling, opt-out) lives in **[`../skills/x-shared/capability-loading.md`](../skills/x-shared/capability-loading.md)**.
 
-## How to Check
+The two files are complementary:
 
-Run this command at bootstrap to load the capability manifest:
+- `capability-loading.md` answers *"how does my skill learn what's available?"* (pin once at session start, never re-check)
+- `lib/feature-gate.md` (this file) answers *"once I know `oracle` is unavailable, what do I substitute?"* (per-capability recipe table)
 
-```bash
-cat ~/.config/x-skills/capabilities.json 2>/dev/null || echo '{"capabilities":{}}'
-```
-
-If the file doesn't exist, the user hasn't run setup yet. Treat all optional deps as unavailable and use Claude-only fallback routing.
+Skills should follow the bootstrap pattern in `capability-loading.md`, then consult the recipes below when picking a fallback row.
 
 ## Capability Checks
 

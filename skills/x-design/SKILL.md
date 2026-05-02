@@ -23,7 +23,8 @@ Resolves user design intent to a curated `DESIGN.md` file from [VoltAgent/awesom
 
 ## Bootstrap
 
-Read these two files before routing any request:
+Read these files before routing any request:
+0. `../x-shared/capability-loading.md` — pin capabilities for the session (used to gate the optional `ui-ux-pro-max` and `shadcn` MCP handoffs in steps 6-7).
 1. `config.json` — pinned commit, URL templates, defaults
 2. `references/catalog.md` — 58 sites with slugs, categories, intent tags, tag vocabulary
 
@@ -69,9 +70,9 @@ Read these two files before routing any request:
 6. **Offer the `ui-ux-pro-max` handoff.** `DESIGN.md` captures aesthetic intent; `ui-ux-pro-max` captures enforceable rules (a11y, palettes, stack guidelines, anti-patterns). **Detect first:** if `ui-ux-pro-max` isn't in the available skills list, skip step 6 silently. Otherwise ask once:
    > "Want me to also generate a `design-system/MASTER.md` with implementation rules via `ui-ux-pro-max`? It complements `DESIGN.md` — vision vs. rules."
 
-   If yes, invoke `ui-ux-pro-max` with the same intent (brand name + product type + descriptive tags from the catalog row). The two files coexist: `DESIGN.md` is the north-star; `MASTER.md` is the rules engine. If no, skip silently — never push twice.
+   If yes, invoke `ui-ux-pro-max` with the same intent (brand name + product type + descriptive tags from the catalog row). **Primitive: `handoff` (sync, depends on result).** Include a [handoff context](../x-shared/context-envelope.md) block: from x-design, slug + brand name + tags, path of the installed `DESIGN.md`, recommended next step. The two files coexist: `DESIGN.md` is the north-star; `MASTER.md` is the rules engine. If no, skip silently — never push twice.
 
-7. **Offer the `shadcn` MCP handoff.** `DESIGN.md` + `MASTER.md` describe *what* the UI looks like; `shadcn` MCP is *how* to install matching components. **Conditional** — call `mcp__shadcn__get_project_registries` first; empty/error result triggers the **non-shadcn advisory** below, then proceeds to step 8 (never push shadcn onto non-shadcn projects). If registries exist, follow the workflow in `references/shadcn-handoff.md` (detect → ask once → seed primitives with `search_items_in_registries` + `get_add_command_for_items` → optional `get_audit_checklist`). **Print install commands; never auto-run.**
+7. **Offer the `shadcn` MCP handoff.** `DESIGN.md` + `MASTER.md` describe *what* the UI looks like; `shadcn` MCP is *how* to install matching components. **Conditional** — call `mcp__shadcn__get_project_registries` first; empty/error result triggers the **non-shadcn advisory** below, then proceeds to step 8 (never push shadcn onto non-shadcn projects). If registries exist, follow the workflow in `references/shadcn-handoff.md` (detect → ask once → seed primitives with `search_items_in_registries` + `get_add_command_for_items` → optional `get_audit_checklist`). **Primitive: sequential `handoff` after step 6** — `shadcn` consumes MASTER.md tokens, so it must follow the ui-ux-pro-max handoff (do NOT fan out steps 6 + 7 in parallel). **Print install commands; never auto-run.** Include a [handoff context](../x-shared/context-envelope.md) line when surfacing the install commands so the next session knows which DESIGN.md/MASTER.md drove the picks.
 
    **Non-shadcn framework advisory:** When `get_project_registries` returns empty, check for a detectable framework and offer a one-line hint (never push, just inform):
    - `nuxt.config.*` or `vue` in deps → "Apply DESIGN.md tokens via CSS custom properties or scoped `<style>` in Vue SFCs."

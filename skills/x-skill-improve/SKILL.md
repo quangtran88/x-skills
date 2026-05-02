@@ -7,6 +7,10 @@ description: Use when the user wants to evaluate x-skill alignment and improve a
 
 Evaluates how well an x-skill was followed during a real session, then improves the skill based on findings.
 
+## Bootstrap
+
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `claude_mem` plugin flag gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable.
+
 ## Invocation
 
 For how to invoke skills and agents, see `../x-shared/invocation-guide.md`.
@@ -140,7 +144,7 @@ This enables cross-session pattern tracking — recurring compliance gaps signal
 
 ## After This Skill
 
-Updates applied? → Offer `/x-skill-review` on the modified skill. See `../x-shared/workflow-chains.md`.
+Updates applied? → Offer `/x-skill-review` on the modified skill (external user-level skill at `~/.claude/skills/x-skill-review/`; if the user has not installed it, surface that fact and stop — do NOT silently no-op the slash command). **Primitive: `handoff` (sync, depends on result).** Include a [handoff context](../x-shared/context-envelope.md) block: from x-skill-improve, name of the modified skill, list of applied edits with severities, alignment-log entry written. See `../x-shared/workflow-chains.md`.
 
 ## Gotchas
 

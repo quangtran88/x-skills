@@ -124,8 +124,8 @@ See `../x-shared/workflow-chains.md` and include a `../x-shared/context-envelope
 - `../x-omo/SKILL.md` — OMO agent runtime (required for any OMO dispatch)
 - `../x-gemini/SKILL.md` — gemini-agent runtime (required for Gemini lanes)
 - `../x-shared/mcp-toolbox.md` — MCP decision matrix (plugin-local, portable)
-- `../x-shared/invocation-guide.md`, `workflow-chains.md`, `context-envelope.md`, `severity-guide.md`, `common-gotchas.md`
-- Downstream chains: `/x-do`, `superpowers:writing-plans`, `/x-skill-improve`
+- `../x-shared/invocation-guide.md`, `workflow-chains.md`, `context-envelope.md`, `common-gotchas.md`
+- Downstream chains: `/x-do`, `superpowers:writing-plans` (research → implementation paths only — `x-skill-improve` does not consume research output)
 
 ## Gotchas
 

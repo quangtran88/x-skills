@@ -10,7 +10,9 @@ Smart entry point for bugs and investigations. Detects severity, routes through 
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `../x-omo/gotchas.md`.**
+
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch.
+1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `../x-omo/gotchas.md`.**
 
 ## Invocation
 
@@ -53,18 +55,17 @@ Classify the bug into ONE mode:
 
 ## Available Tools
 
+For MCP tool selection (search, edit, web facts, library docs), see the canonical decision matrix at **`../x-shared/mcp-toolbox.md`**. The table below covers only bugfix-specific tools (debugging skills, OMC investigation agents, OMO escalation paths) — do not duplicate MCP rows here.
+
 | Tool | When It Helps | How |
 |------|--------------|-----|
-| `morph-mcp` → `codebase_search` | **First choice** for tracing code flow, finding callers, locating related code | MCP tool — semantic search, faster than spawning agents |
-| `morph-mcp` → `edit_file` | **Default** for applying fixes — partial edits with `// ... existing code ...` markers | MCP tool |
-| `morph-mcp` → `github_codebase_search` | Investigating how an external library works internally | MCP tool |
 | `superpowers:systematic-debugging` | Bug with unclear root cause | Skill — 4-phase discipline |
 | `superpowers:test-driven-development` | Writing the regression test | Skill |
 | `superpowers:verification-before-completion` | **Always** — before claiming fixed | Skill |
 | OMC `debugger` | Complex multi-component investigation | Agent |
 | OMC `tracer` | Competing hypotheses (Mode B) | Agent |
 | OMO `oracle` | Fresh perspective after instrumentation pivot + 3 failed attempts | Bash (omo-agent) |
-| OMO `explore` | Codebase search when morph `codebase_search` insufficient (multi-tool parallel) | Bash (omo-agent) |
+| OMO `explore` | Codebase search when `mcp-toolbox.md` primary (`morph-mcp codebase_search`) insufficient — needs parallel multi-tool search | Bash (omo-agent) |
 
 ## Mode A: Quick Bug
 

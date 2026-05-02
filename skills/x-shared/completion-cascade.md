@@ -100,15 +100,20 @@ Wait for user input. Do not silently claim done.
 
 ## When to apply this cascade
 
-| Skill | Apply cascade? |
-|---|---|
-| `x-do` | Yes — primary consumer, pilot target |
-| `x-bugfix` | Yes — after fix is applied (**deferred** to follow-up rollout) |
-| `x-research` | No — research has no "completion" in this sense; it has "synthesis done" |
-| `x-review` | No — reviews return verdicts, not "done" |
-| `x-design` | Yes — after design artifact is written (**deferred** to follow-up rollout) |
-| `x-omo` | No — routes to other CLIs; completion is the target CLI's responsibility |
-| `ralph` / `ultrawork` | **Out of scope** — external OMC plugin-cache skills; suggest upstream if at all. |
+| Skill | Apply cascade? | Rollout state |
+|---|---|---|
+| `x-do` | Yes | **Live** — dispatches `Skill tool: x-verify` in its Completion section. |
+| `x-bugfix` | No (yet) | **Deferred.** Today x-bugfix runs its own post-fix verification (npx tsc + npx eslint + tests + debug-report status labels) inline. The cascade rollout is queued but not shipped — until then, x-bugfix's inline verification is the contract. Do NOT silently dispatch x-verify from x-bugfix. |
+| `x-research` | No | Research has no "completion" in this sense; it has "synthesis done". |
+| `x-review` | No | Reviews return verdicts, not "done". (Step-04 Fix Mode invokes `superpowers:verification-before-completion` directly when the user applies fixes — that's a fix-mode pass, not a cascade dispatch.) |
+| `x-design` | No (yet) | **Deferred.** x-design's "completion" today is the file landing on disk + the philosophy/section-9/AI-slop advisory. The cascade does not apply until step-04 is added. |
+| `x-skill-improve` | No (yet) | **Deferred.** Improvements are validated via the optional `/x-skill-review` handoff, not a cascade. |
+| `x-api-pentest` | No (yet) | **Deferred.** The skill's own step-05/06 synthesis + curl repro requirement substitute for the cascade today. |
+| `x-omo` | No | Routes to other CLIs; completion is the target CLI's responsibility. |
+| `x-gemini` | No | Read-only advisor; no completion concept. |
+| `ralph` / `ultrawork` | **Out of scope** | External OMC plugin-cache skills; suggest upstream if at all. |
+
+**Half-state notice.** The cascade is the canonical contract but only `x-do` ships with it wired today. The "deferred" rows are an honest in-progress signal, not silent drift — every other long-running skill documents its current verification approach in its own SKILL.md. When a deferred skill is upgraded to dispatch the cascade, update both that SKILL.md and this table in the same change.
 
 ## Where the cascade lives (single source of truth)
 

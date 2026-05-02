@@ -18,7 +18,8 @@ matching: fuzzy
 
 ## Bootstrap (MANDATORY first step)
 
-Before dispatching, verify `gemini-agent` is on PATH. If missing, the user has not run setup yet (or upgraded without re-running):
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `gemini_cli` flag and `dependencies[]` entries gate this skill.
+1. Verify `gemini-agent` is on PATH. If missing, the user has not run setup yet (or upgraded without re-running):
 
 ```bash
 command -v gemini-agent &>/dev/null || {
