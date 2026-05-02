@@ -39,7 +39,7 @@ Lane invocation lives in the linked skills (`x-omo/SKILL.md`, `x-gemini/SKILL.md
 
 ## Lane Selection Rules
 
-- Drop a lane if its prerequisite is unavailable (e.g., omit `gemini-agent` lane when `gemini_cli` is false in capabilities; omit `deepwiki` lane when target repo not indexed).
+- Lanes are pre-filtered against the bootstrap-pinned capability set (see `../../x-shared/capability-loading.md`). Drop unavailable lanes BEFORE building the dispatch list — never query the manifest per dispatch. Per-target unavailability (e.g., deepwiki repo not indexed) is a runtime error, not a capability check; mark the lane failed in synthesis.
 - Cap at 5 lanes per dispatch — beyond that, returns diminish faster than tokens grow.
 - For "Web research" class, demote `perplexity_research` to `perplexity_ask` if user budget signals are present (e.g., `--cheap` flag or prior Standard Mode in same session).
 

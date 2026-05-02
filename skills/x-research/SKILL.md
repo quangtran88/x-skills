@@ -11,6 +11,7 @@ x-research is a router. It classifies the question by **information-source signa
 
 Before dispatching anything, load:
 
+0. `../x-shared/capability-loading.md` — pin the active capability set for this session. Skills MUST NOT re-verify per dispatch; trust the bootstrap-pinned set.
 1. `../x-omo/SKILL.md` — OMO agent catalog + Bash invocation patterns. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — UNAVAILABLE due to plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (planning) instead.**
 2. `../x-gemini/SKILL.md` — direct Gemini CLI bridge (Google Search grounding, gemini-3.x, `--file`, `--resume`).
 3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph).
