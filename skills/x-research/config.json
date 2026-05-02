@@ -4,5 +4,6 @@
   "omo_skill": "../x-omo/SKILL.md",
   "gemini_skill": "../x-gemini/SKILL.md",
   "mcp_toolbox": "../x-shared/mcp-toolbox.md",
-  "capabilities_file": "~/.config/x-skills/capabilities.json"
+  "capabilities_file": "~/.config/x-skills/capabilities.json",
+  "capability_loading": "../x-shared/capability-loading.md"
 }
