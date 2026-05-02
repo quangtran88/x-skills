@@ -103,6 +103,7 @@ EOF
 
 verify_files_manifest() {
   local manifest="$CONFIG_DIR/files-manifest.json"
+  command -v jq &>/dev/null || { warn "jq missing — cannot verify manifest"; return 0; }
   [[ -f "$manifest" ]] || { warn "files-manifest.json missing — run setup to generate"; return 0; }
   local drift=0
   while IFS= read -r line; do
