@@ -21,16 +21,16 @@ command -v jq &>/dev/null || exit 0
 active=$(jq -r '
   def truthy: . == true;
   [
-    (.capabilities.opencode | select(truthy)) as $_ | "opencode",
-    (.capabilities.gemini_cli | select(truthy)) as $_ | "gemini_cli",
-    (.capabilities.mcp.perplexity | select(truthy)) as $_ | "mcp.perplexity",
-    (.capabilities.mcp.deepwiki | select(truthy)) as $_ | "mcp.deepwiki",
-    (.capabilities.mcp.exa | select(truthy)) as $_ | "mcp.exa",
-    (.capabilities.mcp.context7 | select(truthy)) as $_ | "mcp.context7",
-    (.capabilities.mcp.morph | select(truthy)) as $_ | "mcp.morph",
-    (.capabilities.plugins.oh_my_claudecode | select(truthy)) as $_ | "plugin.omc",
-    (.capabilities.plugins.superpowers | select(truthy)) as $_ | "plugin.superpowers",
-    (.capabilities.plugins.claude_mem | select(truthy)) as $_ | "plugin.claude_mem"
+    (.capabilities.opencode | select(truthy) | "opencode"),
+    (.capabilities.gemini_cli | select(truthy) | "gemini_cli"),
+    (.capabilities.mcp.perplexity | select(truthy) | "mcp.perplexity"),
+    (.capabilities.mcp.deepwiki | select(truthy) | "mcp.deepwiki"),
+    (.capabilities.mcp.exa | select(truthy) | "mcp.exa"),
+    (.capabilities.mcp.context7 | select(truthy) | "mcp.context7"),
+    (.capabilities.mcp.morph | select(truthy) | "mcp.morph"),
+    (.capabilities.plugins.oh_my_claudecode | select(truthy) | "plugin.omc"),
+    (.capabilities.plugins.superpowers | select(truthy) | "plugin.superpowers"),
+    (.capabilities.plugins.claude_mem | select(truthy) | "plugin.claude_mem")
   ] | map(select(. != null)) | join(",")
 ' "$USER_CAPS" 2>/dev/null)
 
@@ -44,16 +44,16 @@ if [[ -f "$PROJECT_CAPS" ]]; then
     active=$(echo "$merged" | jq -r '
       def truthy: . == true;
       [
-        (.capabilities.opencode | select(truthy)) as $_ | "opencode",
-        (.capabilities.gemini_cli | select(truthy)) as $_ | "gemini_cli",
-        (.capabilities.mcp.perplexity | select(truthy)) as $_ | "mcp.perplexity",
-        (.capabilities.mcp.deepwiki | select(truthy)) as $_ | "mcp.deepwiki",
-        (.capabilities.mcp.exa | select(truthy)) as $_ | "mcp.exa",
-        (.capabilities.mcp.context7 | select(truthy)) as $_ | "mcp.context7",
-        (.capabilities.mcp.morph | select(truthy)) as $_ | "mcp.morph",
-        (.capabilities.plugins.oh_my_claudecode | select(truthy)) as $_ | "plugin.omc",
-        (.capabilities.plugins.superpowers | select(truthy)) as $_ | "plugin.superpowers",
-        (.capabilities.plugins.claude_mem | select(truthy)) as $_ | "plugin.claude_mem"
+        (.capabilities.opencode | select(truthy) | "opencode"),
+        (.capabilities.gemini_cli | select(truthy) | "gemini_cli"),
+        (.capabilities.mcp.perplexity | select(truthy) | "mcp.perplexity"),
+        (.capabilities.mcp.deepwiki | select(truthy) | "mcp.deepwiki"),
+        (.capabilities.mcp.exa | select(truthy) | "mcp.exa"),
+        (.capabilities.mcp.context7 | select(truthy) | "mcp.context7"),
+        (.capabilities.mcp.morph | select(truthy) | "mcp.morph"),
+        (.capabilities.plugins.oh_my_claudecode | select(truthy) | "plugin.omc"),
+        (.capabilities.plugins.superpowers | select(truthy) | "plugin.superpowers"),
+        (.capabilities.plugins.claude_mem | select(truthy) | "plugin.claude_mem")
       ] | map(select(. != null)) | join(",")
     ')
     sources="user+project"
