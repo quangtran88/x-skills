@@ -20,5 +20,18 @@
     "api-pentest"
   ],
   "homepage": "https://github.com/quangtran88/x-skills",
-  "repository": "https://github.com/quangtran88/x-skills"
+  "repository": "https://github.com/quangtran88/x-skills",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-version.sh\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
 }

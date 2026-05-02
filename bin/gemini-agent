@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+# gemini-agent — wrapper for Google Gemini CLI headless mode
+#
+# Bridges Claude Code skills to Gemini CLI. Uses Google Ultra subscription
+# (no API key needed), native Google Search grounding, and gemini-3.x models.
+#
+# Usage:
+#   gemini-agent "<prompt>"                          # default model (flash)
+#   gemini-agent --model pro "<prompt>"              # gemini-3.1-pro-preview
+#   gemini-agent --model flash "<prompt>"            # gemini-2.5-flash
+#   gemini-agent --system /path/system.md "<prompt>" # custom system prompt
+#   gemini-agent --file /abs/path.md "<prompt>"      # attach workspace file via @file
+#   gemini-agent --resume "<prompt>"                 # resume last session
+#   gemini-agent --stream "<prompt>"                 # streaming JSON output
+#   gemini-agent --raw "<prompt>"                    # plain text, no JSON parse
+#   gemini-agent --approval-mode plan "<prompt>"     # tool exec mode
+
+set -uo pipefail
+
+# --- Defaults ---
+# X_GEMINI_DEFAULT_MODEL env var sets fallback model when --model not passed
+# (pattern borrowed from oh-my-claudecode's OMC_GEMINI_DEFAULT_MODEL).
+MODEL="${X_GEMINI_DEFAULT_MODEL:-}"
+SYSTEM_MD=""
+EXTRA_FILES=()
+RESUME=""
+STREAM=0
+RAW=0
+APPROVAL_MODE=""
+
+# --- Parse args ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model|-m)         MODEL="${2:-}"; shift 2 || true ;;
+    --model=*)          MODEL="${1#--model=}"; shift ;;
+    --system)           SYSTEM_MD="${2:-}"; shift 2 || true ;;
+    --system=*)         SYSTEM_MD="${1#--system=}"; shift ;;
+    --file|-f)          EXTRA_FILES+=("${2:-}"); shift 2 || true ;;
+    --file=*)           EXTRA_FILES+=("${1#--file=}"); shift ;;
+    --resume|-r)        RESUME="latest"; shift ;;
+    --resume=*)         RESUME="${1#--resume=}"; shift ;;
+    --stream)           STREAM=1; shift ;;
+    --raw)              RAW=1; shift ;;
+    --yolo)             APPROVAL_MODE="yolo"; shift ;;
+    --approval-mode)    APPROVAL_MODE="${2:-}"; shift 2 || true ;;
+    --approval-mode=*)  APPROVAL_MODE="${1#--approval-mode=}"; shift ;;
+    --help|-h)
+      sed -n '2,18p' "$0" | sed 's/^# //; s/^#//'
+      exit 0 ;;
+    -*) echo "Error: Unknown flag: $1" >&2; exit 1 ;;
+    *)  break ;;
+  esac
+done
+
+PROMPT="${*:-}"
+
+if [[ -z "$PROMPT" ]]; then
+  echo "Error: prompt required" >&2
+  echo "Usage: gemini-agent [--model pro|flash] [--system FILE] [--file FILE] [--resume] [--stream] [--raw] \"<prompt>\"" >&2
+  exit 1
+fi
+
+# --- Verify gemini CLI ---
+if ! command -v gemini &>/dev/null; then
+  echo "Error: gemini CLI not found on PATH" >&2
+  echo "Install: https://github.com/google-gemini/gemini-cli" >&2
+  exit 1
+fi
+
+# --- Build @file references in prompt ---
+# Gemini @file syntax must be inline in the prompt — files outside workspace
+# fail gracefully (warned, not crashed). All paths must be absolute or relative
+# to the current workspace.
+for f in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+  if [[ ! -f "$f" ]]; then
+    echo "Warning: file not found: $f (skipping)" >&2
+    continue
+  fi
+  PROMPT="$PROMPT @$f"
+done
+
+# --- Build command args ---
+ARGS=(-p "$PROMPT")
+
+if [[ -n "$MODEL" ]]; then
+  ARGS+=(-m "$MODEL")
+fi
+
+if [[ -n "$RESUME" ]]; then
+  ARGS+=(-r "$RESUME")
+fi
+
+if [[ -n "$APPROVAL_MODE" ]]; then
+  ARGS+=(--approval-mode "$APPROVAL_MODE")
+fi
+
+# Output format: stream-json for --stream, json otherwise (raw skips JSON parse)
+if [[ "$STREAM" -eq 1 ]]; then
+  ARGS+=(--output-format stream-json)
+elif [[ "$RAW" -eq 0 ]]; then
+  ARGS+=(--output-format json)
+fi
+
+# --- Execute ---
+TMPFILE=$(mktemp /tmp/gemini-agent-XXXXXXXX)
+trap 'rm -f "$TMPFILE"' EXIT
+
+# Internal timeout. Default 600s (10 min).
+GEMINI_TIMEOUT="${GEMINI_TIMEOUT:-600}"
+
+START_TIME=$(date +%s)
+LABEL="${MODEL:-default}"
+echo "[gemini-agent] started model=$LABEL at $(date +%H:%M:%S) (timeout=${GEMINI_TIMEOUT}s)" >&2
+
+# Strip Claude session env vars to prevent context leak into Gemini.
+# Pattern borrowed from oh-my-claudecode's buildProviderEnv — Gemini should
+# not inherit Claude's session ID or entrypoint markers.
+unset_vars=(CLAUDECODE CLAUDE_SESSION_ID CLAUDECODE_SESSION_ID CLAUDE_CODE_ENTRYPOINT)
+ENV_PREFIX=""
+for v in "${unset_vars[@]}"; do
+  ENV_PREFIX+="unset $v; "
+done
+
+# CRITICAL: redirect stderr — gemini CLI prints "Ripgrep is not available.
+# Falling back to GrepTool." and other noise to stderr that corrupts JSON
+# if merged with stdout.
+if [[ -n "$SYSTEM_MD" ]]; then
+  if [[ ! -f "$SYSTEM_MD" ]]; then
+    echo "Error: system prompt file not found: $SYSTEM_MD" >&2
+    exit 1
+  fi
+  bash -c "${ENV_PREFIX} GEMINI_SYSTEM_MD='$SYSTEM_MD' timeout '$GEMINI_TIMEOUT' gemini \"\$@\"" -- "${ARGS[@]}" > "$TMPFILE" 2>/dev/null
+else
+  bash -c "${ENV_PREFIX} timeout '$GEMINI_TIMEOUT' gemini \"\$@\"" -- "${ARGS[@]}" > "$TMPFILE" 2>/dev/null
+fi
+EXIT_CODE=$?
+
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+# --- Error classification ---
+ERROR_TYPE=""
+if [[ $EXIT_CODE -eq 124 ]]; then
+  ERROR_TYPE="timeout"
+  echo "[gemini-agent] ERROR: gemini killed after ${GEMINI_TIMEOUT}s timeout (exit 124)" >&2
+elif [[ $EXIT_CODE -eq 42 ]]; then
+  ERROR_TYPE="empty_prompt"
+elif [[ $EXIT_CODE -ne 0 ]]; then
+  if grep -qi "rate.limit\|quota\|exhausted" "$TMPFILE" 2>/dev/null; then
+    ERROR_TYPE="rate_limited"
+  elif grep -qi "auth\|sign.in\|unauthor" "$TMPFILE" 2>/dev/null; then
+    ERROR_TYPE="auth_error"
+  else
+    ERROR_TYPE="unknown_error"
+  fi
+fi
+
+# --- Persist raw output for debugging ---
+# Prefer project-local .omc/artifacts/x-gemini/ if .omc exists (matches OMC's
+# artifact convention); fall back to /tmp otherwise.
+DEBUG_TS=$(date +%Y%m%d-%H%M%S)
+ARTIFACTS_DIR="/tmp"
+if [[ -d ".omc" ]]; then
+  ARTIFACTS_DIR=".omc/artifacts/x-gemini"
+  mkdir -p "$ARTIFACTS_DIR" 2>/dev/null
+fi
+DEBUG_LOG="$ARTIFACTS_DIR/gemini-agent-${DEBUG_TS}-${LABEL}.log"
+cp "$TMPFILE" "$DEBUG_LOG" 2>/dev/null
+
+# --- Format duration ---
+if [[ "$DURATION" -ge 60 ]]; then
+  DURATION_FMT="$((DURATION / 60))m $((DURATION % 60))s"
+else
+  DURATION_FMT="${DURATION}s"
+fi
+
+STATUS="success"
+[[ $EXIT_CODE -ne 0 ]] && STATUS="failed"
+[[ -n "$ERROR_TYPE" ]] && STATUS="$ERROR_TYPE"
+
+# --- Extract response ---
+# Three modes:
+#   --raw    : pass through plain text
+#   --stream : pass through JSONL events
+#   default  : parse JSON, extract .response, log .stats summary
+
+if [[ "$RAW" -eq 1 || "$STREAM" -eq 1 ]]; then
+  cat "$TMPFILE"
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+  exit $EXIT_CODE
+fi
+
+# JSON mode — parse response + stats
+if ! command -v jq &>/dev/null; then
+  echo "[gemini-agent] WARNING: jq not installed, dumping raw JSON" >&2
+  cat "$TMPFILE"
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+  exit $EXIT_CODE
+fi
+
+# Validate JSON
+if ! jq -e . "$TMPFILE" >/dev/null 2>&1; then
+  echo "[gemini-agent] WARNING: invalid JSON output (likely error before JSON emitted)" >&2
+  echo "[gemini-agent] Raw output tail:" >&2
+  tail -20 "$TMPFILE" >&2
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+  exit ${EXIT_CODE:-1}
+fi
+
+# Extract response field
+RESPONSE=$(jq -r '.response // empty' "$TMPFILE")
+
+# Build stats summary for stderr
+SESSION_ID=$(jq -r '.session_id // "unknown"' "$TMPFILE")
+TOTAL_TOOLS=$(jq -r '.stats.tools.totalCalls // 0' "$TMPFILE")
+MODEL_USED=$(jq -r '.stats.models | keys | .[]' "$TMPFILE" 2>/dev/null | grep -v 'flash-lite' | head -1)
+[[ -z "$MODEL_USED" ]] && MODEL_USED="unknown"
+
+if [[ -z "$RESPONSE" ]]; then
+  echo "[gemini-agent] WARNING: empty .response field" >&2
+  echo "[gemini-agent] Full JSON:" >&2
+  cat "$TMPFILE" >&2
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | session=${SESSION_ID} | raw=${DEBUG_LOG}" >&2
+  exit ${EXIT_CODE:-1}
+fi
+
+# --- Truncate if too long (~50k chars ≈ 12.5k tokens) ---
+MAX_CHARS=50000
+RESPONSE_LEN=${#RESPONSE}
+if [[ "$RESPONSE_LEN" -gt "$MAX_CHARS" ]]; then
+  TRUNCATED_NOTE="[gemini-agent: truncated first $((RESPONSE_LEN - MAX_CHARS)) of $RESPONSE_LEN chars — showing tail]"
+  RESPONSE="${TRUNCATED_NOTE}"$'\n\n'"${RESPONSE: -$MAX_CHARS}"
+fi
+
+echo "$RESPONSE"
+echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | model=${MODEL_USED} | tools=${TOTAL_TOOLS} | session=${SESSION_ID} | raw=${DEBUG_LOG}" >&2
+
+exit $EXIT_CODE

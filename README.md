@@ -12,11 +12,20 @@ All dependencies are optional. Skills degrade gracefully to Claude-only mode whe
 /reload-plugins
 ```
 
-Then run setup to configure the omo-agent binding and detect available dependencies:
+Then run setup to configure the bindings (omo-agent, gemini-agent) and detect available dependencies:
 
 ```
 /x-skills:setup
 ```
+
+### Upgrading
+
+**After every plugin upgrade, re-run `/x-skills:setup`.** It refreshes:
+- Symlinks (`~/.local/bin/omo-agent`, `~/.local/bin/gemini-agent`) to point at the new plugin cache
+- `~/.config/x-skills/capabilities.json` (new fields appear with each release)
+- Detection of newly-supported dependencies (e.g. v1.4.0 added `gemini` CLI detection for the `x-gemini` skill)
+
+The plugin's SessionStart hook detects stale capabilities and reminds you, but you can run `/x-skills:setup` proactively any time — it's idempotent.
 
 ## Skills
 
@@ -29,6 +38,7 @@ Then run setup to configure the omo-agent binding and detect available dependenc
 | **x-design** | `/x-skills:x-design` | Visual design system integration — resolves brand references (Linear-like, Stripe-like) to curated DESIGN.md files from 58 indexed sites |
 | **x-api-pentest** | `/x-skills:x-api-pentest` | API security testing — OWASP API Top 10 testing with schemathesis, nuclei, sqlmap, spectral |
 | **x-omo** | `/x-skills:x-omo` | OpenCode multi-model bridge — dispatch to GPT-5.4, Gemini, Codex models via role agents or direct model routing |
+| **x-gemini** | `/x-skills:x-gemini` | Direct Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, gemini-3.x access without OpenCode layer |
 
 `x-shared` is a reference library used by other skills (not invokable directly).
 
@@ -60,6 +70,7 @@ Everything is optional. Setup detects what's available and skills adapt.
 | Dependency | What it enables | Install |
 |-----------|----------------|---------|
 | [OpenCode](https://github.com/opencode-ai/opencode) | Multi-model dispatch (GPT, Gemini, Codex) | `curl -fsSL https://opencode.ai/install \| bash` |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Direct Gemini access for `x-gemini` (Google Search grounding, gemini-3.x) | `npm install -g @google/gemini-cli` |
 | [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) | Role agents (oracle, explore, librarian) | `opencode plugin oh-my-openagent` |
 | [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) | OMC agents (executor, code-reviewer, debugger) | `/plugin marketplace add Yeachan-Heo/oh-my-claudecode` |
 | [superpowers](https://github.com/obra/superpowers) | Workflow skills (brainstorming, TDD, writing-plans) | `/plugin marketplace add obra/superpowers-marketplace` |

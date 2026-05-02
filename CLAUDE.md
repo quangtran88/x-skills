@@ -14,6 +14,7 @@
 | **x-design** | Apply visual design systems | Standalone |
 | **x-api-pentest** | API security testing (OWASP Top 10) | External security CLIs |
 | **x-omo** | OpenCode multi-model bridge | opencode CLI |
+| **x-gemini** | Direct Gemini CLI bridge (Google Search, gemini-3.x, no API key) | gemini CLI + jq |
 | **x-skill-review** | Audit skill quality | Optional: claude-mem |
 | **x-skill-improve** | Improve skills from session data | Optional: claude-mem |
 | **x-shared** | Shared references (not invokable) | None |

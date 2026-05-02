@@ -8,6 +8,8 @@ Idempotent setup — safe to run any number of times. Each run detects current s
 
 **What `bin/setup` checks (at a glance):**
 - omo-agent symlink at `~/.local/bin/omo-agent`
+- gemini-agent symlink at `~/.local/bin/gemini-agent` (for `x-gemini` skill)
+- gemini CLI installed (`@google/gemini-cli`)
 - opencode CLI + `oh-my-openagent` plugin registration
 - **Role agents in `~/.config/opencode/oh-my-openagent.json` have `"mode": "all"`** — `oracle`, `explore`, `librarian`, `multimodal-looker` default to `mode: "subagent"` in the plugin, so `opencode run --agent <name>` silently fails unless the user config bumps them to `"all"`. The audit seeds the file if it's missing, adds missing entries, and patches wrong-mode entries — writes a timestamped `.bak` before touching an existing file.
 - MCP servers (perplexity, deepwiki, exa, context7, morph)
