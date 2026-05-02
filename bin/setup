@@ -287,7 +287,8 @@ What it does:
 
 With --fix:
   8. Offers to install missing CLI tools (opencode, security tools)
-  9. Outputs plugin install commands for missing Claude Code plugins
+  9. Offers to install missing MCP servers via `claude mcp add`
+ 10. Outputs plugin install commands for missing Claude Code plugins
 
 The omo-agent binding is what enables x-do, x-research, x-review, and x-bugfix
 to dispatch work to non-Claude models (GPT, Gemini, Codex) via OpenCode.
@@ -501,6 +502,7 @@ fi
 check_mcp() {
   local name="$1"
   local desc="$2"
+  local install_cmd="$3"
   # Some MCP servers register under a different name (e.g., "morph-mcp" vs "morph").
   # Build a grep pattern that matches both the short name and common variants.
   local grep_pattern="mcp__${name}__\|mcp__${name}-mcp__\|\"$name\"\|\"${name}-mcp\""
@@ -536,14 +538,20 @@ check_mcp() {
   fi
   warn "$name — not detected ($desc)"
   cap_set "mcp_$name" false
+  missing_add "mcp" "$name" "$desc" "$install_cmd"
   return 1
 }
 
-check_mcp "perplexity"  "web search + reasoning" || true
-check_mcp "deepwiki"    "OSS repo documentation" || true
-check_mcp "exa"         "code context + web crawling" || true
-check_mcp "context7"    "library API docs" || true
-check_mcp "morph"       "semantic codebase search + editing" || true
+check_mcp "perplexity"  "web search + reasoning" \
+  "claude mcp add perplexity -e PERPLEXITY_API_KEY=YOUR_KEY -- npx -y server-perplexity-ask" || true
+check_mcp "deepwiki"    "OSS repo documentation" \
+  "claude mcp add --transport http deepwiki https://mcp.deepwiki.com/mcp" || true
+check_mcp "exa"         "code context + web crawling" \
+  "claude mcp add exa -e EXA_API_KEY=YOUR_KEY -- npx -y exa-mcp-server" || true
+check_mcp "context7"    "library API docs" \
+  "claude mcp add --transport http context7 https://mcp.context7.com/mcp" || true
+check_mcp "morph"       "semantic codebase search + editing" \
+  "claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_KEY -- npx -y @morph-llm/morph-fast-apply" || true
 
 # --- 4. Peer Plugins ---
 header "4. Peer Plugins"
@@ -709,6 +717,7 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
 
   # Separate by type
   CLI_MISSING=$(grep "^cli|" "$MISSING_STORE" 2>/dev/null || true)
+  MCP_MISSING=$(grep "^mcp|" "$MISSING_STORE" 2>/dev/null || true)
   PLUGIN_MISSING=$(grep "^plugin|" "$MISSING_STORE" 2>/dev/null || true)
   TOOL_MISSING=$(grep "^tool|" "$MISSING_STORE" 2>/dev/null || true)
 
@@ -716,6 +725,15 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
     echo ""
     printf "  ${BOLD}CLI tools:${NC}\n"
     echo "$CLI_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  if [[ -n "$MCP_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}MCP servers (need API keys for some):${NC}\n"
+    echo "$MCP_MISSING" | while IFS='|' read -r type name desc cmd; do
       printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
       printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
     done
@@ -762,6 +780,38 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
           info "Skipped $name"
         fi
       done
+    fi
+
+    # Install MCP servers
+    if [[ -n "$MCP_MISSING" ]]; then
+      header "Installing MCP servers"
+      if ! command -v claude &>/dev/null; then
+        warn "claude CLI not found — skip MCP install. Run commands manually inside Claude Code."
+      else
+        echo "$MCP_MISSING" | while IFS='|' read -r type name desc cmd; do
+          printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
+          printf "  Command: %s\n" "$cmd"
+          if echo "$cmd" | grep -q "YOUR_KEY"; then
+            printf "  ${YELLOW}Needs API key — edit YOUR_KEY before running.${NC}\n"
+            printf "  [y to copy-paste later / N to skip] "
+            read -r answer </dev/tty 2>/dev/null || answer="n"
+            info "Skipped auto-install — paste command after setting API key"
+            continue
+          fi
+          printf "  [y/N] "
+          read -r answer </dev/tty 2>/dev/null || answer="n"
+          if [[ "$answer" =~ ^[Yy] ]]; then
+            info "Running: $cmd"
+            if eval "$cmd"; then
+              ok "$name MCP added"
+            else
+              fail "$name install failed"
+            fi
+          else
+            info "Skipped $name"
+          fi
+        done
+      fi
     fi
 
     # Install security tools
