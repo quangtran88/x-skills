@@ -21,3 +21,13 @@ Known failure patterns specific to x-research. For shared OMO patterns, see `../
 - **Don't `cat` background agent output files to poll.** Auto-notifications arrive on completion; polling risks truncated reads and bypasses `~/.claude/rules/background-agents.md`.
 - **Morph auth errors ≠ insufficient results.** On `invalid username, password or token`, fall back immediately to OMC Explore w/ deepwiki → librarian. Don't retry morph with different params. Direct `mcp__github__get_file_contents` is a supplement after fallback, not a primary replacement for deepwiki.
 - **Type E sequencing violation: firing agents "in parallel with morph, just in case".** Morph-first is a HARD GATE — call morph AND read its output BEFORE dispatching any agent. Parallel dispatch alongside morph defeats the principle.
+
+## Max Mode pitfalls
+
+- **Cost overrun.** Max Mode can fire 4-5 token-billed lanes (perplexity_research, exa, gemini, omo). Always show the cost-guard prompt before dispatching. If user picked `prism!`/`--max-yes` to skip the prompt, still report total estimate after dispatch.
+- **Rate limits cascade.** Hitting one provider's quota mid-Max-Mode (gemini "exhausted capacity", perplexity 429) does NOT abort other lanes. Let unaffected lanes finish, mark the failed lane in the synthesis "Lanes that failed" section, offer retry.
+- **Lane timeout cascade.** A single slow lane (`perplexity_research` 60-120s, `omo oracle` 1-5min) blocks synthesis if treated as required. Set per-lane timeouts; after the slowest expected lane + 60s grace, synthesize with what arrived. Never silently drop a lane that is still running — explicitly mark it timed out.
+- **Lane prerequisite missing.** Max Mode must consult `~/.config/x-skills/capabilities.json` before dispatch and skip lanes whose dependency is absent (e.g., no `gemini_cli` → omit gemini lane, do not crash).
+- **deepwiki "not indexed" is not a failure to retry.** If deepwiki returns "repo not indexed" mid-Max-Mode, mark the lane unavailable and rely on librarian. Do not retry deepwiki in the same session.
+- **Synthesis "convergence" trap.** Two lanes agreeing because they both web-searched the same blog post is not real convergence. Note source overlap before claiming convergence — independent agreement (e.g., morph local code + librarian source clone + deepwiki AI summary all describing the same architecture) is stronger than three web summaries echoing each other.
+- **Cost-guard skipped in chained workflows.** If x-do or another skill calls x-research with Max Mode internally, the cost guard still runs and surfaces to the user — do NOT auto-confirm on the user's behalf. Chained skills must propagate the decision back.

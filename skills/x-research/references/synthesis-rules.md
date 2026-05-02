@@ -74,3 +74,16 @@ If parallel agents return contradictory findings (e.g., explore shows one patter
 - Present both perspectives clearly
 - Note which has stronger evidence
 - Flag for user decision — don't silently pick one
+
+## Max Mode Reconciliation
+
+When the orchestrator ran Max Mode (multiple parallel lanes), use the reconciled-synthesis template in `max-mode.md` instead of the standard linear synthesis. Key differences:
+
+1. **Lead with convergent findings**, not the answer. The agreement across lanes IS the strongest evidence.
+2. **Surface divergence explicitly** — name the lanes, their positions, and the reconciliation rationale. Never silently pick a side.
+3. **Preserve unique single-lane insights** — they are the reason Max Mode was used. Even one lane finding something the others missed has signal value.
+4. **Include a confidence map** — claim → lanes supporting → confidence band. Lets the user calibrate trust per claim.
+5. **Always cite per-lane sources** in a single Sources block, attributed by lane.
+6. **Name failed lanes** — partial failure is normal; silent omission is not.
+
+Apply Evidence Tiering (above) to break ties when same-class lanes disagree (e.g., perplexity_ask vs gemini-agent both Tier 4 web — present both; deepwiki Tier 2 beats either when they conflict).
