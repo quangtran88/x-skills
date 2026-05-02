@@ -282,13 +282,15 @@ What it does:
   3. Verifies opencode CLI is installed and reachable
   4. Detects available MCP servers (perplexity, deepwiki, exa, context7, morph-mcp)
   5. Detects peer plugins (oh-my-claudecode, superpowers, claude-mem)
-  6. Writes a capability manifest to ~/.config/x-skills/capabilities.json
-  7. Reports which skills are fully operational vs degraded
+  6. Detects companion skills (ui-ux-pro-max, x-skill-review) under ~/.omc/skills/ and ~/.claude/skills/
+  7. Writes a capability manifest to ~/.config/x-skills/capabilities.json
+  8. Reports which skills are fully operational vs degraded
 
 With --fix:
-  8. Offers to install missing CLI tools (opencode, security tools)
-  9. Offers to install missing MCP servers via `claude mcp add`
- 10. Outputs plugin install commands for missing Claude Code plugins
+  9. Offers to install missing CLI tools (opencode, security tools)
+ 10. Offers to install missing MCP servers via `claude mcp add`
+ 11. Offers to git-clone missing companion skills (ui-ux-pro-max)
+ 12. Outputs plugin install commands for missing Claude Code plugins
 
 The omo-agent binding is what enables x-do, x-research, x-review, and x-bugfix
 to dispatch work to non-Claude models (GPT, Gemini, Codex) via OpenCode.
@@ -579,6 +581,37 @@ check_plugin "superpowers" "workflow skills (brainstorming, TDD, writing-plans)"
 check_plugin "claude-mem" "cross-session memory + search" \
   "/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem@thedotmack" || true
 
+# --- 4b. Companion Skills (user-level, not Claude Code plugins) ---
+header "4b. Companion Skills (user-level)"
+
+# Detects skills installed under ~/.omc/skills/<name>/ or ~/.claude/skills/<name>/.
+# These are NOT Claude Code plugins — they are loose skill directories that ship
+# from upstream repos and are referenced by name from x-* skills (handoff targets).
+check_companion_skill() {
+  local name="$1"
+  local desc="$2"
+  local install_cmd="$3"
+  for d in "$HOME/.omc/skills/$name" "$HOME/.claude/skills/$name"; do
+    if [[ -f "$d/SKILL.md" ]]; then
+      ok "$name — $desc (at $d)"
+      cap_set "skill_$name" true
+      return 0
+    fi
+  done
+  warn "$name — not installed ($desc)"
+  cap_set "skill_$name" false
+  missing_add "skill" "$name" "$desc" "$install_cmd"
+  return 1
+}
+
+check_companion_skill "ui-ux-pro-max" \
+  "design-system MASTER.md generator (x-design step-6 handoff)" \
+  "git clone https://github.com/nextlevelbuilder/ui-ux-pro-max-skill \"$HOME/.omc/skills/ui-ux-pro-max\"" || true
+
+check_companion_skill "x-skill-review" \
+  "skill quality auditor (x-skill-improve handoff target)" \
+  "echo 'See https://github.com/nextlevelbuilder for x-skill-review install (user-level skill)'" || true
+
 # --- 5. External tools (for x-api-pentest) ---
 header "5. Security Tools (optional, for x-api-pentest)"
 
@@ -632,6 +665,10 @@ if [[ "$MODE" != "check" ]]; then
       "oh_my_claudecode": $(cap_json plugin_oh-my-claudecode),
       "superpowers": $(cap_json plugin_superpowers),
       "claude_mem": $(cap_json plugin_claude-mem)
+    },
+    "companion_skills": {
+      "ui_ux_pro_max": $(cap_json skill_ui-ux-pro-max),
+      "x_skill_review": $(cap_json skill_x-skill-review)
     },
     "security_tools": {
       "schemathesis": $(cap_json tool_schemathesis),
@@ -720,6 +757,7 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
   MCP_MISSING=$(grep "^mcp|" "$MISSING_STORE" 2>/dev/null || true)
   PLUGIN_MISSING=$(grep "^plugin|" "$MISSING_STORE" 2>/dev/null || true)
   TOOL_MISSING=$(grep "^tool|" "$MISSING_STORE" 2>/dev/null || true)
+  SKILL_MISSING=$(grep "^skill|" "$MISSING_STORE" 2>/dev/null || true)
 
   if [[ -n "$CLI_MISSING" ]]; then
     echo ""
@@ -752,6 +790,15 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
     echo ""
     printf "  ${BOLD}Security tools (optional):${NC}\n"
     echo "$TOOL_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  if [[ -n "$SKILL_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}Companion skills (user-level):${NC}\n"
+    echo "$SKILL_MISSING" | while IFS='|' read -r type name desc cmd; do
       printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
       printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
     done
@@ -830,6 +877,42 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
         done
       else
         info "Skipped security tools"
+      fi
+    fi
+
+    # Companion skills (git clone-based)
+    if [[ -n "$SKILL_MISSING" ]]; then
+      header "Installing companion skills"
+      if ! command -v git &>/dev/null; then
+        warn "git not found — skip skill install. Run commands manually."
+      else
+        echo "$SKILL_MISSING" | while IFS='|' read -r type name desc cmd; do
+          # Pre-check: skip if already present (race-safe vs. caps cache)
+          if [[ -f "$HOME/.omc/skills/$name/SKILL.md" || -f "$HOME/.claude/skills/$name/SKILL.md" ]]; then
+            ok "$name already installed"
+            continue
+          fi
+          printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
+          printf "  Command: %s\n" "$cmd"
+          # Skip non-git pointers (e.g., the stub for x-skill-review)
+          if ! echo "$cmd" | grep -q "^git clone"; then
+            info "Skipped — manual install required"
+            continue
+          fi
+          printf "  [y/N] "
+          read -r answer </dev/tty 2>/dev/null || answer="n"
+          if [[ "$answer" =~ ^[Yy] ]]; then
+            mkdir -p "$HOME/.omc/skills"
+            info "Running: $cmd"
+            if eval "$cmd"; then
+              ok "$name installed"
+            else
+              fail "$name installation failed"
+            fi
+          else
+            info "Skipped $name"
+          fi
+        done
       fi
     fi
 
