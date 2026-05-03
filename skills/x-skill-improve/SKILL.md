@@ -9,7 +9,7 @@ Evaluates how well an x-skill was followed during a real session, then improves 
 
 ## Bootstrap
 
-0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `claude_mem` plugin flag gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable.
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `oh_my_claudecode` plugin flag gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable. `claude_mem` is optional and used only for memory-backed enhancements.
 
 ## Invocation
 
@@ -44,9 +44,12 @@ Use `session_search` (MCP tool) to find sessions where the target skill was invo
 ### 2. Load Skill Files
 
 Read the full skill directory for the identified skill. Resolve location using this precedence:
-- Skill name starts with `x-` → check **plugin source repo** first: `/Users/randytran/Codes/x-skills/skills/<name>/`
-- Fallback → `~/.claude/skills/<name>/`
-- Plugin cache (`~/.claude/plugins/cache/`) → **read-only reference**, never edit here
+- Skill name starts with `x-` → check **plugin source repo** first. Resolve dynamically:
+  1. `${X_SKILLS_PLUGIN_ROOT:-}/skills/<name>/` if env var set
+  2. The directory of an x-skills git checkout (try `git -C "$dir" config --get remote.origin.url | grep -q x-skills` for any candidate from `~/Codes`, `~/code`, `~/src`, `$HOME`)
+  3. `~/.claude/plugins/cache/x-skills-marketplace/x-skills/*/skills/<name>/` (read-only — never edit here)
+- Fallback for non-x skills → `~/.claude/skills/<name>/`
+- Plugin cache → **read-only reference**, never edit here
 
 ```
 <resolved-path>/<skill-name>/
@@ -112,7 +115,7 @@ All findings use the [shared severity scale](../x-shared/severity-guide.md):
 
 When the user chooses to apply:
 
-- **Resolve edit target:** For `x-*` skills, always edit the **source repo** at `/Users/randytran/Codes/x-skills/skills/<name>/`, not the plugin cache or installed copy. For standalone skills, edit `~/.claude/skills/<name>/`.
+- **Resolve edit target:** For `x-*` skills, always edit the **source repo** (resolved per the precedence in step 2: `$X_SKILLS_PLUGIN_ROOT`, then a local x-skills git checkout). Never edit the plugin cache (`~/.claude/plugins/cache/`) or installed copy. For standalone skills, edit `~/.claude/skills/<name>/`.
 - **Default edit tool:** Use `morph-mcp edit_file` for all skill edits — partial edits with `// ... existing code ...` markers are faster and preserve context better than full rewrites. Fall back to native `Edit` only if `edit_file` errors.
 - **UPDATE SKILL findings:** Make targeted edits to the skill files. Prefer:
   - Adding exceptions to existing rules (not rewriting them)
@@ -130,7 +133,7 @@ This skill references shared infrastructure in `../x-shared/`:
 - `severity-guide.md` — finding severity scale
 - `workflow-chains.md` — cross-skill chaining
 
-**Runtime:** Requires `session_search` MCP tool (oh-my-claudecode plugin). Falls back to JSONL-direct if unavailable.
+**Runtime:** Requires `session_search` MCP tool from the oh-my-claudecode plugin. Falls back to JSONL-direct read of `~/.claude/projects/*/sessions/*.jsonl` if unavailable.
 
 ## Persistence
 
