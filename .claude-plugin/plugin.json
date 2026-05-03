@@ -1,6 +1,6 @@
 {
   "name": "x-skills",
-  "version": "1.3.6",
+  "version": "1.4.0",
   "description": "Intelligent skill routers for execution, research, review, debugging, design, and security testing — with optional multi-model orchestration via OpenCode",
   "author": {
     "name": "Randy Tran"
@@ -20,5 +20,23 @@
     "api-pentest"
   ],
   "homepage": "https://github.com/quangtran88/x-skills",
-  "repository": "https://github.com/quangtran88/x-skills"
+  "repository": "https://github.com/quangtran88/x-skills",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/check-version.sh\"",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-capabilities.sh\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
 }

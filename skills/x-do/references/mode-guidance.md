@@ -53,9 +53,11 @@ After x-bugfix completes:
 
 ## F: Refactor
 
-**Delegate to `/refactor`** — it has a 6-phase workflow (intent gate → codebase analysis → codemap → test assessment → plan → execute with per-step verification → final verification). Uses AST-grep, LSP, and Morph codebase_search for structural precision.
+**Detect first.** `/refactor` is an external skill (not in this plugin). Check the available-skills list at session start (or `~/.claude/skills/refactor/` and the harness's skill registry). If present → delegate. If absent → fall back to Mode A (treat as a multi-task plan): brainstorm scope, write a plan, dispatch executor, post-impl review. Do NOT silently call `Skill("refactor", ...)` and hope it resolves.
 
-Route: hand off the user's refactoring description to refactor via `Skill("refactor", args="<target and scope>")`. It will handle analysis, planning, and execution internally.
+**Delegate to `/refactor`** (when available) — it has a 6-phase workflow (intent gate → codebase analysis → codemap → test assessment → plan → execute with per-step verification → final verification). Uses AST-grep, LSP, and Morph codebase_search for structural precision.
+
+Route: hand off the user's refactoring description to refactor via `Skill("refactor", args="<target and scope>")` — primitive: `handoff` (sync, depends on result). Include a [handoff context](../../x-shared/context-envelope.md) block: from x-do Mode F, target/scope, files in scope, why-now reason. It will handle analysis, planning, and execution internally.
 
 **Enumerated review-feedback exception:** When the user provides specific, numbered changes on an existing commit (e.g., "I have feedback for commit abc123: 1. use csv lib, 2. extract method, 3. fix error type..."), treat as **Mode A** instead — the feedback list IS the plan. `/refactor`'s discovery phases (intent gate, codemap) add ceremony that duplicates what the user already scoped. Route to Mode A and follow its plan review → execute → post-impl review pipeline.
 

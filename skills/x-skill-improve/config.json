@@ -1,0 +1,23 @@
+{
+  "supported_skills": [
+    "x-do",
+    "x-research",
+    "x-review",
+    "x-skill-review",
+    "x-skill-improve",
+    "x-bugfix"
+  ],
+  "skills_dir": "~/.claude/skills",
+  "shared_dir": "~/.claude/skills/x-shared",
+  "data_dir": "~/.claude/skills/x-skill-improve/data",
+  "session_search": {
+    "discovery": {
+      "contextChars": 500,
+      "limit": 10
+    },
+    "extraction": {
+      "contextChars": 1000,
+      "limit": 20
+    }
+  }
+}

@@ -68,10 +68,16 @@ x-do routes. It does not execute. Dispatch to an executor subagent via `Agent` t
 
 ## Completion (MANDATORY)
 
-Before claiming done, dispatch x-verify via the Skill tool:
+Before claiming done, **resolve the `verifier` slot** per `../x-shared/slot-schema.md` § "Slot precedence (v1 — 3-layer cascade)":
+
+1. **User in-prompt override?** ("use x-review for verification this time", "skip verification") → wins.
+2. **Skill frontmatter `slots:` block** (this skill declares `verifier: x-verify`).
+3. **Schema default** (would be `verification-before-completion`) — only if 1 and 2 are silent.
+
+Surface the resolution inline before dispatching, e.g. `Dispatching verifier slot → resolved to x-verify via skill frontmatter default`. Then dispatch the resolved value via the Skill tool (skills) or Agent tool (OMC agents) per `../x-shared/invocation-guide.md` § "skill-or-agent-typed slot dispatch".
 
 ```
-Skill tool: x-verify
+# Default resolution (no override): Skill tool: x-verify
 ```
 
 x-verify runs the completion cascade (see `../x-shared/completion-cascade.md`). Honor its verdict:
@@ -91,7 +97,9 @@ Smart entry point that detects what to do and routes through the optimal workflo
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (plan review / planning) instead. See `../x-omo/gotchas.md`.**
+
+0. Pin capabilities for the session per `../x-shared/capability-loading.md` (look for the `[x-skills/capabilities]` snapshot injected by SessionStart; otherwise read `~/.config/x-skills/capabilities.json` once). Filter routing tables against the pinned set; do NOT re-check per dispatch.
+1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (plan review / planning) instead. See `../x-omo/gotchas.md`.**
 
 ## Invocation
 
@@ -204,7 +212,7 @@ Fix all errors before proceeding to review or completion.
 
 Work done? → `/x-review` the changes. See `../x-shared/workflow-chains.md` for common sequences. Include a [handoff context](../x-shared/context-envelope.md) block.
 
-**Learner hook:** If the completed workflow was complex (3+ steps, multi-agent, novel pattern), offer skill extraction:
+**Learner hook:** If the completed workflow was complex (3+ steps, multi-agent, novel pattern) AND the OMC plugin is available (per the capability set pinned in Bootstrap step 0), offer skill extraction. Skip silently when OMC is unavailable — do not surface a slash command the user can't run.
 > This workflow succeeded. Save as a reusable skill? **[Y]** `/oh-my-claudecode:learner` **[N]** Skip
 
 ## Dependencies

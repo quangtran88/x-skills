@@ -2,5 +2,8 @@
   "omo_agent": "omo-agent",
   "omo_agent_fallback": "../x-omo/omo-agent",
   "omo_skill": "../x-omo/SKILL.md",
-  "capabilities_file": "~/.config/x-skills/capabilities.json"
+  "gemini_skill": "../x-gemini/SKILL.md",
+  "mcp_toolbox": "../x-shared/mcp-toolbox.md",
+  "capabilities_file": "~/.config/x-skills/capabilities.json",
+  "capability_loading": "../x-shared/capability-loading.md"
 }

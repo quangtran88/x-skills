@@ -35,9 +35,20 @@ Skills declare their pluggable dependencies via frontmatter `slots:` block. v1 h
 **Type:** `skill-or-agent`. A verifier can be either a Skill-tool target or an Agent-tool subagent target — dispatch differs between the two, callers must check which kind of identifier resolved.
 - `verification-before-completion` — superpowers default cascade (skill — dispatch via `Skill` tool)
 - `x-verify` — local completion-cascade dispatcher (skill — dispatch via `Skill` tool; x-verify internally runs the cascade from 06)
-- `x-skill-review` — when verifying a skill modification (skill, external — dispatch via `Skill` tool)
+- `x-skill-review` — when verifying a skill modification (skill, external — installed at `~/.claude/skills/x-skill-review/`, NOT shipped in this plugin — dispatch via `Skill` tool when available)
 - `code-reviewer` — OMC agent (dispatch via `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`)
 - `custom:<skill-name>` — project-specific verifier (skill — dispatch via `Skill` tool)
+
+### `code-reviewer` provider — dual namespace
+
+`code-reviewer` resolves to one of two equivalent agent providers depending on which plugin is installed:
+
+| Provider | `subagent_type` | When chosen |
+|---|---|---|
+| `oh-my-claudecode:code-reviewer` | OMC plugin | Default for `completion-cascade.md` step 4 (verifier slot canonical). Full OMC review prompt with severity rubric. |
+| `superpowers:code-reviewer` | superpowers plugin | Default for `x-review/steps/step-02-review.md` (multi-reviewer dispatch). Pairs with `superpowers:requesting-code-review` workflow. |
+
+Both are valid resolutions of the `code-reviewer` slot value. Skills MAY hard-code either provider as their default; users SHOULD NOT mix them within a single review pipeline (e.g., x-do post-impl review uses OMC; x-review uses superpowers — pick one when chaining). When the user-prompt override names a slot value of `code-reviewer` without a namespace, prefer OMC (`oh-my-claudecode:code-reviewer`) per the cascade default.
 
 ### `reviewer` slot (vocabulary only — not emitted in v1)
 

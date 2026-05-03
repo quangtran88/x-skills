@@ -1,22 +1,23 @@
 # x-skills — Intelligent Skill Routers for Claude Code
 
-11 skills that classify user intent and route to the optimal executor. Ships with optional multi-model orchestration via OpenCode.
+10 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
 
 ## Skills
 
-| Skill | Purpose | Requires |
-|-------|---------|----------|
-| **x-do** | Build, implement, fix, execute | Best with: opencode, OMC, superpowers |
-| **x-research** | Research, investigate, understand | Best with: opencode, MCP servers |
-| **x-review** | Code review, plan review, PR review | Best with: opencode, OMC, superpowers |
-| **x-verify** | Run the completion cascade ("am I done?") | Standalone |
-| **x-bugfix** | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
-| **x-design** | Apply visual design systems | Standalone |
-| **x-api-pentest** | API security testing (OWASP Top 10) | External security CLIs |
-| **x-omo** | OpenCode multi-model bridge | opencode CLI |
-| **x-skill-review** | Audit skill quality | Optional: claude-mem |
-| **x-skill-improve** | Improve skills from session data | Optional: claude-mem |
-| **x-shared** | Shared references (not invokable) | None |
+| Skill | Source | Purpose | Requires |
+|-------|--------|---------|----------|
+| **x-do** | plugin | Build, implement, fix, execute | Best with: opencode, OMC, superpowers |
+| **x-research** | plugin | Research, investigate, understand | Best with: opencode, MCP servers |
+| **x-review** | plugin | Code review, plan review, PR review | Best with: opencode, OMC, superpowers |
+| **x-verify** | plugin | Run the completion cascade ("am I done?") | Standalone |
+| **x-bugfix** | plugin | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
+| **x-design** | plugin | Apply visual design systems | Standalone |
+| **x-api-pentest** | plugin | API security testing (OWASP Top 10) | External security CLIs |
+| **x-omo** | plugin | OpenCode multi-model bridge | opencode CLI |
+| **x-gemini** | plugin | Direct Gemini CLI bridge (Google Search, gemini-3.x, no API key) | gemini CLI + jq |
+| **x-skill-improve** | plugin | Improve skills from session data | Optional: claude-mem |
+| **x-shared** | plugin | Shared references (not invokable) | None |
+| **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/`; optional: claude-mem |
 
 ## Feature Gates
 
@@ -27,11 +28,15 @@ Skills auto-detect available dependencies at bootstrap and route accordingly. No
 
 ### Bootstrap Protocol
 
-Every skill that dispatches to external agents MUST:
+Every skill that dispatches to external agents MUST follow the contract in `skills/x-shared/capability-loading.md`:
 
-1. Read `~/.config/x-skills/capabilities.json` (written by `bin/setup`)
-2. If the file is missing, assume Claude-only mode
-3. Route based on what's available — see `lib/feature-gate.md` for fallback table
+1. Look for the `[x-skills/capabilities]` line injected by the SessionStart hook (parsed once per session — do NOT re-check per dispatch)
+2. If absent, read `~/.config/x-skills/capabilities.json` (written by `bin/setup`)
+3. Merge `.x-skills/capabilities.json` from the project if present (project override > user manifest)
+4. Filter routing tables against the pinned set; pick fallback rows when primary unavailable
+5. If the manifest is missing entirely, assume Claude-only mode
+
+Quick fallback reference for OMO/OMC agents lives in this file (tables below). Detailed schema, drift handling, and opt-out mechanics live in `skills/x-shared/capability-loading.md`.
 
 ### omo-agent Binding
 

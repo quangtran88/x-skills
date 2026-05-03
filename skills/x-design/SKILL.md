@@ -23,7 +23,8 @@ Resolves user design intent to a curated `DESIGN.md` file from [VoltAgent/awesom
 
 ## Bootstrap
 
-Read these two files before routing any request:
+Read these files before routing any request:
+0. `../x-shared/capability-loading.md` — pin capabilities for the session (used to gate the optional `ui-ux-pro-max` and `shadcn` MCP handoffs in steps 6-7).
 1. `config.json` — pinned commit, URL templates, defaults
 2. `references/catalog.md` — 58 sites with slugs, categories, intent tags, tag vocabulary
 
@@ -66,12 +67,15 @@ Read these two files before routing any request:
    - **Stack-aware hint:** Check the project for `package.json` (React/Next → Tailwind `bg-[#hex]` or `className`), `nuxt.config` / `vue` deps (Vue → scoped `<style>`), `svelte.config` (Svelte → `style:` directives), `pubspec.yaml` (Flutter → `Color(0xFFhex)`), or plain HTML. Append one line: "Section 9 prompts use raw CSS values — adapt to `bg-[#f5f4ed]` (Tailwind), `style={{ background }}` (React), or your framework's convention."
    - **AI slop warning:** Append a brief advisory referencing `references/ai-slop-patterns.md` — name the top 3–4 pitfalls inline (3-column feature grid, gradient backgrounds, icons in colored circles, cookie-cutter rhythm) and note: "See the full list in the AI slop reference. The site-specific Don'ts in section 7 take precedence."
 
-6. **Offer the `ui-ux-pro-max` handoff.** `DESIGN.md` captures aesthetic intent; `ui-ux-pro-max` captures enforceable rules (a11y, palettes, stack guidelines, anti-patterns). **Detect first:** if `ui-ux-pro-max` isn't in the available skills list, skip step 6 silently. Otherwise ask once:
-   > "Want me to also generate a `design-system/MASTER.md` with implementation rules via `ui-ux-pro-max`? It complements `DESIGN.md` — vision vs. rules."
+6. **Offer the `ui-ux-pro-max` handoff.** `DESIGN.md` captures aesthetic intent; `ui-ux-pro-max` captures enforceable rules (a11y, palettes, stack guidelines, anti-patterns). External user-level skill (NOT shipped in this plugin) — upstream: <https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>. Install location: `~/.omc/skills/ui-ux-pro-max/` (or `~/.claude/skills/ui-ux-pro-max/`). **Detect first** by checking the available skills list. Behavior:
+   - **Installed** → ask once:
+     > "Want me to also generate a `design-system/MASTER.md` with implementation rules via `ui-ux-pro-max`? It complements `DESIGN.md` — vision vs. rules."
+   - **Not installed** → surface the install pointer once, then skip step 6 (do NOT silently no-op):
+     > "Optional next step: `ui-ux-pro-max` would generate enforceable rules (`design-system/MASTER.md`) to complement `DESIGN.md`. Not installed. Source: <https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>. Skipping for now."
 
-   If yes, invoke `ui-ux-pro-max` with the same intent (brand name + product type + descriptive tags from the catalog row). The two files coexist: `DESIGN.md` is the north-star; `MASTER.md` is the rules engine. If no, skip silently — never push twice.
+   If user accepts, invoke `ui-ux-pro-max` with the same intent (brand name + product type + descriptive tags from the catalog row). **Primitive: `handoff` (sync, depends on result).** Include a [handoff context](../x-shared/context-envelope.md) block: from x-design, slug + brand name + tags, path of the installed `DESIGN.md`, recommended next step. The two files coexist: `DESIGN.md` is the north-star; `MASTER.md` is the rules engine. If user declines, skip silently — never push twice.
 
-7. **Offer the `shadcn` MCP handoff.** `DESIGN.md` + `MASTER.md` describe *what* the UI looks like; `shadcn` MCP is *how* to install matching components. **Conditional** — call `mcp__shadcn__get_project_registries` first; empty/error result triggers the **non-shadcn advisory** below, then proceeds to step 8 (never push shadcn onto non-shadcn projects). If registries exist, follow the workflow in `references/shadcn-handoff.md` (detect → ask once → seed primitives with `search_items_in_registries` + `get_add_command_for_items` → optional `get_audit_checklist`). **Print install commands; never auto-run.**
+7. **Offer the `shadcn` MCP handoff.** `DESIGN.md` + `MASTER.md` describe *what* the UI looks like; `shadcn` MCP is *how* to install matching components. **Conditional** — call `mcp__shadcn__get_project_registries` first; empty/error result triggers the **non-shadcn advisory** below, then proceeds to step 8 (never push shadcn onto non-shadcn projects). If registries exist, follow the workflow in `references/shadcn-handoff.md` (detect → ask once → seed primitives with `search_items_in_registries` + `get_add_command_for_items` → optional `get_audit_checklist`). **Primitive: sequential `handoff` after step 6** — `shadcn` consumes MASTER.md tokens, so it must follow the ui-ux-pro-max handoff (do NOT fan out steps 6 + 7 in parallel). **Print install commands; never auto-run.** Include a [handoff context](../x-shared/context-envelope.md) line when surfacing the install commands so the next session knows which DESIGN.md/MASTER.md drove the picks.
 
    **Non-shadcn framework advisory:** When `get_project_registries` returns empty, check for a detectable framework and offer a one-line hint (never push, just inform):
    - `nuxt.config.*` or `vue` in deps → "Apply DESIGN.md tokens via CSS custom properties or scoped `<style>` in Vue SFCs."
@@ -110,12 +114,12 @@ Read these two files before routing any request:
 - `config.json` — pinned commit + URL templates + defaults
 - `references/catalog.md` — 58-site index, authoritative slug + tag source
 - Upstream: `VoltAgent/awesome-design-md` at the pinned commit in `config.json`
-- Optional: `ui-ux-pro-max` skill (step 6 handoff) — generates `design-system/MASTER.md`
+- Optional: `ui-ux-pro-max` skill (step 6 handoff) — generates `design-system/MASTER.md`. **External user-level skill, NOT shipped in this plugin.** Upstream: <https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>. Install path: `~/.omc/skills/ui-ux-pro-max/` (or `~/.claude/skills/ui-ux-pro-max/`).
 - Optional: `shadcn` MCP (step 7 handoff) — `get_project_registries`, `search_items_in_registries`, `get_add_command_for_items`, `get_audit_checklist`
 
 ## Related Skills
 
-- `ui-ux-pro-max` — bespoke design authoring (styles, palettes, accessibility). `x-design` routes to *existing* references; `ui-ux-pro-max` helps *author* decisions from scratch.
+- `ui-ux-pro-max` — bespoke design authoring (styles, palettes, accessibility). `x-design` routes to *existing* references; `ui-ux-pro-max` helps *author* decisions from scratch. External user-level skill (not shipped here) — install from <https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>.
 - `update-research` — maintains the research-library clone (path in `config.json` → `research_fallback_path`); separate from this skill's index-only footprint
 - `x-review` — post-install visual review pass
 
@@ -145,6 +149,7 @@ Each stage is opt-in. Stages 2 and 3 are skipped silently if the user declines o
 | Skipping non-shadcn framework advisory | When shadcn detection fails, check for Vue/Svelte/Flutter and offer a one-line token-application hint |
 | Auto-running `npx shadcn add ...` commands | Step 7c **prints** install commands; the user runs them |
 | Forcing `ui-ux-pro-max` when it isn't installed | Step 6 must check the available skills list before invoking |
+| Silently skipping step 6 when `ui-ux-pro-max` missing | Surface the install pointer (<https://github.com/nextlevelbuilder/ui-ux-pro-max-skill>) once, then stop — do NOT no-op |
 
 ## Gotchas
 

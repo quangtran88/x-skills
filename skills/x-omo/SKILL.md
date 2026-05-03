@@ -1,6 +1,6 @@
 ---
 name: x-omo
-description: OpenCode multi-model agents — route to non-Claude models via opencode CLI
+description: Use when user asks for non-Claude model dispatch (GPT-5, Gemini, Codex, o3) or invokes OMO agents (oracle, explore, librarian, multimodal-looker) — bridges Claude Code to OpenCode CLI, handles agent catalog, model routing flags, and prompt-block construction
 triggers:
   - "omo"
   - "opencode agent"
@@ -193,6 +193,10 @@ These blocks are guidance for prompt construction — they do NOT replace the `[
 - **Flag uncertainty** — note hedging or contradictions
 - If an agent modified files, verify (tests, diagnostics)
 - Contradictions between agents = flag for user decision
+
+## Gotchas
+
+See `gotchas.md` for known failure patterns (UNAVAILABLE display-name agents, mode=subagent dispatch failures, `--pure` flag requirements, model fallback chains). Update it when you encounter new ones. Sibling skills (`x-do`, `x-bugfix`, etc.) reach into this file via `../x-omo/gotchas.md`.
 
 ---
 

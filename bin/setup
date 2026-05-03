@@ -13,10 +13,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 OMO_AGENT_SRC="$PLUGIN_DIR/bin/omo-agent"
+GEMINI_AGENT_SRC="$PLUGIN_DIR/bin/gemini-agent"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/x-skills"
 CAPS_FILE="$CONFIG_DIR/capabilities.json"
 LINK_DIR="$HOME/.local/bin"
 LINK_PATH="$LINK_DIR/omo-agent"
+GEMINI_LINK_PATH="$LINK_DIR/gemini-agent"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -53,8 +55,75 @@ cap_json() {
     *)          echo "\"$val\"" ;;
   esac
 }
+# Hash skill files to detect drift between setups.
+# Outputs sha256 hex per file relative to plugin dir.
+sha_skill_file() {
+  local f="$1"
+  if command -v sha256sum &>/dev/null; then
+    sha256sum "$f" | awk '{print $1}'
+  elif command -v shasum &>/dev/null; then
+    shasum -a 256 "$f" | awk '{print $1}'
+  else
+    echo "no-hash-tool"
+  fi
+}
 # Track missing deps: type|name|description|install_command
 missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
+
+write_files_manifest() {
+  local manifest="$CONFIG_DIR/files-manifest.json"
+  local skills_dir="$PLUGIN_DIR/skills"
+  [[ -d "$skills_dir" ]] || return 0
+
+  local entries=""
+  local first=1
+  while IFS= read -r f; do
+    local rel="${f#$PLUGIN_DIR/}"
+    local hash
+    hash=$(sha_skill_file "$f")
+    if [[ $first -eq 1 ]]; then
+      first=0
+    else
+      entries+=","
+    fi
+    entries+=$'\n    '"{ \"path\": \"$rel\", \"sha256\": \"$hash\" }"
+  done < <(find "$skills_dir" -name "SKILL.md" -type f | sort)
+
+  cat > "$manifest" <<EOF
+{
+  "version": "1.0.0",
+  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "plugin_dir": "$PLUGIN_DIR",
+  "files": [$entries
+  ]
+}
+EOF
+  ok "Written file integrity manifest to $manifest"
+}
+
+verify_files_manifest() {
+  local manifest="$CONFIG_DIR/files-manifest.json"
+  command -v jq &>/dev/null || { warn "jq missing — cannot verify manifest"; return 0; }
+  [[ -f "$manifest" ]] || { warn "files-manifest.json missing — run setup to generate"; return 0; }
+  local drift=0
+  while IFS= read -r line; do
+    local rel
+    local expected
+    rel=$(echo "$line" | jq -r '.path')
+    expected=$(echo "$line" | jq -r '.sha256')
+    local actual
+    actual=$(sha_skill_file "$PLUGIN_DIR/$rel")
+    if [[ "$expected" != "$actual" ]]; then
+      warn "drift: $rel (expected $expected, got $actual)"
+      drift=$((drift + 1))
+    fi
+  done < <(jq -c '.files[]' "$manifest" 2>/dev/null)
+  if [[ $drift -gt 0 ]]; then
+    warn "$drift skill file(s) drifted since last setup. Re-run: ./bin/setup"
+  else
+    ok "Skill file integrity verified ($(jq '.files | length' "$manifest") files)"
+  fi
+}
 
 # --- oh-my-openagent mode=all audit ---
 # Built-in role agents (oracle/explore/librarian/multimodal-looker) default to
@@ -213,12 +282,15 @@ What it does:
   3. Verifies opencode CLI is installed and reachable
   4. Detects available MCP servers (perplexity, deepwiki, exa, context7, morph-mcp)
   5. Detects peer plugins (oh-my-claudecode, superpowers, claude-mem)
-  6. Writes a capability manifest to ~/.config/x-skills/capabilities.json
-  7. Reports which skills are fully operational vs degraded
+  6. Detects companion skills (ui-ux-pro-max, x-skill-review) under ~/.omc/skills/ and ~/.claude/skills/
+  7. Writes a capability manifest to ~/.config/x-skills/capabilities.json
+  8. Reports which skills are fully operational vs degraded
 
 With --fix:
-  8. Offers to install missing CLI tools (opencode, security tools)
-  9. Outputs plugin install commands for missing Claude Code plugins
+  9. Offers to install missing CLI tools (opencode, security tools)
+ 10. Offers to install missing MCP servers via `claude mcp add`
+ 11. Offers to git-clone missing companion skills (ui-ux-pro-max)
+ 12. Outputs plugin install commands for missing Claude Code plugins
 
 The omo-agent binding is what enables x-do, x-research, x-review, and x-bugfix
 to dispatch work to non-Claude models (GPT, Gemini, Codex) via OpenCode.
@@ -230,12 +302,18 @@ esac
 
 # --- Uninstall ---
 if [[ "$MODE" == "uninstall" ]]; then
-  header "Uninstalling x-skills omo-agent binding"
+  header "Uninstalling x-skills bindings"
   if [[ -L "$LINK_PATH" ]]; then
     rm "$LINK_PATH"
     ok "Removed symlink $LINK_PATH"
   else
     info "No symlink found at $LINK_PATH"
+  fi
+  if [[ -L "$GEMINI_LINK_PATH" ]]; then
+    rm "$GEMINI_LINK_PATH"
+    ok "Removed symlink $GEMINI_LINK_PATH"
+  else
+    info "No symlink found at $GEMINI_LINK_PATH"
   fi
   if [[ -f "$CAPS_FILE" ]]; then
     rm "$CAPS_FILE"
@@ -289,6 +367,49 @@ if [[ "$MODE" != "check" ]]; then
   fi
 else
   info "[check mode] Would create symlink: $LINK_PATH → $OMO_AGENT_SRC"
+fi
+
+# --- 1b. gemini-agent binding ---
+header "1b. gemini-agent binding"
+
+if [[ ! -f "$GEMINI_AGENT_SRC" ]]; then
+  warn "gemini-agent not found at $GEMINI_AGENT_SRC"
+else
+  chmod +x "$GEMINI_AGENT_SRC"
+  ok "gemini-agent is executable"
+
+  if [[ "$MODE" != "check" ]]; then
+    if [[ -L "$GEMINI_LINK_PATH" ]]; then
+      EXISTING_TARGET="$(readlink "$GEMINI_LINK_PATH")"
+      if [[ "$EXISTING_TARGET" == "$GEMINI_AGENT_SRC" ]]; then
+        ok "Symlink already correct: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC"
+      else
+        ln -sf "$GEMINI_AGENT_SRC" "$GEMINI_LINK_PATH"
+        ok "Updated symlink: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC (was: $EXISTING_TARGET)"
+      fi
+    elif [[ -e "$GEMINI_LINK_PATH" ]]; then
+      warn "$GEMINI_LINK_PATH exists but is not a symlink — skipping"
+    else
+      ln -s "$GEMINI_AGENT_SRC" "$GEMINI_LINK_PATH"
+      ok "Created symlink: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC"
+    fi
+  else
+    info "[check mode] Would create symlink: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC"
+  fi
+fi
+
+# --- 1c. Gemini CLI ---
+header "1c. Gemini CLI (for x-gemini skill)"
+
+if command -v gemini &>/dev/null; then
+  GEMINI_VERSION=$(gemini --version 2>/dev/null || echo "unknown")
+  ok "gemini found: $GEMINI_VERSION"
+  cap_set gemini_cli true
+else
+  warn "gemini CLI not found"
+  info "x-gemini skill will be unavailable. Install: https://github.com/google-gemini/gemini-cli"
+  cap_set gemini_cli false
+  missing_add "cli" "gemini" "Direct Google Gemini CLI (for x-gemini skill)" "npm install -g @google/gemini-cli"
 fi
 
 # --- 2. OpenCode CLI ---
@@ -383,6 +504,7 @@ fi
 check_mcp() {
   local name="$1"
   local desc="$2"
+  local install_cmd="$3"
   # Some MCP servers register under a different name (e.g., "morph-mcp" vs "morph").
   # Build a grep pattern that matches both the short name and common variants.
   local grep_pattern="mcp__${name}__\|mcp__${name}-mcp__\|\"$name\"\|\"${name}-mcp\""
@@ -418,14 +540,20 @@ check_mcp() {
   fi
   warn "$name — not detected ($desc)"
   cap_set "mcp_$name" false
+  missing_add "mcp" "$name" "$desc" "$install_cmd"
   return 1
 }
 
-check_mcp "perplexity"  "web search + reasoning" || true
-check_mcp "deepwiki"    "OSS repo documentation" || true
-check_mcp "exa"         "code context + web crawling" || true
-check_mcp "context7"    "library API docs" || true
-check_mcp "morph"       "semantic codebase search + editing" || true
+check_mcp "perplexity"  "web search + reasoning" \
+  "claude mcp add perplexity -e PERPLEXITY_API_KEY=YOUR_KEY -- npx -y server-perplexity-ask" || true
+check_mcp "deepwiki"    "OSS repo documentation" \
+  "claude mcp add --transport http deepwiki https://mcp.deepwiki.com/mcp" || true
+check_mcp "exa"         "code context + web crawling" \
+  "claude mcp add exa -e EXA_API_KEY=YOUR_KEY -- npx -y exa-mcp-server" || true
+check_mcp "context7"    "library API docs" \
+  "claude mcp add --transport http context7 https://mcp.context7.com/mcp" || true
+check_mcp "morph"       "semantic codebase search + editing" \
+  "claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_KEY -- npx -y @morph-llm/morph-fast-apply" || true
 
 # --- 4. Peer Plugins ---
 header "4. Peer Plugins"
@@ -452,6 +580,37 @@ check_plugin "superpowers" "workflow skills (brainstorming, TDD, writing-plans)"
   "/plugin marketplace add obra/superpowers-marketplace && /plugin install superpowers@superpowers-marketplace" || true
 check_plugin "claude-mem" "cross-session memory + search" \
   "/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem@thedotmack" || true
+
+# --- 4b. Companion Skills (user-level, not Claude Code plugins) ---
+header "4b. Companion Skills (user-level)"
+
+# Detects skills installed under ~/.omc/skills/<name>/ or ~/.claude/skills/<name>/.
+# These are NOT Claude Code plugins — they are loose skill directories that ship
+# from upstream repos and are referenced by name from x-* skills (handoff targets).
+check_companion_skill() {
+  local name="$1"
+  local desc="$2"
+  local install_cmd="$3"
+  for d in "$HOME/.omc/skills/$name" "$HOME/.claude/skills/$name"; do
+    if [[ -f "$d/SKILL.md" ]]; then
+      ok "$name — $desc (at $d)"
+      cap_set "skill_$name" true
+      return 0
+    fi
+  done
+  warn "$name — not installed ($desc)"
+  cap_set "skill_$name" false
+  missing_add "skill" "$name" "$desc" "$install_cmd"
+  return 1
+}
+
+check_companion_skill "ui-ux-pro-max" \
+  "design-system MASTER.md generator (x-design step-6 handoff)" \
+  "git clone https://github.com/nextlevelbuilder/ui-ux-pro-max-skill \"$HOME/.omc/skills/ui-ux-pro-max\"" || true
+
+check_companion_skill "x-skill-review" \
+  "skill quality auditor (x-skill-improve handoff target)" \
+  "echo 'See https://github.com/nextlevelbuilder for x-skill-review install (user-level skill)'" || true
 
 # --- 5. External tools (for x-api-pentest) ---
 header "5. Security Tools (optional, for x-api-pentest)"
@@ -494,6 +653,7 @@ if [[ "$MODE" != "check" ]]; then
     "opencode": $(cap_json opencode),
     "omo_plugin": $(cap_json omo_plugin),
     "omo_mode_all": $(cap_json omo_mode_all),
+    "gemini_cli": $(cap_json gemini_cli),
     "mcp": {
       "perplexity": $(cap_json mcp_perplexity),
       "deepwiki": $(cap_json mcp_deepwiki),
@@ -506,6 +666,10 @@ if [[ "$MODE" != "check" ]]; then
       "superpowers": $(cap_json plugin_superpowers),
       "claude_mem": $(cap_json plugin_claude-mem)
     },
+    "companion_skills": {
+      "ui_ux_pro_max": $(cap_json skill_ui-ux-pro-max),
+      "x_skill_review": $(cap_json skill_x-skill-review)
+    },
     "security_tools": {
       "schemathesis": $(cap_json tool_schemathesis),
       "nuclei": $(cap_json tool_nuclei),
@@ -517,8 +681,13 @@ if [[ "$MODE" != "check" ]]; then
 }
 MANIFEST
   ok "Written to $CAPS_FILE"
+  write_files_manifest
 else
   info "[check mode] Would write to $CAPS_FILE"
+fi
+
+if [[ "$MODE" == "check" ]]; then
+  verify_files_manifest
 fi
 
 # ============================================================
@@ -537,6 +706,7 @@ report_skill() {
     case "$dep" in
       opencode)       [[ "$(cap_get opencode)" == "true" ]] && met=true ;;
       omo_plugin)     [[ "$(cap_get omo_plugin)" == "true" || "$(cap_get omo_plugin)" == "partial" ]] && met=true ;;
+      gemini_cli)     [[ "$(cap_get gemini_cli)" == "true" ]] && met=true ;;
       omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
       superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
       claude-mem)     [[ "$(cap_get plugin_claude-mem)" == "true" ]] && met=true ;;
@@ -568,6 +738,7 @@ report_skill "x-bugfix"       opencode omo_plugin omc morph
 report_skill "x-design"
 report_skill "x-api-pentest"  security-tools
 report_skill "x-omo"          opencode omo_plugin
+report_skill "x-gemini"       gemini_cli
 report_skill "x-skill-review" claude-mem
 report_skill "x-skill-improve" claude-mem
 report_skill "x-shared"
@@ -583,13 +754,24 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
 
   # Separate by type
   CLI_MISSING=$(grep "^cli|" "$MISSING_STORE" 2>/dev/null || true)
+  MCP_MISSING=$(grep "^mcp|" "$MISSING_STORE" 2>/dev/null || true)
   PLUGIN_MISSING=$(grep "^plugin|" "$MISSING_STORE" 2>/dev/null || true)
   TOOL_MISSING=$(grep "^tool|" "$MISSING_STORE" 2>/dev/null || true)
+  SKILL_MISSING=$(grep "^skill|" "$MISSING_STORE" 2>/dev/null || true)
 
   if [[ -n "$CLI_MISSING" ]]; then
     echo ""
     printf "  ${BOLD}CLI tools:${NC}\n"
     echo "$CLI_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  if [[ -n "$MCP_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}MCP servers (need API keys for some):${NC}\n"
+    echo "$MCP_MISSING" | while IFS='|' read -r type name desc cmd; do
       printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
       printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
     done
@@ -608,6 +790,15 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
     echo ""
     printf "  ${BOLD}Security tools (optional):${NC}\n"
     echo "$TOOL_MISSING" | while IFS='|' read -r type name desc cmd; do
+      printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
+      printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
+    done
+  fi
+
+  if [[ -n "$SKILL_MISSING" ]]; then
+    echo ""
+    printf "  ${BOLD}Companion skills (user-level):${NC}\n"
+    echo "$SKILL_MISSING" | while IFS='|' read -r type name desc cmd; do
       printf "    ${YELLOW}%s${NC} — %s\n" "$name" "$desc"
       printf "      Install: ${BLUE}%s${NC}\n" "$cmd"
     done
@@ -638,6 +829,38 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
       done
     fi
 
+    # Install MCP servers
+    if [[ -n "$MCP_MISSING" ]]; then
+      header "Installing MCP servers"
+      if ! command -v claude &>/dev/null; then
+        warn "claude CLI not found — skip MCP install. Run commands manually inside Claude Code."
+      else
+        echo "$MCP_MISSING" | while IFS='|' read -r type name desc cmd; do
+          printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
+          printf "  Command: %s\n" "$cmd"
+          if echo "$cmd" | grep -q "YOUR_KEY"; then
+            printf "  ${YELLOW}Needs API key — edit YOUR_KEY before running.${NC}\n"
+            printf "  [y to copy-paste later / N to skip] "
+            read -r answer </dev/tty 2>/dev/null || answer="n"
+            info "Skipped auto-install — paste command after setting API key"
+            continue
+          fi
+          printf "  [y/N] "
+          read -r answer </dev/tty 2>/dev/null || answer="n"
+          if [[ "$answer" =~ ^[Yy] ]]; then
+            info "Running: $cmd"
+            if eval "$cmd"; then
+              ok "$name MCP added"
+            else
+              fail "$name install failed"
+            fi
+          else
+            info "Skipped $name"
+          fi
+        done
+      fi
+    fi
+
     # Install security tools
     if [[ -n "$TOOL_MISSING" ]]; then
       printf "\n  Install missing security tools? [y/N] "
@@ -654,6 +877,42 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
         done
       else
         info "Skipped security tools"
+      fi
+    fi
+
+    # Companion skills (git clone-based)
+    if [[ -n "$SKILL_MISSING" ]]; then
+      header "Installing companion skills"
+      if ! command -v git &>/dev/null; then
+        warn "git not found — skip skill install. Run commands manually."
+      else
+        echo "$SKILL_MISSING" | while IFS='|' read -r type name desc cmd; do
+          # Pre-check: skip if already present (race-safe vs. caps cache)
+          if [[ -f "$HOME/.omc/skills/$name/SKILL.md" || -f "$HOME/.claude/skills/$name/SKILL.md" ]]; then
+            ok "$name already installed"
+            continue
+          fi
+          printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
+          printf "  Command: %s\n" "$cmd"
+          # Skip non-git pointers (e.g., the stub for x-skill-review)
+          if ! echo "$cmd" | grep -q "^git clone"; then
+            info "Skipped — manual install required"
+            continue
+          fi
+          printf "  [y/N] "
+          read -r answer </dev/tty 2>/dev/null || answer="n"
+          if [[ "$answer" =~ ^[Yy] ]]; then
+            mkdir -p "$HOME/.omc/skills"
+            info "Running: $cmd"
+            if eval "$cmd"; then
+              ok "$name installed"
+            else
+              fail "$name installation failed"
+            fi
+          else
+            info "Skipped $name"
+          fi
+        done
       fi
     fi
 
