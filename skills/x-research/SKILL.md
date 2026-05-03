@@ -63,7 +63,7 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 
 **Cheapest-viable-first.** Free/instant tools (morph, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
 
-**⛔ HARD GATE — sequencing matters:** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate.
+**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate. **Max Mode is exempt** — its whole purpose is parallel multi-lane fan-out where the user has accepted the cost.
 
 **Parallel only when axes differ:** morph (local code) ∥ perplexity (web) is fine. morph ∥ OMO `explore` "just in case" is waste.
 

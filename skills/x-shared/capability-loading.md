@@ -10,11 +10,11 @@ Single contract for how x-skills routers learn what's available. Borrowed from B
 
 ## Sources of Truth (precedence high → low)
 
-1. **Project override** — `.x-skills/capabilities.json` in repo root (optional, lets project mute lanes)
+1. **Project override** — `.x-skills/capabilities.json` in the project root (optional, lets project mute lanes). Project root is resolved as `$CLAUDE_PROJECT_DIR` first, then `git rev-parse --show-toplevel`, then cwd.
 2. **User manifest** — `~/.config/x-skills/capabilities.json` (written by `bin/setup`)
 3. **Plugin defaults** — empty set, all lanes treated as unavailable, fallback rows used everywhere
 
-Skills MUST merge in this order. Project value wins over user value. Missing key = inherit from lower tier.
+Project overrides are **subtractive only**: a project file can disable a capability the user has, but cannot grant new capabilities. This bounds trust — a hostile repo cannot upgrade routing posture by lying. The hook also caps the project file at 16 KiB to prevent SessionStart DoS.
 
 ## Schema
 
@@ -63,8 +63,8 @@ When a skill needs to dispatch external tools:
 
 1. Look for the most recent `[x-skills/capabilities]` line in the conversation context (injected by SessionStart hook). Parse the comma-separated active set.
 2. If absent, read `~/.config/x-skills/capabilities.json` once with jq.
-3. Merge `.x-skills/capabilities.json` if present in current working dir.
-4. Filter the skill's routing/fan-out tables against the merged set. Drop unavailable lanes silently. Pick fallback row when primary unavailable.
+3. The SessionStart hook already merged `.x-skills/capabilities.json` (resolved against the project root, subtractive only). Skills do not need to re-merge — trust the active set in the snapshot line.
+4. Filter the skill's routing/fan-out tables against the active set. Drop unavailable lanes silently. Pick fallback row when primary unavailable.
 5. **Do not re-check the manifest per dispatch.** Trust the pinned set for the session.
 
 ## Drift Handling
