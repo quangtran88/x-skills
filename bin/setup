@@ -70,58 +70,193 @@ sha_skill_file() {
 # Track missing deps: type|name|description|install_command
 missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
 
+# Verify a binary is owned by the current user and not group/other-writable.
+# Refuses to symlink to anything in a world-writable directory. This bounds
+# trust on the plugin-cache symlink target — the cache is rewritten on every
+# upgrade, so we never want ~/.local/bin/omo-agent → an attacker-controlled
+# location.
+verify_symlink_target() {
+  local src="$1"
+  [[ -f "$src" ]] || return 1
+  local owner perms parent_perms
+  if owner=$(stat -f%u "$src" 2>/dev/null); then
+    perms=$(stat -f%p "$src" 2>/dev/null)
+    parent_perms=$(stat -f%p "$(dirname "$src")" 2>/dev/null)
+  else
+    owner=$(stat -c%u "$src" 2>/dev/null) || return 1
+    perms=$(stat -c%a "$src" 2>/dev/null)
+    parent_perms=$(stat -c%a "$(dirname "$src")" 2>/dev/null)
+  fi
+  [[ "$owner" == "$(id -u)" ]] || { warn "symlink target not owned by current user: $src"; return 1; }
+  # Check world-writable bit (last octal digit in stat -c%a, or in -f%p the
+  # low 3 bits of the final 4-digit field).
+  local last="${perms: -1}"
+  [[ "$last" =~ [2367] ]] && { warn "symlink target is world-writable: $src"; return 1; }
+  local plast="${parent_perms: -1}"
+  [[ "$plast" =~ [2367] ]] && { warn "symlink target's parent dir is world-writable: $(dirname "$src")"; return 1; }
+  return 0
+}
+
+# Install a symlink at $link_path → $src (idempotent, audit-mode aware).
+install_symlink() {
+  local src="$1" link_path="$2"
+  if [[ "$MODE" == "check" ]]; then
+    info "[check mode] Would create symlink: $link_path → $src"
+    return 0
+  fi
+  if ! verify_symlink_target "$src"; then
+    fail "refusing to symlink — $src failed ownership/permission check"
+    return 1
+  fi
+  mkdir -p "$(dirname "$link_path")"
+  if [[ -L "$link_path" ]]; then
+    local existing_target
+    existing_target="$(readlink "$link_path")"
+    if [[ "$existing_target" == "$src" ]]; then
+      ok "Symlink already correct: $link_path → $src"
+    else
+      ln -sf "$src" "$link_path"
+      ok "Updated symlink: $link_path → $src (was: $existing_target)"
+    fi
+  elif [[ -e "$link_path" ]]; then
+    warn "$link_path exists but is not a symlink — skipping (remove manually to fix)"
+  else
+    ln -s "$src" "$link_path"
+    ok "Created symlink: $link_path → $src"
+  fi
+}
+
+# Static dispatch table for --fix install commands. Keeps `eval "$cmd"` from
+# running data-derived strings — the install command is keyed by name, not
+# embedded in MISSING_STORE.
+run_install() {
+  local name="$1"
+  case "$name" in
+    opencode)
+      curl -fsSL https://opencode.ai/install | bash
+      ;;
+    oh-my-openagent)
+      opencode plugin oh-my-openagent
+      ;;
+    oh-my-openagent-mode-all)
+      "$SCRIPT_DIR/setup" --fix
+      ;;
+    gemini)
+      npm install -g @google/gemini-cli
+      ;;
+    jq)
+      brew install jq
+      ;;
+    schemathesis|sqlmap)
+      pip install "$name"
+      ;;
+    nuclei)
+      brew install nuclei || go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+      ;;
+    spectral)
+      npm install -g @stoplight/spectral-cli
+      ;;
+    interactsh-client)
+      go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
+      ;;
+    perplexity)
+      claude mcp add perplexity -e PERPLEXITY_API_KEY="${PERPLEXITY_API_KEY:?set PERPLEXITY_API_KEY first}" -- npx -y server-perplexity-ask
+      ;;
+    deepwiki)
+      claude mcp add --transport http deepwiki https://mcp.deepwiki.com/mcp
+      ;;
+    exa)
+      claude mcp add exa -e EXA_API_KEY="${EXA_API_KEY:?set EXA_API_KEY first}" -- npx -y exa-mcp-server
+      ;;
+    context7)
+      claude mcp add --transport http context7 https://mcp.context7.com/mcp
+      ;;
+    morph)
+      claude mcp add morph-mcp -e MORPH_API_KEY="${MORPH_API_KEY:?set MORPH_API_KEY first}" -- npx -y @morph-llm/morph-fast-apply
+      ;;
+    ui-ux-pro-max)
+      mkdir -p "$HOME/.omc/skills"
+      git clone https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$HOME/.omc/skills/ui-ux-pro-max"
+      ;;
+    *)
+      fail "no install handler for: $name"
+      return 1
+      ;;
+  esac
+}
+
+# Files-manifest tracks SHA256 of routing-critical files for drift detection.
+# Scope: SKILL.md prompts, hooks, bin scripts, x-shared contract docs. The
+# manifest lives in user-writable ~/.config/, so this is a freshness signal
+# (catches "I forgot to re-run setup after upgrading"), not a security control.
+manifest_file_list() {
+  command -v jq &>/dev/null || return 1
+  {
+    find "$PLUGIN_DIR/skills" -maxdepth 4 -name "SKILL.md" -type f -not -type l 2>/dev/null
+    find "$PLUGIN_DIR/skills/x-shared" -maxdepth 2 -name "*.md" -type f -not -type l 2>/dev/null
+    find "$PLUGIN_DIR/hooks" -maxdepth 1 -name "*.sh" -type f -not -type l 2>/dev/null
+    [[ -f "$PLUGIN_DIR/bin/omo-agent" && ! -L "$PLUGIN_DIR/bin/omo-agent" ]] && echo "$PLUGIN_DIR/bin/omo-agent"
+    [[ -f "$PLUGIN_DIR/bin/gemini-agent" && ! -L "$PLUGIN_DIR/bin/gemini-agent" ]] && echo "$PLUGIN_DIR/bin/gemini-agent"
+    [[ -f "$PLUGIN_DIR/bin/setup" && ! -L "$PLUGIN_DIR/bin/setup" ]] && echo "$PLUGIN_DIR/bin/setup"
+  } | sort -u
+}
+
 write_files_manifest() {
   local manifest="$CONFIG_DIR/files-manifest.json"
-  local skills_dir="$PLUGIN_DIR/skills"
-  [[ -d "$skills_dir" ]] || return 0
-
-  local entries=""
-  local first=1
+  command -v jq &>/dev/null || { warn "jq missing — skipping freshness manifest"; return 0; }
+  local entries_json="[]"
   while IFS= read -r f; do
-    local rel="${f#$PLUGIN_DIR/}"
-    local hash
+    [[ -z "$f" ]] && continue
+    local rel hash
+    rel="${f#"$PLUGIN_DIR"/}"
     hash=$(sha_skill_file "$f")
-    if [[ $first -eq 1 ]]; then
-      first=0
-    else
-      entries+=","
-    fi
-    entries+=$'\n    '"{ \"path\": \"$rel\", \"sha256\": \"$hash\" }"
-  done < <(find "$skills_dir" -name "SKILL.md" -type f | sort)
+    entries_json=$(jq -c --arg p "$rel" --arg s "$hash" '. + [{path: $p, sha256: $s}]' <<<"$entries_json")
+  done < <(manifest_file_list)
 
-  cat > "$manifest" <<EOF
-{
-  "version": "1.0.0",
-  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "plugin_dir": "$PLUGIN_DIR",
-  "files": [$entries
-  ]
-}
-EOF
-  ok "Written file integrity manifest to $manifest"
+  jq -n \
+    --arg dir "$PLUGIN_DIR" \
+    --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson files "$entries_json" \
+    '{version: "1.0.0", generated_at: $ts, plugin_dir: $dir, files: $files}' \
+    > "$manifest"
+  ok "Written freshness manifest to $manifest"
 }
 
 verify_files_manifest() {
   local manifest="$CONFIG_DIR/files-manifest.json"
   command -v jq &>/dev/null || { warn "jq missing — cannot verify manifest"; return 0; }
   [[ -f "$manifest" ]] || { warn "files-manifest.json missing — run setup to generate"; return 0; }
-  local drift=0
-  while IFS= read -r line; do
-    local rel
-    local expected
-    rel=$(echo "$line" | jq -r '.path')
-    expected=$(echo "$line" | jq -r '.sha256')
+  local drift=0 missing=0
+  # Single jq call emits path<TAB>sha — avoids 2 forks per file.
+  while IFS=$'\t' read -r rel expected; do
+    [[ -z "$rel" ]] && continue
+    local target="$PLUGIN_DIR/$rel"
+    if [[ ! -f "$target" ]]; then
+      warn "missing: $rel"
+      missing=$((missing + 1))
+      continue
+    fi
     local actual
-    actual=$(sha_skill_file "$PLUGIN_DIR/$rel")
+    actual=$(sha_skill_file "$target")
     if [[ "$expected" != "$actual" ]]; then
       warn "drift: $rel (expected $expected, got $actual)"
       drift=$((drift + 1))
     fi
-  done < <(jq -c '.files[]' "$manifest" 2>/dev/null)
-  if [[ $drift -gt 0 ]]; then
-    warn "$drift skill file(s) drifted since last setup. Re-run: ./bin/setup"
-  else
-    ok "Skill file integrity verified ($(jq '.files | length' "$manifest") files)"
+  done < <(jq -r '.files[] | "\(.path)\t\(.sha256)"' "$manifest" 2>/dev/null)
+
+  # Detect extra files on disk that the manifest does not know about.
+  local disk_count manifest_count extra=0
+  manifest_count=$(jq '.files | length' "$manifest" 2>/dev/null)
+  disk_count=$(manifest_file_list | wc -l | tr -d ' ')
+  if [[ "$disk_count" -gt "$manifest_count" ]]; then
+    extra=$((disk_count - manifest_count))
+    warn "$extra file(s) present on disk but not in manifest — re-run setup to refresh"
+  fi
+
+  if [[ $drift -gt 0 || $missing -gt 0 ]]; then
+    warn "freshness check failed ($drift drifted, $missing missing). Re-run: ./bin/setup"
+  elif [[ $extra -eq 0 ]]; then
+    ok "Freshness verified ($manifest_count files)"
   fi
 }
 
@@ -247,7 +382,13 @@ check_omo_mode_all() {
       fail "Could not create tmp file next to $config"
       return 0
     }
-    local bak="${config}.bak.$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+    local bak
+    bak=$(mktemp "${config}.bak.XXXXXX") || {
+      fail "Could not create backup file"
+      rm -f "$tmp"
+      return 0
+    }
+    [[ ! -L "$bak" ]] || { fail "backup path is a symlink — refusing to write"; rm -f "$tmp"; return 0; }
     cp "$config" "$bak"
     if jq "$patch_filter" "$config" > "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
       mv "$tmp" "$config"
@@ -342,31 +483,14 @@ chmod +x "$OMO_AGENT_SRC"
 [[ -f "$PLUGIN_DIR/skills/x-omo/omo-agent" ]] && chmod +x "$PLUGIN_DIR/skills/x-omo/omo-agent"
 ok "omo-agent is executable"
 
+install_symlink "$OMO_AGENT_SRC" "$LINK_PATH"
 if [[ "$MODE" != "check" ]]; then
-  mkdir -p "$LINK_DIR"
-  if [[ -L "$LINK_PATH" ]]; then
-    EXISTING_TARGET="$(readlink "$LINK_PATH")"
-    if [[ "$EXISTING_TARGET" == "$OMO_AGENT_SRC" ]]; then
-      ok "Symlink already correct: $LINK_PATH → $OMO_AGENT_SRC"
-    else
-      ln -sf "$OMO_AGENT_SRC" "$LINK_PATH"
-      ok "Updated symlink: $LINK_PATH → $OMO_AGENT_SRC (was: $EXISTING_TARGET)"
-    fi
-  elif [[ -e "$LINK_PATH" ]]; then
-    warn "$LINK_PATH exists but is not a symlink — skipping (remove manually to fix)"
-  else
-    ln -s "$OMO_AGENT_SRC" "$LINK_PATH"
-    ok "Created symlink: $LINK_PATH → $OMO_AGENT_SRC"
-  fi
-
   if echo "$PATH" | tr ':' '\n' | grep -qx "$LINK_DIR"; then
     ok "$LINK_DIR is on PATH"
   else
     warn "$LINK_DIR is NOT on PATH"
     info "Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
   fi
-else
-  info "[check mode] Would create symlink: $LINK_PATH → $OMO_AGENT_SRC"
 fi
 
 # --- 1b. gemini-agent binding ---
@@ -377,25 +501,7 @@ if [[ ! -f "$GEMINI_AGENT_SRC" ]]; then
 else
   chmod +x "$GEMINI_AGENT_SRC"
   ok "gemini-agent is executable"
-
-  if [[ "$MODE" != "check" ]]; then
-    if [[ -L "$GEMINI_LINK_PATH" ]]; then
-      EXISTING_TARGET="$(readlink "$GEMINI_LINK_PATH")"
-      if [[ "$EXISTING_TARGET" == "$GEMINI_AGENT_SRC" ]]; then
-        ok "Symlink already correct: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC"
-      else
-        ln -sf "$GEMINI_AGENT_SRC" "$GEMINI_LINK_PATH"
-        ok "Updated symlink: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC (was: $EXISTING_TARGET)"
-      fi
-    elif [[ -e "$GEMINI_LINK_PATH" ]]; then
-      warn "$GEMINI_LINK_PATH exists but is not a symlink — skipping"
-    else
-      ln -s "$GEMINI_AGENT_SRC" "$GEMINI_LINK_PATH"
-      ok "Created symlink: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC"
-    fi
-  else
-    info "[check mode] Would create symlink: $GEMINI_LINK_PATH → $GEMINI_AGENT_SRC"
-  fi
+  install_symlink "$GEMINI_AGENT_SRC" "$GEMINI_LINK_PATH"
 fi
 
 # --- 1c. Gemini CLI ---
@@ -410,6 +516,20 @@ else
   info "x-gemini skill will be unavailable. Install: https://github.com/google-gemini/gemini-cli"
   cap_set gemini_cli false
   missing_add "cli" "gemini" "Direct Google Gemini CLI (for x-gemini skill)" "npm install -g @google/gemini-cli"
+fi
+
+# gemini-agent runtime requires `timeout` (or `gtimeout` on macOS without coreutils).
+if command -v timeout &>/dev/null; then
+  ok "timeout binary available"
+elif command -v gtimeout &>/dev/null; then
+  ok "gtimeout binary available (gemini-agent will use it)"
+else
+  warn "neither 'timeout' nor 'gtimeout' on PATH — gemini-agent will fail at runtime"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    missing_add "cli" "coreutils" "Provides timeout/gtimeout (required by gemini-agent)" "brew install coreutils"
+  else
+    missing_add "cli" "coreutils" "Provides timeout (required by gemini-agent)" "apt-get install coreutils"
+  fi
 fi
 
 # --- 2. OpenCode CLI ---
@@ -600,7 +720,11 @@ check_companion_skill() {
   done
   warn "$name — not installed ($desc)"
   cap_set "skill_$name" false
-  missing_add "skill" "$name" "$desc" "$install_cmd"
+  # Only register a missing entry when run_install knows how to install it.
+  case "$name" in
+    ui-ux-pro-max) missing_add "skill" "$name" "$desc" "$install_cmd" ;;
+    *) info "  manual install required for $name" ;;
+  esac
   return 1
 }
 
@@ -610,7 +734,7 @@ check_companion_skill "ui-ux-pro-max" \
 
 check_companion_skill "x-skill-review" \
   "skill quality auditor (x-skill-improve handoff target)" \
-  "echo 'See https://github.com/nextlevelbuilder for x-skill-review install (user-level skill)'" || true
+  "manual install — see https://github.com/nextlevelbuilder for x-skill-review (user-level skill)" || true
 
 # --- 5. External tools (for x-api-pentest) ---
 header "5. Security Tools (optional, for x-api-pentest)"
@@ -739,8 +863,8 @@ report_skill "x-design"
 report_skill "x-api-pentest"  security-tools
 report_skill "x-omo"          opencode omo_plugin
 report_skill "x-gemini"       gemini_cli
-report_skill "x-skill-review" claude-mem
-report_skill "x-skill-improve" claude-mem
+report_skill "x-skill-review" omc claude-mem
+report_skill "x-skill-improve" omc
 report_skill "x-shared"
 
 # ============================================================
@@ -808,25 +932,26 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
   if [[ "$MODE" == "fix" ]]; then
     echo ""
 
-    # Install CLI tools
+    # Install CLI tools (dispatched via run_install — no eval on data).
     if [[ -n "$CLI_MISSING" ]]; then
       header "Installing CLI tools"
-      echo "$CLI_MISSING" | while IFS='|' read -r type name desc cmd; do
+      while IFS='|' read -r type name desc cmd; do
+        [[ -z "$name" ]] && continue
         printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
         printf "  Command: %s\n" "$cmd"
         printf "  [y/N] "
         read -r answer </dev/tty 2>/dev/null || answer="n"
         if [[ "$answer" =~ ^[Yy] ]]; then
-          info "Running: $cmd"
-          if eval "$cmd"; then
+          info "Running install handler for: $name"
+          if run_install "$name"; then
             ok "$name installed"
           else
-            fail "$name installation failed"
+            fail "$name installation failed (see output above)"
           fi
         else
           info "Skipped $name"
         fi
-      done
+      done <<<"$CLI_MISSING"
     fi
 
     # Install MCP servers
@@ -835,21 +960,20 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
       if ! command -v claude &>/dev/null; then
         warn "claude CLI not found — skip MCP install. Run commands manually inside Claude Code."
       else
-        echo "$MCP_MISSING" | while IFS='|' read -r type name desc cmd; do
+        while IFS='|' read -r type name desc cmd; do
+          [[ -z "$name" ]] && continue
           printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
           printf "  Command: %s\n" "$cmd"
           if echo "$cmd" | grep -q "YOUR_KEY"; then
-            printf "  ${YELLOW}Needs API key — edit YOUR_KEY before running.${NC}\n"
-            printf "  [y to copy-paste later / N to skip] "
-            read -r answer </dev/tty 2>/dev/null || answer="n"
-            info "Skipped auto-install — paste command after setting API key"
+            printf "  ${YELLOW}Needs API key — set %s_API_KEY env var, then re-run.${NC}\n" "$(echo "$name" | tr '[:lower:]' '[:upper:]')"
+            info "Skipped — set the API key env var before installing"
             continue
           fi
           printf "  [y/N] "
           read -r answer </dev/tty 2>/dev/null || answer="n"
           if [[ "$answer" =~ ^[Yy] ]]; then
-            info "Running: $cmd"
-            if eval "$cmd"; then
+            info "Running install handler for: $name"
+            if run_install "$name"; then
               ok "$name MCP added"
             else
               fail "$name install failed"
@@ -857,7 +981,7 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
           else
             info "Skipped $name"
           fi
-        done
+        done <<<"$MCP_MISSING"
       fi
     fi
 
@@ -867,14 +991,15 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
       read -r answer </dev/tty 2>/dev/null || answer="n"
       if [[ "$answer" =~ ^[Yy] ]]; then
         header "Installing security tools"
-        echo "$TOOL_MISSING" | while IFS='|' read -r type name desc cmd; do
+        while IFS='|' read -r type name desc cmd; do
+          [[ -z "$name" ]] && continue
           printf "  Installing ${BOLD}%s${NC}...\n" "$name"
-          if eval "$cmd" 2>/dev/null; then
+          if run_install "$name"; then
             ok "$name installed"
           else
-            fail "$name installation failed — try manually: $cmd"
+            fail "$name installation failed (see output above)"
           fi
-        done
+        done <<<"$TOOL_MISSING"
       else
         info "Skipped security tools"
       fi
@@ -886,33 +1011,27 @@ if [[ "${MISSING_COUNT:-0}" -gt 0 ]]; then
       if ! command -v git &>/dev/null; then
         warn "git not found — skip skill install. Run commands manually."
       else
-        echo "$SKILL_MISSING" | while IFS='|' read -r type name desc cmd; do
+        while IFS='|' read -r type name desc cmd; do
+          [[ -z "$name" ]] && continue
           # Pre-check: skip if already present (race-safe vs. caps cache)
           if [[ -f "$HOME/.omc/skills/$name/SKILL.md" || -f "$HOME/.claude/skills/$name/SKILL.md" ]]; then
             ok "$name already installed"
             continue
           fi
           printf "\n  Install ${BOLD}%s${NC}? (%s)\n" "$name" "$desc"
-          printf "  Command: %s\n" "$cmd"
-          # Skip non-git pointers (e.g., the stub for x-skill-review)
-          if ! echo "$cmd" | grep -q "^git clone"; then
-            info "Skipped — manual install required"
-            continue
-          fi
           printf "  [y/N] "
           read -r answer </dev/tty 2>/dev/null || answer="n"
           if [[ "$answer" =~ ^[Yy] ]]; then
-            mkdir -p "$HOME/.omc/skills"
-            info "Running: $cmd"
-            if eval "$cmd"; then
+            info "Running install handler for: $name"
+            if run_install "$name"; then
               ok "$name installed"
             else
-              fail "$name installation failed"
+              fail "$name installation failed (see output above)"
             fi
           else
             info "Skipped $name"
           fi
-        done
+        done <<<"$SKILL_MISSING"
       fi
     fi
 
