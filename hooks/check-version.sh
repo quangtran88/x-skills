@@ -28,9 +28,18 @@ if [[ ! -f "$CAPS_FILE" ]]; then
   exit 0
 fi
 
+# Single jq call extracts both fields needed below — cheaper than 2 forks.
+# Output format: <plugin_dir>\t<has_gemini_cli_field:true|false>
+CAPS_FIELDS=$(jq -r '
+  [
+    (.plugin_dir // ""),
+    (if (.capabilities | has("gemini_cli")) then "true" else "false" end)
+  ] | @tsv
+' "$CAPS_FILE" 2>/dev/null)
+IFS=$'\t' read -r CACHED_DIR HAS_GEMINI_FIELD <<<"$CAPS_FIELDS"
+
 # Case 2: capabilities file points at a different plugin_dir → upgraded
 # to a new cache version, old symlinks/manifest still point at old path.
-CACHED_DIR=$(jq -r '.plugin_dir // empty' "$CAPS_FILE" 2>/dev/null)
 if [[ -n "$CACHED_DIR" && "$CACHED_DIR" != "$PLUGIN_DIR" ]]; then
   echo "[x-skills] Plugin upgraded (cache: $PLUGIN_DIR, manifest still points at: $CACHED_DIR). Re-run: /x-skills:setup"
   exit 0
@@ -43,9 +52,10 @@ if [[ -f "$PLUGIN_DIR/bin/gemini-agent" && ! -L "$HOME/.local/bin/gemini-agent" 
   exit 0
 fi
 
-# Case 4: capability manifest missing the gemini_cli field entirely →
-# manifest written by an older setup script. Refresh recommended.
-if ! jq -e '.capabilities.gemini_cli' "$CAPS_FILE" >/dev/null 2>&1; then
+# Case 4: capability manifest lacks the gemini_cli field entirely → manifest
+# was written by an older setup script. (Distinct from the field being
+# present-and-false, which just means gemini is not installed.)
+if [[ "$HAS_GEMINI_FIELD" != "true" ]]; then
   echo "[x-skills] Capability manifest is from a pre-v1.4.0 setup. Re-run: /x-skills:setup to refresh."
   exit 0
 fi
