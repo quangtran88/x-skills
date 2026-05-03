@@ -18,8 +18,6 @@
 set -uo pipefail
 
 # --- Defaults ---
-# X_GEMINI_DEFAULT_MODEL env var sets fallback model when --model not passed
-# (pattern borrowed from oh-my-claudecode's OMC_GEMINI_DEFAULT_MODEL).
 MODEL="${X_GEMINI_DEFAULT_MODEL:-}"
 SYSTEM_MD=""
 EXTRA_FILES=()
@@ -64,6 +62,17 @@ fi
 if ! command -v gemini &>/dev/null; then
   echo "Error: gemini CLI not found on PATH" >&2
   echo "Install: https://github.com/google-gemini/gemini-cli" >&2
+  exit 1
+fi
+
+# --- Resolve timeout binary (macOS lacks `timeout` without coreutils) ---
+if command -v timeout &>/dev/null; then
+  TIMEOUT_BIN="timeout"
+elif command -v gtimeout &>/dev/null; then
+  TIMEOUT_BIN="gtimeout"
+else
+  echo "Error: neither 'timeout' nor 'gtimeout' on PATH" >&2
+  echo "Install: brew install coreutils (macOS) or apt install coreutils (Linux)" >&2
   exit 1
 fi
 
@@ -112,26 +121,24 @@ START_TIME=$(date +%s)
 LABEL="${MODEL:-default}"
 echo "[gemini-agent] started model=$LABEL at $(date +%H:%M:%S) (timeout=${GEMINI_TIMEOUT}s)" >&2
 
-# Strip Claude session env vars to prevent context leak into Gemini.
-# Pattern borrowed from oh-my-claudecode's buildProviderEnv — Gemini should
-# not inherit Claude's session ID or entrypoint markers.
-unset_vars=(CLAUDECODE CLAUDE_SESSION_ID CLAUDECODE_SESSION_ID CLAUDE_CODE_ENTRYPOINT)
-ENV_PREFIX=""
-for v in "${unset_vars[@]}"; do
-  ENV_PREFIX+="unset $v; "
-done
+# Strip Claude session env vars so Gemini does not inherit Claude's session
+# context. CRITICAL: redirect stderr — gemini CLI prints "Ripgrep is not
+# available. Falling back to GrepTool." and other noise to stderr that
+# corrupts JSON if merged with stdout.
+ERR_TMPFILE=$(mktemp /tmp/gemini-agent-err-XXXXXXXX)
+trap 'rm -f "$TMPFILE" "$ERR_TMPFILE"' EXIT
 
-# CRITICAL: redirect stderr — gemini CLI prints "Ripgrep is not available.
-# Falling back to GrepTool." and other noise to stderr that corrupts JSON
-# if merged with stdout.
 if [[ -n "$SYSTEM_MD" ]]; then
   if [[ ! -f "$SYSTEM_MD" ]]; then
     echo "Error: system prompt file not found: $SYSTEM_MD" >&2
     exit 1
   fi
-  bash -c "${ENV_PREFIX} GEMINI_SYSTEM_MD='$SYSTEM_MD' timeout '$GEMINI_TIMEOUT' gemini \"\$@\"" -- "${ARGS[@]}" > "$TMPFILE" 2>/dev/null
+  GEMINI_SYSTEM_MD="$SYSTEM_MD" \
+    env -u CLAUDECODE -u CLAUDE_SESSION_ID -u CLAUDECODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT \
+    "$TIMEOUT_BIN" "$GEMINI_TIMEOUT" gemini "${ARGS[@]}" > "$TMPFILE" 2>"$ERR_TMPFILE"
 else
-  bash -c "${ENV_PREFIX} timeout '$GEMINI_TIMEOUT' gemini \"\$@\"" -- "${ARGS[@]}" > "$TMPFILE" 2>/dev/null
+  env -u CLAUDECODE -u CLAUDE_SESSION_ID -u CLAUDECODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT \
+    "$TIMEOUT_BIN" "$GEMINI_TIMEOUT" gemini "${ARGS[@]}" > "$TMPFILE" 2>"$ERR_TMPFILE"
 fi
 EXIT_CODE=$?
 
@@ -139,6 +146,7 @@ END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
 # --- Error classification ---
+# stderr is captured separately; classify against it (not stdout/JSON body).
 ERROR_TYPE=""
 if [[ $EXIT_CODE -eq 124 ]]; then
   ERROR_TYPE="timeout"
@@ -146,9 +154,9 @@ if [[ $EXIT_CODE -eq 124 ]]; then
 elif [[ $EXIT_CODE -eq 42 ]]; then
   ERROR_TYPE="empty_prompt"
 elif [[ $EXIT_CODE -ne 0 ]]; then
-  if grep -qi "rate.limit\|quota\|exhausted" "$TMPFILE" 2>/dev/null; then
+  if grep -qi "rate.limit\|quota\|exhausted" "$ERR_TMPFILE" 2>/dev/null; then
     ERROR_TYPE="rate_limited"
-  elif grep -qi "auth\|sign.in\|unauthor" "$TMPFILE" 2>/dev/null; then
+  elif grep -qi "auth\|sign.in\|unauthor" "$ERR_TMPFILE" 2>/dev/null; then
     ERROR_TYPE="auth_error"
   else
     ERROR_TYPE="unknown_error"
@@ -156,16 +164,29 @@ elif [[ $EXIT_CODE -ne 0 ]]; then
 fi
 
 # --- Persist raw output for debugging ---
-# Prefer project-local .omc/artifacts/x-gemini/ if .omc exists (matches OMC's
-# artifact convention); fall back to /tmp otherwise.
-DEBUG_TS=$(date +%Y%m%d-%H%M%S)
-ARTIFACTS_DIR="/tmp"
-if [[ -d ".omc" ]]; then
-  ARTIFACTS_DIR=".omc/artifacts/x-gemini"
-  mkdir -p "$ARTIFACTS_DIR" 2>/dev/null
+# Logs contain the full prompt + response; secrets pasted into prompts persist.
+# Default to user-private cache dir with mode 0600. Set X_GEMINI_NO_LOG=1 to
+# disable logging entirely. Project-local .omc/artifacts/x-gemini/ used only
+# when X_GEMINI_LOG_PROJECT=1 is set explicitly.
+DEBUG_LOG=""
+if [[ "${X_GEMINI_NO_LOG:-0}" != "1" ]]; then
+  DEBUG_TS=$(date +%Y%m%d-%H%M%S)
+  if [[ "${X_GEMINI_LOG_PROJECT:-0}" == "1" && -d ".omc" ]]; then
+    ARTIFACTS_DIR=".omc/artifacts/x-gemini"
+  else
+    ARTIFACTS_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/x-skills/gemini"
+  fi
+  if mkdir -p "$ARTIFACTS_DIR" 2>/dev/null; then
+    DEBUG_LOG="$ARTIFACTS_DIR/gemini-agent-${DEBUG_TS}-${LABEL}.log"
+    # ! -L guard prevents symlink hijack; install with mode 0600.
+    if [[ ! -L "$DEBUG_LOG" ]]; then
+      install -m 0600 /dev/null "$DEBUG_LOG" 2>/dev/null && cp "$TMPFILE" "$DEBUG_LOG" 2>/dev/null
+    else
+      DEBUG_LOG=""
+    fi
+  fi
 fi
-DEBUG_LOG="$ARTIFACTS_DIR/gemini-agent-${DEBUG_TS}-${LABEL}.log"
-cp "$TMPFILE" "$DEBUG_LOG" 2>/dev/null
+[[ -z "$DEBUG_LOG" ]] && DEBUG_LOG="(disabled)"
 
 # --- Format duration ---
 if [[ "$DURATION" -ge 60 ]]; then
