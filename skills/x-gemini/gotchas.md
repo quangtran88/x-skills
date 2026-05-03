@@ -56,7 +56,14 @@ Gemini exits **42** (input error), not the usual 1, on empty prompts. The wrappe
 
 ## Output truncation at 50k chars
 
-The wrapper truncates `.response` to the **last** 50k characters (≈12.5k tokens) if longer. The full raw JSON stays in `/tmp/gemini-agent-*.log`. If you need the full response programmatically, read the raw log.
+The wrapper truncates `.response` to the **last** 50k characters (≈12.5k tokens) if longer. The full raw JSON stays in the log file (`raw=` path on the stderr summary). If you need the full response programmatically, read that path.
+
+## Logs persist the full prompt + response (may contain secrets)
+
+By default the wrapper writes the raw response (which includes the prompt Gemini received) to `~/.cache/x-skills/gemini/gemini-agent-<ts>-<label>.log` with mode `0600`. If you paste secrets into a prompt (API keys in stack traces, credentials in error output), they end up in that log. Override with:
+
+- `X_GEMINI_NO_LOG=1` — disable logging entirely
+- `X_GEMINI_LOG_PROJECT=1` — write into `.omc/artifacts/x-gemini/` (project-local, opt-in only). Make sure `.omc/` is gitignored before enabling.
 
 ## No tool execution by default
 
@@ -68,7 +75,7 @@ Direct `gemini` CLI triggers Google Search grounding for current-events queries.
 
 ## Claude session env vars stripped before invocation
 
-The wrapper unsets `CLAUDECODE`, `CLAUDE_SESSION_ID`, `CLAUDECODE_SESSION_ID`, and `CLAUDE_CODE_ENTRYPOINT` before spawning `gemini`. This prevents Gemini from inheriting the Claude session ID or thinking it's running inside Claude Code. Pattern borrowed from oh-my-claudecode's `buildProviderEnv`.
+The wrapper unsets `CLAUDECODE`, `CLAUDE_SESSION_ID`, `CLAUDECODE_SESSION_ID`, and `CLAUDE_CODE_ENTRYPOINT` before spawning `gemini`. This prevents Gemini from inheriting the Claude session ID or thinking it's running inside Claude Code.
 
 If you need any of these vars inside Gemini for some reason, the wrapper does not provide a passthrough — modify the wrapper or call `gemini` directly.
 
@@ -76,9 +83,9 @@ If you need any of these vars inside Gemini for some reason, the wrapper does no
 
 `--yolo` (alias for `--approval-mode yolo`) lets Gemini execute shell commands and write files without per-call approval. Equivalent to OMC's default for `omc ask`. **The wrapper defaults to read-only** — `--yolo` is opt-in only. Reasoning: a wrapper that grants shell access by default is a footgun. Callers must consciously opt in.
 
-## Artifacts dir auto-detected
+## Artifacts dir defaults to user cache
 
-Raw JSON logs go to `.omc/artifacts/x-gemini/` if `.omc/` exists in CWD (matches OMC artifact convention), otherwise `/tmp`. The stderr summary's `raw=` field shows the actual path used.
+Raw JSON logs default to `~/.cache/x-skills/gemini/` (mode 0600, user-private). Set `X_GEMINI_LOG_PROJECT=1` to opt into the legacy `.omc/artifacts/x-gemini/` location. Set `X_GEMINI_NO_LOG=1` to disable logging entirely. The stderr summary's `raw=` field shows the actual path used (or `(disabled)`).
 
 ## Auth: Google login, not API key
 

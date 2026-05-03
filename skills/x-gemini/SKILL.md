@@ -2,15 +2,9 @@
 name: x-gemini
 description: Direct Google Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, and gemini-3.x models without the OpenCode layer
 triggers:
-  - "gemini cli"
-  - "gemini-cli"
-  - "ask gemini directly"
-  - "use gemini cli"
-  - "gemini direct"
-  - "google search grounding"
-  - "gemini-3.1-pro"
-  - "gemini-3-pro"
   - "x-gemini"
+  - "ask gemini directly"
+  - "gemini-3.1-pro"
 matching: fuzzy
 ---
 
@@ -18,33 +12,12 @@ matching: fuzzy
 
 ## Bootstrap (MANDATORY first step)
 
-0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `gemini_cli` flag and `dependencies[]` entries gate this skill.
-1. Verify `gemini-agent` is on PATH. If missing, the user has not run setup yet (or upgraded without re-running):
-
-```bash
-command -v gemini-agent &>/dev/null || {
-  echo "gemini-agent not on PATH. Run /x-skills:setup to install the symlink."
-  exit 1
-}
-command -v gemini &>/dev/null || {
-  echo "gemini CLI not installed. Install: npm install -g @google/gemini-cli, then run /x-skills:setup"
-  exit 1
-}
-```
-
-If either check fails, instruct the user: **run `/x-skills:setup` inside Claude Code** (do NOT tell them to run `bin/setup` directly — the slash command is the canonical entry point).
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `gemini_cli` flag gates this skill.
+1. If `gemini-agent` or `gemini` is not on PATH, instruct the user: **run `/x-skills:setup` inside Claude Code**. Do not tell them to run `bin/setup` directly — the slash command is the canonical entry point.
 
 ---
 
 Wraps the official `gemini` CLI for headless invocation from Claude Code skills. Bypasses OpenCode entirely — no `oh-my-openagent.json`, no plugin compat bugs, no API key. Uses your Google Ultra subscription and Gemini's native Google Search grounding.
-
-**Not a replacement for `x-omo`.** OMO routes to multiple model providers (GPT, Codex, Gemini-via-opencode). x-gemini is the direct path when you specifically need:
-
-- `gemini-3.1-pro-preview` (not always exposed via opencode)
-- Native Google Search grounding in the answer
-- Workspace `@file` references
-- Session resume across invocations
-- Lower latency (no opencode plumbing)
 
 ## Quick Dispatch
 
@@ -120,7 +93,7 @@ gemini-agent --approval-mode plan "List files in current dir"
 
 # Autonomous tool execution (yolo mode — no approvals required)
 # DANGER: Gemini gets unrestricted shell access. Only use when caller
-# explicitly approves. Pattern borrowed from OMC's `omc ask`.
+# explicitly approves.
 gemini-agent --yolo "Set up the project and run tests"
 
 # Raw text passthrough (skip JSON parsing)
@@ -168,19 +141,14 @@ Capture the session ID from stderr if you want to `--resume` later. The full raw
 | non-zero + log mentions "exhausted/quota" | rate limited | wait or switch to `flash` |
 | non-zero + log mentions "auth/sign in" | not logged in | run `gemini` interactively to auth |
 
-## Integration with Other Skills
-
-- **`x-research`** — for general research questions, prefer `x-research` (it routes to morph + librarian + oracle as appropriate). Reach for `x-gemini` only when you specifically need Google Search grounding or `gemini-3.1-pro-preview`.
-- **`x-omo`** — `x-gemini` is the **non-opencode** Gemini path. If you need any non-Gemini model, use `x-omo`.
-- **`x-do`** — `x-gemini` is read-only / advisor. Hand findings to `x-do` for execution.
-
 ## Dependencies
 
 - **`gemini` CLI** (required) — install: https://github.com/google-gemini/gemini-cli; auth via `gemini` interactive (Google account login)
+- **`timeout`** (required) — `brew install coreutils` on macOS, or use `gtimeout`
 - **`jq`** (required for default JSON mode) — `brew install jq`
 - **Google Ultra subscription** (recommended) — quota-friendly access to gemini-3.x
 
-The `bin/setup` script detects all three and writes capability flags to `~/.config/x-skills/capabilities.json`.
+`bin/setup` detects all of these and writes capability flags to `~/.config/x-skills/capabilities.json`.
 
 ## Gotchas
 
