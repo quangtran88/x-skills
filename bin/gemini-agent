@@ -17,6 +17,19 @@
 
 set -uo pipefail
 
+# M7: prefer a UTF-8 locale so bash parameter expansion (${var: -N}) counts
+# characters not bytes. Avoids truncating Gemini's Unicode output mid-codepoint.
+# macOS ships en_US.UTF-8 but not C.UTF-8; probe a few options.
+if [[ -z "${LC_ALL:-}" || "${LC_ALL%%.*}" == "C" ]]; then
+  for _loc in C.UTF-8 en_US.UTF-8 C.utf8 en_US.utf8; do
+    if locale -a 2>/dev/null | grep -qiE "^${_loc//./\\.}$"; then
+      export LC_ALL="$_loc"
+      break
+    fi
+  done
+  unset _loc
+fi
+
 # --- Defaults ---
 MODEL="${X_GEMINI_DEFAULT_MODEL:-}"
 SYSTEM_MD=""
@@ -80,7 +93,17 @@ fi
 # Gemini @file syntax must be inline in the prompt — files outside workspace
 # fail gracefully (warned, not crashed). All paths must be absolute or relative
 # to the current workspace.
+# H2: reject paths containing whitespace, '@', or starting with '-' to prevent
+# the appended `@$f` token from injecting extra prompt directives.
 for f in "${EXTRA_FILES[@]+"${EXTRA_FILES[@]}"}"; do
+  if [[ "$f" == -* ]]; then
+    echo "Error: --file path begins with '-' (rejected): $f" >&2
+    exit 1
+  fi
+  if [[ "$f" =~ [[:space:]@] ]]; then
+    echo "Error: --file path contains whitespace or '@' (rejected): $f" >&2
+    exit 1
+  fi
   if [[ ! -f "$f" ]]; then
     echo "Warning: file not found: $f (skipping)" >&2
     continue
