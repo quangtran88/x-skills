@@ -73,27 +73,64 @@ project_size_ok() {
   [[ "$size" -le 16384 ]]
 }
 
-if project_size_ok; then
-  # Subtractive merge: $project * $user keeps user as base, then for any key
-  # the project sets to false, the AND below disables it. We do this in jq:
-  # walk both, AND-combine leaf booleans/strings.
-  active=$(jq -r --slurpfile p "$PROJECT_CAPS" '
-    def disable_if_project_false($pj):
-      if $pj == null then .
-      elif $pj == false then false
-      elif (type == "object") and (($pj | type) == "object") then
-        . as $self
-        | reduce ($pj | keys[]) as $k ($self;
-            .[$k] = ($self[$k] | disable_if_project_false($pj[$k])))
-      else .
-      end;
-    .capabilities |= disable_if_project_false($p[0].capabilities // {})
-    | '"$JQ_FILTER"'
-  ' "$USER_CAPS" 2>/dev/null)
-  [[ -n "$active" ]] && echo "[x-skills/capabilities] active=$active | merged-from=user+project"
-else
+fallback_to_user_only() {
+  local active
   active=$(jq -r "$JQ_FILTER" "$USER_CAPS" 2>/dev/null)
   [[ -n "$active" ]] && echo "[x-skills/capabilities] active=$active | merged-from=user"
+}
+
+# H1: project file present but invalid/oversized must NOT silently nuke the
+# whole snapshot — fall through to user-only with a one-line warning.
+# M6: depth cap (leaf_paths < 200) bounds jq recursion cost on hostile input.
+# M3: full filter rendered to a tmpfile to avoid shell-concat quoting fragility.
+if [[ -f "$PROJECT_CAPS" ]]; then
+  if ! project_size_ok; then
+    echo "[x-skills] WARNING: $PROJECT_CAPS exceeds 16 KiB cap — using user manifest only" >&2
+    fallback_to_user_only
+    exit 0
+  fi
+  if ! jq -e . "$PROJECT_CAPS" >/dev/null 2>&1; then
+    echo "[x-skills] WARNING: $PROJECT_CAPS has invalid JSON — using user manifest only" >&2
+    fallback_to_user_only
+    exit 0
+  fi
+  if ! jq -e '[paths] | length < 500' "$PROJECT_CAPS" >/dev/null 2>&1; then
+    echo "[x-skills] WARNING: $PROJECT_CAPS exceeds nesting cap (500 paths) — using user manifest only" >&2
+    fallback_to_user_only
+    exit 0
+  fi
+
+  FILTER_FILE=$(mktemp -t x-skills-filter.XXXXXX 2>/dev/null) || {
+    fallback_to_user_only
+    exit 0
+  }
+  trap 'rm -f "$FILTER_FILE"' EXIT
+  cat >"$FILTER_FILE" <<'JQ_MERGE'
+def all_false:
+  if type == "object" then map_values(all_false)
+  elif type == "array" then map(all_false)
+  else false end;
+def disable_if_project_false($pj):
+  if $pj == null then .
+  elif $pj == false then all_false
+  elif (type == "object") and (($pj | type) == "object") then
+    . as $self
+    | reduce ($pj | keys[]) as $k ($self;
+        .[$k] = ($self[$k] | disable_if_project_false($pj[$k])))
+  else .
+  end;
+.capabilities |= disable_if_project_false($p[0].capabilities // {}) |
+JQ_MERGE
+  printf '%s\n' "$JQ_FILTER" >>"$FILTER_FILE"
+
+  active=$(jq -r --slurpfile p "$PROJECT_CAPS" -f "$FILTER_FILE" "$USER_CAPS" 2>/dev/null)
+  if [[ -n "$active" ]]; then
+    echo "[x-skills/capabilities] active=$active | merged-from=user+project"
+  else
+    fallback_to_user_only
+  fi
+else
+  fallback_to_user_only
 fi
 
 exit 0
