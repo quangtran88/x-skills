@@ -9,7 +9,7 @@ Evaluates how well an x-skill was followed during a real session, then improves 
 
 ## Bootstrap
 
-0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `oh_my_claudecode` plugin flag gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable. `claude_mem` is optional and used only for memory-backed enhancements.
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `plugin.omc` snapshot token (manifest key `plugins.oh_my_claudecode`) gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable. `plugin.claude_mem` is optional and used only for memory-backed enhancements.
 
 ## Invocation
 

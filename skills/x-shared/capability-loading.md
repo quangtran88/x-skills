@@ -21,6 +21,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
 ```json
 {
   "version": "1.0.0",
+  "plugin_version": "1.4.0",
   "generated_at": "ISO-8601",
   "plugin_dir": "/abs/path",
   "omo_agent": "/abs/path/bin/omo-agent",
@@ -41,6 +42,10 @@ Project overrides are **subtractive only**: a project file can disable a capabil
       "superpowers": true,
       "claude_mem": true
     },
+    "companion_skills": {
+      "ui_ux_pro_max": true,
+      "x_skill_review": true
+    },
     "security_tools": {
       "schemathesis": true,
       "nuclei": true,
@@ -48,14 +53,11 @@ Project overrides are **subtractive only**: a project file can disable a capabil
       "spectral": true,
       "interactsh": false
     }
-  },
-  "dependencies": [
-    { "name": "gemini", "required": false, "installed": true, "version": "0.5.0", "path": "/usr/local/bin/gemini" }
-  ]
+  }
 }
 ```
 
-`capabilities.*` is the boolean lookup map (skill-friendly). `dependencies[]` is the typed audit trail (mirrors omo's `DependencyInfo`). Both written by setup; either is canonical.
+`capabilities.*` is the boolean lookup map (skill-friendly), the single canonical source. `version` is the manifest schema version; `plugin_version` mirrors `plugin.json` and drives `check-version.sh` freshness detection.
 
 ## Skill Bootstrap Pattern
 
