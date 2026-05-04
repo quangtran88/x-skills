@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # x-skills SessionStart hook — detect stale install
 #
-# Compares plugin version (from plugin.json) against capability manifest's
-# generated version. If mismatch (or capability file missing), prints a
-# one-line nudge to run /x-skills:setup. Silent when in sync.
+# Emits a one-line nudge to run /x-skills:setup when:
+#   - capability manifest is missing (Case 1)
+#   - manifest's plugin_dir doesn't match the loaded plugin (Case 2)
+#   - manifest's plugin_version doesn't match plugin.json's version (Case 2b)
+#   - gemini-agent is in the plugin but not on PATH (Case 3)
+#   - manifest predates the gemini_cli capability key (Case 4)
 #
-# Designed to be cheap (<50ms) and noise-free. Failure is non-fatal —
-# never blocks a session.
+# Silent when in sync. Cheap (<50ms), non-fatal — never blocks a session.
+# Set XSKILLS_SUPPRESS_VERSION_CHECK=1 to mute all nudges.
 
 set -uo pipefail
+
+[[ "${XSKILLS_SUPPRESS_VERSION_CHECK:-0}" == "1" ]] && exit 0
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
@@ -28,15 +33,16 @@ if [[ ! -f "$CAPS_FILE" ]]; then
   exit 0
 fi
 
-# Single jq call extracts both fields needed below — cheaper than 2 forks.
-# Output format: <plugin_dir>\t<has_gemini_cli_field:true|false>
+# Single jq call extracts all fields needed below — cheaper than N forks.
+# Output format: <plugin_dir>\t<plugin_version>\t<has_gemini_cli_field:true|false>
 CAPS_FIELDS=$(jq -r '
   [
     (.plugin_dir // ""),
+    (.plugin_version // ""),
     (if (.capabilities | has("gemini_cli")) then "true" else "false" end)
   ] | @tsv
 ' "$CAPS_FILE" 2>/dev/null)
-IFS=$'\t' read -r CACHED_DIR HAS_GEMINI_FIELD <<<"$CAPS_FIELDS"
+IFS=$'\t' read -r CACHED_DIR MANIFEST_PLUGIN_VERSION HAS_GEMINI_FIELD <<<"$CAPS_FIELDS"
 
 # Case 2: capabilities file points at a different plugin_dir → upgraded
 # to a new cache version, old symlinks/manifest still point at old path.
@@ -45,9 +51,17 @@ if [[ -n "$CACHED_DIR" && "$CACHED_DIR" != "$PLUGIN_DIR" ]]; then
   exit 0
 fi
 
-# Case 3: gemini-agent symlink missing but binary exists in new version →
-# upgraded from a pre-1.4.0 install without re-running setup.
-if [[ -f "$PLUGIN_DIR/bin/gemini-agent" && ! -L "$HOME/.local/bin/gemini-agent" ]]; then
+# Case 2b (M1): manifest's plugin_version differs from current plugin.json.
+# Catches in-place upgrades that didn't change cache path.
+if [[ -n "$MANIFEST_PLUGIN_VERSION" && "$MANIFEST_PLUGIN_VERSION" != "$PLUGIN_VERSION" ]]; then
+  echo "[x-skills] Plugin upgraded ($MANIFEST_PLUGIN_VERSION → $PLUGIN_VERSION). Re-run: /x-skills:setup"
+  exit 0
+fi
+
+# Case 3 (H4): gemini-agent missing from PATH but binary exists in plugin →
+# upgraded from a pre-1.4.0 install without re-running setup. Use `command -v`
+# instead of hardcoding ~/.local/bin to honor custom LINK_DIR installs.
+if [[ -f "$PLUGIN_DIR/bin/gemini-agent" ]] && ! command -v gemini-agent &>/dev/null; then
   echo "[x-skills] gemini-agent binding missing (added in v1.4.0). Run: /x-skills:setup to enable x-gemini skill."
   exit 0
 fi
