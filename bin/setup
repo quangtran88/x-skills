@@ -78,22 +78,29 @@ missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
 verify_symlink_target() {
   local src="$1"
   [[ -f "$src" ]] || return 1
-  local owner perms parent_perms
+  local owner perms_raw parent_perms_raw
   if owner=$(stat -f%u "$src" 2>/dev/null); then
-    perms=$(stat -f%p "$src" 2>/dev/null)
-    parent_perms=$(stat -f%p "$(dirname "$src")" 2>/dev/null)
+    # BSD/macOS: -f%p returns full mode, e.g. "100755"
+    perms_raw=$(stat -f%p "$src" 2>/dev/null)
+    parent_perms_raw=$(stat -f%p "$(dirname "$src")" 2>/dev/null)
   else
+    # Linux: -c%a returns perm bits only, e.g. "755" or "1777"
     owner=$(stat -c%u "$src" 2>/dev/null) || return 1
-    perms=$(stat -c%a "$src" 2>/dev/null)
-    parent_perms=$(stat -c%a "$(dirname "$src")" 2>/dev/null)
+    perms_raw=$(stat -c%a "$src" 2>/dev/null)
+    parent_perms_raw=$(stat -c%a "$(dirname "$src")" 2>/dev/null)
   fi
   [[ "$owner" == "$(id -u)" ]] || { warn "symlink target not owned by current user: $src"; return 1; }
-  # Check world-writable bit (last octal digit in stat -c%a, or in -f%p the
-  # low 3 bits of the final 4-digit field).
-  local last="${perms: -1}"
-  [[ "$last" =~ [2367] ]] && { warn "symlink target is world-writable: $src"; return 1; }
-  local plast="${parent_perms: -1}"
-  [[ "$plast" =~ [2367] ]] && { warn "symlink target's parent dir is world-writable: $(dirname "$src")"; return 1; }
+
+  # H5: arithmetic-mode check rejects BOTH group-writable (0020) and
+  # world-writable (0002). Last 4 octal digits cover the standard perm bits
+  # (incl. setuid/setgid/sticky) on both BSD and Linux outputs.
+  local perms="${perms_raw: -4}" pperms="${parent_perms_raw: -4}"
+  if (( 8#$perms & 0022 )); then
+    warn "symlink target is group/world-writable: $src (mode $perms)"; return 1
+  fi
+  if (( 8#$pperms & 0022 )); then
+    warn "symlink target's parent dir is group/world-writable: $(dirname "$src") (mode $pperms)"; return 1
+  fi
   return 0
 }
 
@@ -158,6 +165,16 @@ run_install() {
       ;;
     interactsh-client)
       go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest
+      ;;
+    coreutils)
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        brew install coreutils
+      elif command -v apt-get &>/dev/null; then
+        sudo apt-get install -y coreutils
+      else
+        fail "no coreutils installer for this platform — install timeout/gtimeout manually"
+        return 1
+      fi
       ;;
     perplexity)
       claude mcp add perplexity -e PERPLEXITY_API_KEY="${PERPLEXITY_API_KEY:?set PERPLEXITY_API_KEY first}" -- npx -y server-perplexity-ask
@@ -507,29 +524,40 @@ fi
 # --- 1c. Gemini CLI ---
 header "1c. Gemini CLI (for x-gemini skill)"
 
-if command -v gemini &>/dev/null; then
+# H3: gemini_cli capability requires BOTH `gemini` AND a timeout binary.
+# Without timeout/gtimeout, bin/gemini-agent hard-fails at runtime — reporting
+# the capability as ready would mislead skills.
+GEMINI_PRESENT=0
+TIMEOUT_PRESENT=0
+command -v gemini &>/dev/null && GEMINI_PRESENT=1
+{ command -v timeout &>/dev/null || command -v gtimeout &>/dev/null; } && TIMEOUT_PRESENT=1
+
+if [[ $GEMINI_PRESENT -eq 1 ]]; then
   GEMINI_VERSION=$(gemini --version 2>/dev/null || echo "unknown")
   ok "gemini found: $GEMINI_VERSION"
-  cap_set gemini_cli true
 else
   warn "gemini CLI not found"
   info "x-gemini skill will be unavailable. Install: https://github.com/google-gemini/gemini-cli"
-  cap_set gemini_cli false
   missing_add "cli" "gemini" "Direct Google Gemini CLI (for x-gemini skill)" "npm install -g @google/gemini-cli"
 fi
 
-# gemini-agent runtime requires `timeout` (or `gtimeout` on macOS without coreutils).
-if command -v timeout &>/dev/null; then
-  ok "timeout binary available"
-elif command -v gtimeout &>/dev/null; then
-  ok "gtimeout binary available (gemini-agent will use it)"
+if [[ $TIMEOUT_PRESENT -eq 1 ]]; then
+  ok "timeout/gtimeout binary available"
 else
-  warn "neither 'timeout' nor 'gtimeout' on PATH — gemini-agent will fail at runtime"
+  warn "neither 'timeout' nor 'gtimeout' on PATH — gemini-agent would fail at runtime"
   if [[ "$(uname -s)" == "Darwin" ]]; then
     missing_add "cli" "coreutils" "Provides timeout/gtimeout (required by gemini-agent)" "brew install coreutils"
   else
     missing_add "cli" "coreutils" "Provides timeout (required by gemini-agent)" "apt-get install coreutils"
   fi
+fi
+
+if [[ $GEMINI_PRESENT -eq 1 && $TIMEOUT_PRESENT -eq 1 ]]; then
+  cap_set gemini_cli true
+else
+  cap_set gemini_cli false
+  [[ $GEMINI_PRESENT -eq 1 && $TIMEOUT_PRESENT -eq 0 ]] && \
+    info "gemini_cli capability gated false until coreutils installed"
 fi
 
 # --- 2. OpenCode CLI ---
@@ -767,9 +795,21 @@ header "6. Writing capability manifest"
 if [[ "$MODE" != "check" ]]; then
   mkdir -p "$CONFIG_DIR"
 
-  cat > "$CAPS_FILE" <<MANIFEST
+  # M1: read plugin version once for embedding in manifest (drives check-version.sh).
+  PLUGIN_JSON_PATH="$PLUGIN_DIR/.claude-plugin/plugin.json"
+  PLUGIN_VERSION_VAL="unknown"
+  if [[ -f "$PLUGIN_JSON_PATH" ]] && command -v jq &>/dev/null; then
+    PLUGIN_VERSION_VAL=$(jq -r '.version // "unknown"' "$PLUGIN_JSON_PATH" 2>/dev/null)
+    [[ -z "$PLUGIN_VERSION_VAL" ]] && PLUGIN_VERSION_VAL="unknown"
+  fi
+
+  # M5: atomic write — render to mktemp, then mv. Prevents corrupt manifests
+  # on Ctrl-C/OOM mid-write that would later confuse check-version.sh.
+  CAPS_TMP=$(mktemp "${CAPS_FILE}.tmp.XXXXXX") || fail "could not mktemp for $CAPS_FILE"
+  cat > "$CAPS_TMP" <<MANIFEST
 {
   "version": "1.0.0",
+  "plugin_version": "$PLUGIN_VERSION_VAL",
   "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "plugin_dir": "$PLUGIN_DIR",
   "omo_agent": "$OMO_AGENT_SRC",
@@ -804,7 +844,13 @@ if [[ "$MODE" != "check" ]]; then
   }
 }
 MANIFEST
-  ok "Written to $CAPS_FILE"
+  if command -v jq &>/dev/null && ! jq -e . "$CAPS_TMP" >/dev/null 2>&1; then
+    rm -f "$CAPS_TMP"
+    fail "rendered manifest is invalid JSON — refusing to overwrite $CAPS_FILE"
+  else
+    mv "$CAPS_TMP" "$CAPS_FILE"
+    ok "Written to $CAPS_FILE"
+  fi
   write_files_manifest
 else
   info "[check mode] Would write to $CAPS_FILE"
