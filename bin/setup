@@ -911,6 +911,7 @@ report_skill "x-omo"          opencode omo_plugin
 report_skill "x-gemini"       gemini_cli
 report_skill "x-skill-review" omc claude-mem
 report_skill "x-skill-improve" omc
+report_skill "x-guide"         gemini_cli research-mcps
 report_skill "x-shared"
 
 # ============================================================

@@ -1,6 +1,6 @@
 # x-skills — Intelligent Skill Routers for Claude Code
 
-10 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
+11 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
 
 ## Skills
 
@@ -15,6 +15,7 @@
 | **x-api-pentest** | plugin | API security testing (OWASP Top 10) | External security CLIs |
 | **x-omo** | plugin | OpenCode multi-model bridge | opencode CLI |
 | **x-gemini** | plugin | Direct Gemini CLI bridge (Google Search, gemini-3.x, no API key) | gemini CLI + jq |
+| **x-guide** | plugin | Step-by-step comprehension-gated tutorials for docs/specs/code | Best with: x-gemini, x-research |
 | **x-skill-improve** | plugin | Improve skills from session data | Optional: claude-mem |
 | **x-shared** | plugin | Shared references (not invokable) | None |
 | **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/`; optional: claude-mem |

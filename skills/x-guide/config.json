@@ -1,0 +1,8 @@
+{
+  "omo_skill": "../x-omo/SKILL.md",
+  "gemini_skill": "../x-gemini/SKILL.md",
+  "research_skill": "../x-research/SKILL.md",
+  "shared_capability_loading": "../x-shared/capability-loading.md",
+  "shared_invocation_guide": "../x-shared/invocation-guide.md",
+  "capabilities_file": "~/.config/x-skills/capabilities.json"
+}

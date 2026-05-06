@@ -25,6 +25,7 @@ Every skill in x-skills follows the **router principle**: it classifies, it rout
 | **x-gemini** | *(not declared)* | Direct Gemini CLI bridge — uses Google Ultra subscription, native Google Search grounding, gemini-3.x access |
 | **x-skill-improve** | *(not declared)* | Session-based skill alignment analyzer — evaluates how well a skill was followed during a real session |
 | **x-verify** | `verifier` | Completion cascade dispatcher — answers "am I done?" for long-running skills |
+| **x-guide** | `progressive-tutor` | Comprehension-gated tutorial generator — turns docs/specs/code into a progressive, resumable walkthrough with per-project state |
 | **x-shared** | *(not a skill)* | Shared infrastructure consumed by other skills (not invokable) |
 
 Skills that declare a `role` in their frontmatter have explicit behavioral constraints. The role taxonomy exists to prevent role leakage (e.g., a reviewer applying fixes during review phase). Not all skills declare a role — those without one follow general conventions documented in their SKILL.md body.
@@ -91,6 +92,7 @@ x-skills/
     ├── x-omo/                # OpenCode bridge
     ├── x-gemini/             # Gemini CLI bridge
     ├── x-skill-improve/      # Skill alignment analyzer
+    ├── x-guide/              # Progressive comprehension-gated tutor
     └── x-shared/             # Shared references (NOT a skill)
 ```
 

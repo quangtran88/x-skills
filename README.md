@@ -39,6 +39,7 @@ The plugin's SessionStart hook detects stale capabilities and reminds you, but y
 | **x-api-pentest** | `/x-skills:x-api-pentest` | API security testing — OWASP API Top 10 testing with schemathesis, nuclei, sqlmap, spectral |
 | **x-omo** | `/x-skills:x-omo` | OpenCode multi-model bridge — dispatch to GPT-5.4, Gemini, Codex models via role agents or direct model routing |
 | **x-gemini** | `/x-skills:x-gemini` | Direct Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, gemini-3.x access without OpenCode layer |
+| **x-guide** | `/x-skills:x-guide` | Progressive comprehension-gated tutor — turns docs/PRDs/specs/code/features into a resumable walkthrough with per-project state in `.x-guide/<slug>/` |
 
 `x-shared` is a reference library used by other skills (not invokable directly).
 
@@ -139,6 +140,7 @@ x-skills/
 │   ├── x-design/             # Design system integration
 │   ├── x-api-pentest/        # API security testing
 │   ├── x-omo/                # OpenCode bridge
+│   ├── x-guide/              # Progressive comprehension-gated tutor
 │   └── x-shared/             # Shared references
 ├── CLAUDE.md                 # Plugin instructions
 └── package.json
