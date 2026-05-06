@@ -38,7 +38,7 @@ input.type in {file, dir, url, paste} AND size_estimate <= 50_000
   → Claude direct (no _ingest.md cache)
 ```
 
-The full decision matrix lives in `../references/routing-matrix.md`.
+The full decision matrix lives in `../references/routing-matrix.md` — if the tree above ever drifts from the reference, the reference wins.
 
 ## Per-Route Behavior
 

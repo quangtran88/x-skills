@@ -2,6 +2,8 @@
 
 > **Purpose:** Turn complex inputs (file, function, directory, PRD, plan, spec, URL, pasted prose, or vague feature name) into a progressive, resumable walkthrough. Produces `.x-guide/<slug>/GUIDE.md` and walks the user one part at a time with a menu-driven command loop.
 
+> **Skill type:** Type 5 (Code Scaffolding & Templates) with a pedagogy/explainer angle. The skill *generates* a `GUIDE.md` artifact (Type-5 trait) but the artifact's purpose is comprehension-gated teaching, not boilerplate. None of Anthropic's 9 canonical types capture "tutor / explainer" cleanly; classify as Scaffolding-with-pedagogy until a future taxonomy revision adds an explicit Educational type.
+
 ---
 
 ## Workflow (5 Phases)

@@ -67,7 +67,7 @@ Generate the 3 follow-ups as plausible deepening questions a learner would ask a
 
 ## Command Handling
 
-Full table: `../references/menu-commands.md`. Quick summary:
+Full table: `../references/menu-commands.md` — if the summary below ever drifts from the reference, the reference wins. Quick summary:
 
 | Cmd | Effect |
 |---|---|

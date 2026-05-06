@@ -31,6 +31,7 @@ If the request is closer to one of these, route there instead and stop:
 | "Review this code / plan / PR" | `x-review` |
 | "Debug / fix this bug" | `x-bugfix` |
 | "Build / implement / execute this plan" | `x-do` |
+| "Audit / improve a skill itself" | `x-skill-improve` |
 
 ## Phase Dispatch
 
