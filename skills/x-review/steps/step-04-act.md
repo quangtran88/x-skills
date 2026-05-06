@@ -56,26 +56,34 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 
 **Procedure:**
 
-1. **Re-display each clarification block** drafted in step 3 — verbatim, in finding-number order. Do NOT summarize, condense, or skip blocks even if "obvious."
-2. **Prompt the user** with this exact line after the last block:
+1. **Display the Big Picture header** drafted in step 3 — verbatim, before any clarification block. If missing, halt and demand step 3 produce it before proceeding.
+2. **Re-display each clarification block** drafted in step 3 — verbatim, in finding-number order. Do NOT summarize, condense, or skip blocks even if "obvious." Each block must include `Axis:`, `Severity inheritance:`, per-option `Impact:` lines, options A/B/C plus always-D ("Reject framing") and conditionally-E ("Split this fix off"), and `Decider:` footer.
+3. **Display the meta-finding** if step 3 emitted one (`META: Plan scope mismatch`). Pause for user reaction before listing per-finding choices.
+4. **Prompt the user** with this exact line after the last block:
 
    ```
    Resolve the decisions above. For each finding number, reply:
-     <#>: A | B | C   (or describe a custom direction)
+     <#>: A | B | C | D | E   (or describe a custom direction)
      <#>: skip         (defer this finding — excluded from Fix Mode)
    You can answer multiple in one message.
    ```
 
-3. **WAIT for user input.** Do NOT proceed. Do NOT propose answers on the user's behalf. Do NOT auto-pick the recommended option.
-4. **Lock direction.** When the user replies, record the chosen option per finding. `skip` removes that finding from Fix Mode scope (note it in the handoff context as deferred).
-5. **Only after every NEEDS_DIRECTION row has an answer or skip** may you continue to "Act on Verdict".
+5. **WAIT for user input.** Do NOT proceed. Do NOT propose answers on the user's behalf. Do NOT auto-pick the recommended option.
+6. **Lock direction.** When the user replies, record the chosen option per finding. `skip` removes that finding from Fix Mode scope (note it in the handoff context as deferred).
+7. **Tracker enforcement (axis-aware).** If the chosen option is a deferral (C / skip / "v2" / explicit follow-up):
+   - For axis = `security` or `compliance` with a dead-gate / open-surface outcome → REJECT the choice, restate why deferral is forbidden for this axis, re-prompt.
+   - For axis = `impl` or `product` → require the user provide `Follow-up tracker:`, `Owner:`, `Deadline:` before continuing. If absent, re-prompt with the three fields explicitly listed.
+8. **Reject-framing handling (option D).** If user picks D on any finding, halt the entire Fix Mode flow. Surface back: "You're saying the plan itself should change. Restate the new plan goal, then re-run review against it." Do NOT enter Fix Mode for any finding until plan is restated and confirmed.
+9. **Split handling (option E).** If user picks E on any finding, fix only that finding in this PR; record other findings as deferred with tracker fields.
+10. **Only after every NEEDS_DIRECTION row has an answer or skip (and any tracker fields filled)** may you continue to "Act on Verdict".
 
 **Rules:**
 
 - If the user asks a follow-up question instead of choosing, answer it (read more code if needed), then re-prompt the choice. Do not assume silence = recommendation.
-- If the user picks a custom direction not in A/B/C, restate the chosen direction in plain language and confirm before fixing.
-- If the user says "you decide" or "pick the best": still surface the recommendation and the tradeoff one more time, get explicit ack ("yes go with recommended"). Do not silently take initiative on architectural changes.
-- Skipped findings still appear in the final handoff context block as `Deferred — awaiting direction`.
+- If the user picks a custom direction not in A/B/C/D/E, restate the chosen direction in plain language and confirm before fixing.
+- If the user says "you decide" or "pick the best" on a `product` or `compliance` axis finding: refuse softly. Reply: "This axis needs the [decider] to pick — not me. I can recommend, but you should loop them in." Surface the recommendation again, do not auto-act.
+- If the user says "you decide" on `impl` axis: still surface recommendation + tradeoff once more, get explicit ack ("yes go with recommended"). Do not silently take initiative.
+- Skipped findings still appear in the final handoff context block as `Deferred — awaiting direction` with axis and tracker fields recorded.
 
 **Skip this gate ONLY if** the synthesis table has zero `NEEDS_DIRECTION = ✓` rows. Verify the column before skipping.
 
