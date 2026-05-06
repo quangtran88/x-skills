@@ -10,24 +10,30 @@
 - Launch all reviewers in ONE message for true parallelism
 - Wait for ALL background notifications before proceeding
 
+## Scope Guard (prepend to EVERY reviewer prompt — paste verbatim)
+
+Read `references/scope-guard.md` and paste the SCOPE block VERBATIM at the top of every reviewer prompt below (Agent code-reviewer, omo-agent oracle, omo-agent --model gpt, requesting-code-review). Do NOT summarize or paraphrase — the reviewers calibrate to the literal wording.
+
+In the prompt examples below, `<SCOPE_GUARD>` is shorthand for the full block from `references/scope-guard.md`. When you actually invoke the tool, replace it with the entire pasted block (~10 lines).
+
 ## Plan Review (Target A)
 
 Launch these 3 in ONE message. **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.
 
-1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `<omo_agent from config.json> --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `../../x-omo/gotchas.md`.*
-3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
+1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective. Prepend the Scope Guard above.
+2. **Bash tool:** `<omo_agent from config.json> --model gpt "<SCOPE_GUARD>\n\nYou are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: false assumptions in the plan, missing dependencies, ambiguous success criteria, verification gaps. Do NOT propose new features, alternative architectures, or scope additions."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `../../x-omo/gotchas.md`.*
+3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow. Prepend the Scope Guard.
 
-For architecture-sensitive plans, add a 4th reviewer:
-- **Bash tool:** `<omo_agent from config.json> oracle "<architecture review prompt>"`, `run_in_background: true`, `timeout: 600000`
+For architecture-sensitive plans, add a 4th reviewer **only if the user explicitly asked for an architecture review**:
+- **Bash tool:** `<omo_agent from config.json> oracle "<SCOPE_GUARD>\n\n<architecture review prompt>"`, `run_in_background: true`, `timeout: 600000`
 
 ## Code / Git Diff Review (Targets B, C, D)
 
-Launch these 3 in ONE message — all tool calls in a single response, not sequential messages:
+Launch these 3 in ONE message — all tool calls in a single response, not sequential messages. **Every prompt below MUST start with the Scope Guard block from the top of this file.**
 
-1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `<omo_agent from config.json> oracle "<review prompt with diff/file content>"`, `run_in_background: true`, `timeout: 600000` — GPT perspective
-3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
+1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective. Prepend Scope Guard.
+2. **Bash tool:** `<omo_agent from config.json> oracle "<SCOPE_GUARD>\n\n<review prompt with diff/file content>"`, `run_in_background: true`, `timeout: 600000` — GPT perspective
+3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow. Prepend Scope Guard to the request.
 
 **Example — correct (one message, three tool calls):**
 ```

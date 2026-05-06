@@ -34,15 +34,17 @@ S, P, X are read-only and can run in parallel. D modifies files — run it last,
 
 ```
 Additional passes available:
-[S] Security — threat modeling (STRIDE/OWASP)
-[P] Performance — path tracing (hot paths, complexity analysis)
-[C] Complexity — structural analysis (function sizes, coupling, duplication)
-[X] Cross-model — adversarial (skip if oracle already ran in primary pass; use [C] instead)
+[S] Security — deeper threat modeling (STRIDE/OWASP)
+[P] Performance — perf path tracing  [scope-expander: non-bug optimization suggestions]
+[C] Complexity — structural analysis  [scope-expander: refactor candidates]
+[X] Cross-model — adversarial (skip if oracle already ran in primary pass)
 [V] Visual — compare screenshots to specs
-[D] Deslop — code archaeology (AI pattern detection, modifies files — run last)
-[A] All of S, P, C, D
+[D] Deslop — code archaeology  [scope-expander: refactor / dead-code edits]
+[A] All of S, P, C, D  [warning: P/C/D are scope-expanders]
 [N] Done
 ```
+
+**Scope-expander rule:** `[P]`, `[C]`, `[D]` widen the review past the bug/security/false-assumption contract. Never auto-run them. Never recommend "[A] All" — let the user pick. If the user picks `[A]`, confirm once: "All passes includes refactor + perf suggestions beyond bugs/security — proceed?" before launching.
 
 The exact menu from `references/review-passes.md` is the only valid form. If you find yourself drafting a numbered fix menu, STOP — show the lettered passes menu first and wait for user input.
 

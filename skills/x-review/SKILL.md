@@ -1,12 +1,38 @@
 ---
 name: x-review
-description: Use when the user asks to review code, a plan, a PR, or a directory — auto-detects target and runs cross-model review by default (Claude + GPT perspectives)
+description: Use when the user asks to review code, a plan, a PR, or a directory — auto-detects target, runs cross-model review (Claude + GPT). Reports bugs, security issues, false assumptions, and plan deviations only; refactor/perf/restructure are opt-in passes
 role: reviewer
 ---
 
 ## Role: reviewer
 
 **x-review is a reviewer.** It evaluates existing work and returns verdicts. It does **not** apply fixes.
+
+## Scope Contract (READ FIRST — overrides reviewer instincts)
+
+x-review evaluates whether the target **does what it claims to do, safely**. Nothing more.
+
+**In scope (report these):**
+- **Bugs** — logic defects, off-by-one, null deref, race conditions, broken control flow, incorrect error handling that hides failure.
+- **Security issues** — injection, auth/authz holes, secret leakage, unsafe deserialization, SSRF, path traversal, missing input validation at trust boundaries.
+- **False assumptions** — claims in the spec/plan/code/comments that contradict the actual code, missing dependencies the plan presumes exist, success criteria that cannot be measured, fabricated APIs/files/symbols.
+- **Spec/plan deviations** — implementation diverges from the stated intent of the plan or PR description.
+
+**Out of scope (DO NOT report unless the user explicitly asks):**
+- New features, alternative approaches, "you could also…" suggestions
+- Performance optimizations that aren't user-visible bugs (no "this is O(n²), consider a map")
+- Refactors, restructuring, extraction, layering changes
+- Style, naming, formatting, comment quality
+- Test coverage suggestions for code that already has tests, unless a missing test would have caught a real bug found in this review
+- Architectural redesigns, library swaps, framework migrations
+- "Future-proofing", extensibility, configurability that the spec did not ask for
+- Documentation polish, README improvements
+
+**Severity rule:** If a finding does not name a concrete bug, security flaw, or false assumption that affects correctness or safety, it is out of scope — drop it, do not downgrade it to LOW. Reviewers will surface noise; the synthesis step (step 3) is where it gets filtered.
+
+**The test:** "If we shipped this as-is and a user hit it, would something break, leak, or behave wrong?" If no → out of scope.
+
+This contract narrows what reviewers report. The user can request broader passes explicitly via the [P]/[C]/[D] menu in step 4 — those passes are opt-in scope-expanders, never default.
 
 **x-review MUST NOT:**
 - Call `Edit` or `Write` during the review phase (steps 1-3 up to verdict) — reviewers evaluate, they don't fix

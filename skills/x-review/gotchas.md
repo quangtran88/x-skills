@@ -20,6 +20,7 @@ Known failure patterns specific to x-review. For shared OMO patterns, see `../x-
 
 ## Output quality
 
+- **Scope creep — over-engineering findings.** Reviewers (especially `oracle` and `code-reviewer` opus) return refactor proposals, perf suggestions, alt approaches, and "future-proofing" alongside real bugs. The model then includes them in synthesis "to be thorough." This violates the Scope Contract in SKILL.md — x-review reports only bugs, security, false assumptions, and plan deviations. Mitigations: (1) Scope Guard prepended to every reviewer prompt in step 2, (2) Scope Filter in step 3 drops out-of-scope findings before verification, (3) `[P]/[C]/[D]` in the passes menu marked `[scope-expander]` and never auto-run. If you find yourself writing "Consider extracting…", "Could be refactored…", "For better performance…", "You might also want to…" in the synthesis table, STOP — drop those rows. Test for every finding: "If we shipped as-is, would something break/leak/behave wrong?" If no → drop, do not downgrade to LOW.
 - **Cross-model review (GPT-5.4) sometimes flags Claude-style patterns as issues.** Use judgment — if the flagged pattern matches the project's existing conventions, it's not a real finding.
 - **Security reviewer can be noisy on internal-only code.** If the code never faces user input or external traffic, some OWASP findings are false positives. Note the context when presenting findings.
 

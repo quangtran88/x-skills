@@ -8,6 +8,33 @@
 - ALL reviewer results must be collected before this step
 - CRITICAL + HIGH findings must be addressed before marking review complete
 
+## Scope Filter (MANDATORY — runs BEFORE verification)
+
+Reviewers will return out-of-scope findings even with the Scope Guard. Drop them before verifying.
+
+For every raw finding from any reviewer, ask:
+
+1. Does it name a **concrete bug** (logic defect, null deref, race, broken control flow, mishandled error that hides failure)?
+2. Does it name a **security issue** (injection, authn/authz hole, secret leak, SSRF, traversal, missing input validation at a trust boundary)?
+3. Does it name a **false assumption** (spec/plan/code claim that contradicts the actual implementation, missing dep the plan presumes, fabricated API/file/symbol, success criterion that can't be measured)?
+4. Does it name a **deviation from the stated plan/PR intent**?
+
+If the answer to all four is **no** → **drop the finding entirely.** Do not include it. Do not downgrade to LOW.
+
+**Drop these patterns regardless of how the reviewer worded them:**
+- "Consider extracting…", "Could be refactored…", "Would be cleaner if…"
+- "For better performance, use…" (unless the current code is a user-visible bug)
+- "You might also want to add…", "It would be nice to support…"
+- "Add tests for X" when X already has tests, unless a missing test would have caught a real in-scope finding
+- "Improve naming", "Add JSDoc", "Reformat", "Reorganize files"
+- "Future-proof for…", "Make this configurable", "Support library Y as alternative"
+- "Architectural improvement: split into…", "Adopt pattern Z"
+- New-feature suggestions of any kind
+
+**When in doubt, ask the user before including:** "Reviewer flagged X — looks like a refactor/perf suggestion outside the bug-and-security scope. Include?" Default = drop.
+
+Record the count of dropped-as-out-of-scope findings in synthesis (e.g., `Filtered 7 out-of-scope findings (refactor/perf/style)`) so the user can ask to see them if needed.
+
 ## Verify Each Finding (MANDATORY)
 
 Before synthesizing, **spot-check every CRITICAL and HIGH finding** against the actual code:
@@ -30,21 +57,30 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 5. **Mark verified** — indicate which findings were confirmed against actual code
 6. **Tag NEEDS_DIRECTION** — mark any finding that requires user input before fixing (see criteria below)
 
-## Tag NEEDS_DIRECTION (MANDATORY)
+## Tag NEEDS_DIRECTION (MANDATORY — narrow criteria)
 
-A finding requires user direction BEFORE any fix when ANY of these apply:
+NEEDS_DIRECTION only applies to **in-scope findings** (bugs, security, false assumptions, plan deviations) where the **fix itself** is ambiguous. It is NOT a hook for architectural redesign or scope expansion.
 
-1. **Reviewers disagree on direction** — e.g., "extract module" vs "inline", "add cache" vs "remove cache"
-2. **Architectural choice** — sync vs async, schema redesign, breaking API change, library swap, layer boundary shift
-3. **Tradeoff with no clear winner** — perf vs readability, coupling vs duplication, type safety vs flexibility
-4. **Ambiguous fix scope** — minimal patch vs root-cause refactor, single-call-site vs cross-cutting change
-5. **Product/UX implication** — error message wording, default values, opt-in vs opt-out behavior
+Tag a finding when ANY of these apply to the **fix for a confirmed bug/security/false-assumption finding**:
 
-If unsure whether to tag → tag it. False positives cost one user prompt; false negatives cost wrong fixes.
+1. **Two valid fixes exist for the same bug** — e.g., null-check at caller vs callee, retry vs fail-fast for a known race
+2. **Product/UX implication for an in-scope bug** — error message wording, what value to default to when the previous default was wrong, opt-in vs opt-out for a security toggle
+3. **Reviewers disagree on the minimal fix** — both proposals address the same in-scope finding, but pick different patches
+
+**Do NOT tag (these are out-of-scope and should already be dropped by the Scope Filter):**
+- "Should we refactor…" — out of scope
+- "Sync vs async architecture" — out of scope unless it's the cause of a confirmed bug
+- "Library swap, schema redesign, layer-boundary shift" — out of scope
+- "Perf vs readability tradeoff" — out of scope
+- "Minimal patch vs root-cause refactor" — default is minimal patch; refactor is out of scope
+
+If you're tempted to tag a finding NEEDS_DIRECTION because it raises a design question rather than a fix question, the finding itself is out of scope — drop it via the Scope Filter instead of asking the user to make a design decision.
 
 ## Draft Clarification Block (per NEEDS_DIRECTION finding)
 
 For every NEEDS_DIRECTION row, draft an explainer block now (you have full context loaded; step 4 will not). Use plain language — assume reader is product owner, not deep technical expert. Define jargon inline.
+
+**Use this template ONLY when two valid patches exist for the SAME confirmed in-scope finding (bug / security / false-assumption / plan-deviation).** Do NOT use it to surface architectural choices, refactor options, or scope-expanding decisions — those are out of scope and should already be dropped by the Scope Filter. If the options below describe "how to redesign X" rather than "which patch fixes bug Y", you've drifted out of scope: drop the row, do not draft this block.
 
 ```
 ### Decision needed: [short title]

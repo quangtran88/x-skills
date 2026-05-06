@@ -2,17 +2,19 @@
 
 Different analytical methods find different defect classes. A checklist finds what it checks for; path tracing finds what happens at boundaries; adversarial review finds what you assumed was fine.
 
-Cross-model review (`[X]`) is now built into the default flow for both plan and code reviews. After the default cross-model pass, offer additional specialized passes:
+Cross-model review (`[X]`) is now built into the default flow for both plan and code reviews. After the default cross-model pass, offer additional specialized passes.
+
+**Scope note:** Default x-review reports only bugs, security issues, false assumptions, and plan deviations (see SKILL.md → Scope Contract). Passes marked `[scope-expander]` widen the review beyond that contract — they are **opt-in only** and should never auto-run. The user must explicitly pick them.
 
 ```
 Additional passes available:
-[S] Security — threat modeling (STRIDE/OWASP)
-[P] Performance — path tracing (hot paths, complexity analysis)
-[C] Complexity — structural analysis (function sizes, coupling, duplication)
-[X] Cross-model — adversarial (skip if oracle already ran in primary pass; use [C] instead)
+[S] Security — deeper threat modeling (STRIDE/OWASP) on top of default security findings
+[P] Performance — perf path tracing  [scope-expander: includes non-bug optimization suggestions]
+[C] Complexity — structural analysis  [scope-expander: includes refactor candidates]
+[X] Cross-model — adversarial (skip if oracle already ran in primary pass)
 [V] Visual — compare screenshots to specs
-[D] Deslop — code archaeology (AI pattern detection, modifies files — run last)
-[A] All of S, P, C, D
+[D] Deslop — code archaeology  [scope-expander: includes refactor / dead-code edits]
+[A] All of S, P, C, D  [warning: P/C/D are scope-expanders]
 [N] Done
 ```
 
