@@ -1,6 +1,6 @@
 {
   "name": "x-skills",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "description": "Intelligent skill routers for Claude Code — execution, research, review, debugging, design, and security testing",
   "license": "MIT",
   "author": "Randy Tran",
