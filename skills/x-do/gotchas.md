@@ -41,6 +41,16 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 
 **Fix:** Cross-model review = exactly 3 calls in ONE message: **A**gent, **B**ash, **S**kill. Mnemonic: ABS. If you only see 2 tool calls, you're missing one.
 
+## Granular Commits from executor / ralph
+
+**Symptom:** After `oh-my-claudecode:executor` (or `ralph`) finishes, `git log` shows 8-20 micro-commits — one per file or per intermediate step. Reviewers can't reason about intent; squash-on-merge loses the structure.
+
+**Root cause:** `executor` commits aggressively to checkpoint progress; `ralph` commits per story. Neither groups by domain/concern.
+
+**Fix:** Run commit recomposition after verification, before branch finish. Capture `BASE_SHA=$(git rev-parse HEAD)` BEFORE dispatching the executor, then post-execution: `git reset --soft $BASE_SHA` → `Skill` tool → `commit` (groups staged changes by domain). Verify `git diff $BASE_SHA..HEAD` against pre-reset `ORIG_HEAD` is empty before claiming done. See `steps/step-04-execute.md` § "Commit Recomposition" for the full procedure and skip conditions.
+
+**Do not** rewrite history if any commit in the range is already pushed to a shared remote — offer squash-on-merge in the PR instead.
+
 ## Spinning Without Delegating
 
 **Symptom:** Claude attempts the same fix 2+ times with minor variations, or reads the same files repeatedly without making progress.

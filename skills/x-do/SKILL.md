@@ -208,6 +208,10 @@ After completing implementation in any TS/JS project, run before claiming done:
 
 Fix all errors before proceeding to review or completion.
 
+## Commit Recomposition (executor / ralph routes)
+
+OMC `executor` and `ralph` commit per micro-step, producing noisy history. After verification passes, recompose into atomic, domain-grouped commits via the `commit` skill. See `steps/step-04-execute.md` § "Commit Recomposition" for the full procedure (capture `BASE_SHA` before dispatch → soft-reset → `Skill commit` → verify zero net diff). Skip if branch is already pushed/shared, or if user asked to preserve granular commits.
+
 ## After This Skill
 
 Work done? → `/x-review` the changes. See `../x-shared/workflow-chains.md` for common sequences. Include a [handoff context](../x-shared/context-envelope.md) block.
