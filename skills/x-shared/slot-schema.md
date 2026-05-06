@@ -39,16 +39,15 @@ Skills declare their pluggable dependencies via frontmatter `slots:` block. v1 h
 - `code-reviewer` — OMC agent (dispatch via `Agent` tool with `subagent_type: "oh-my-claudecode:code-reviewer"`)
 - `custom:<skill-name>` — project-specific verifier (skill — dispatch via `Skill` tool)
 
-### `code-reviewer` provider — dual namespace
+### `code-reviewer` provider
 
-`code-reviewer` resolves to one of two equivalent agent providers depending on which plugin is installed:
+`code-reviewer` resolves to a single Agent-tool subagent:
 
 | Provider | `subagent_type` | When chosen |
 |---|---|---|
-| `oh-my-claudecode:code-reviewer` | OMC plugin | Default for `completion-cascade.md` step 4 (verifier slot canonical). Full OMC review prompt with severity rubric. |
-| `superpowers:code-reviewer` | superpowers plugin | Default for `x-review/steps/step-02-review.md` (multi-reviewer dispatch). Pairs with `superpowers:requesting-code-review` workflow. |
+| `oh-my-claudecode:code-reviewer` | OMC plugin | Canonical default for all reviewer dispatches (`completion-cascade.md` step 4, `x-review/steps/step-02-review.md`). Full OMC review prompt with severity rubric. |
 
-Both are valid resolutions of the `code-reviewer` slot value. Skills MAY hard-code either provider as their default; users SHOULD NOT mix them within a single review pipeline (e.g., x-do post-impl review uses OMC; x-review uses superpowers — pick one when chaining). When the user-prompt override names a slot value of `code-reviewer` without a namespace, prefer OMC (`oh-my-claudecode:code-reviewer`) per the cascade default.
+The superpowers plugin ships **skills**, not subagents — there is no `superpowers:code-reviewer` agent. The superpowers code-review surface is the `superpowers:requesting-code-review` Skill, which is dispatched separately via the `Skill` tool and may be paired with the OMC `code-reviewer` agent in the same review message.
 
 ### `reviewer` slot (vocabulary only — not emitted in v1)
 

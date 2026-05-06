@@ -14,7 +14,7 @@
 
 Launch these 3 in ONE message. **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.
 
-1. **Agent tool:** `subagent_type: "superpowers:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
+1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
 2. **Bash tool:** `<omo_agent from config.json> --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `../../x-omo/gotchas.md`.*
 3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
 
@@ -25,14 +25,14 @@ For architecture-sensitive plans, add a 4th reviewer:
 
 Launch these 3 in ONE message — all tool calls in a single response, not sequential messages:
 
-1. **Agent tool:** `subagent_type: "superpowers:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
+1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
 2. **Bash tool:** `<omo_agent from config.json> oracle "<review prompt with diff/file content>"`, `run_in_background: true`, `timeout: 600000` — GPT perspective
 3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
 
 **Example — correct (one message, three tool calls):**
 ```
 [assistant response]
-  Tool: Agent(subagent_type="superpowers:code-reviewer", model="opus", run_in_background=true, prompt="...")
+  Tool: Agent(subagent_type="oh-my-claudecode:code-reviewer", model="opus", run_in_background=true, prompt="...")
   Tool: Bash(command="<omo_agent from config.json> oracle '...'", run_in_background=true, timeout=600000)
   Tool: Skill(skill="superpowers:requesting-code-review")
 ```
@@ -41,7 +41,7 @@ If you just sent a message with only ONE tool call, STOP — you already failed 
 **Pre-launch self-check (run BEFORE sending the message):**
 
 *Presence checks (all 3 reviewers in one message):*
-1. Is `Agent(subagent_type="superpowers:code-reviewer", ...)` in the call list? If no → STOP, add it.
+1. Is `Agent(subagent_type="oh-my-claudecode:code-reviewer", ...)` in the call list? If no → STOP, add it.
 2. Is `Bash(command="<omo_agent> ...")` in the call list? If no → STOP, add it.
 3. Is `Skill(skill="superpowers:requesting-code-review")` in the call list? If no → STOP, add it.
 4. Are all 3 in the SAME message? If no → STOP, batch them.
@@ -71,7 +71,7 @@ If an OMO agent times out (exit code 124) or fails:
 
 - [ ] code-reviewer (Agent tool, opus, `run_in_background: true`) — result collected
 - [ ] oracle (Bash tool, `omo-agent oracle`, `run_in_background: true`) — result collected OR failure handled (partial output assessed, gap noted)
-- [ ] `superpowers:requesting-code-review` (Skill tool) → launches superpowers:code-reviewer — result collected
+- [ ] `superpowers:requesting-code-review` (Skill tool) — structured review workflow result collected
 - [ ] All 3 launched in ONE message (Skill loads synchronously, then its agent runs in background)
 
 **Do NOT proceed until every box is checked.**

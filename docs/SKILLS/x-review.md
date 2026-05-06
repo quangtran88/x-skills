@@ -32,18 +32,18 @@ Step 1: Prepare (step-01-prepare.md)
 
 Step 2: Review (step-02-review.md)
   ├─ **Target A (Plan/Spec):** Launch 3 reviewers in ONE MESSAGE:
-  │   1. Agent tool: subagent_type="superpowers:code-reviewer", model="opus" — Claude perspective
+  │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
   │   2. Bash tool: omo-agent --model gpt "<plan blocker-finder prompt>" — GPT-5.4 blocker-finder (OKAY/REJECT verdict). Replaces UNAVAILABLE `momus` role agent.
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
   │   (Optional 4th: omo-agent oracle for architecture-sensitive plans)
   ├─ **Targets B/C/D (Code/Files/Diff):** Launch 3 reviewers in ONE MESSAGE:
-  │   1. Agent tool: subagent_type="superpowers:code-reviewer", model="opus" — Claude perspective
+  │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
   │   2. Bash tool: omo-agent oracle "<review prompt with diff/file content>" — GPT perspective
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
   ├─ Wait for ALL background notifications
   └─ Collect all results before proceeding
   ├─ Launch 3 reviewers in ONE MESSAGE (all tool calls in single response):
-  │   1. Agent tool: subagent_type="superpowers:code-reviewer", model="opus" — Claude perspective
+  │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
   │   2. Bash tool: omo-agent oracle "<review prompt>" — GPT perspective
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
   ├─ Wait for ALL background notifications
@@ -67,7 +67,7 @@ Step 4: Act (step-04-act.md)
 The **one-message launch** is critical for compliance. All 3 reviewers must be dispatched in a single assistant response:
 
 ```
-Tool: Agent(subagent_type="superpowers:code-reviewer", model="opus", run_in_background=true)
+Tool: Agent(subagent_type="oh-my-claudecode:code-reviewer", model="opus", run_in_background=true)
 Tool: Bash(command="omo-agent oracle '...'", run_in_background=true, timeout=600000)
 Tool: Skill(skill="superpowers:requesting-code-review")
 ```

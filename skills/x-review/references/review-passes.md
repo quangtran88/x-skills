@@ -20,13 +20,13 @@ Additional passes available:
 
 | Pass | Methodology | Invocation | Finds |
 |------|------------|------------|-------|
-| **Primary** | Spec compliance + quality heuristics | Agent: `subagent_type: "superpowers:code-reviewer"`, `model: "opus"` | Logic defects, spec deviations, quality issues |
-| **S** Security | Threat modeling (STRIDE/OWASP) | Agent: `subagent_type: "superpowers:code-reviewer"`, `model: "opus"` + STRIDE/OWASP prompt | Vulnerabilities, injection vectors, hardcoded secrets |
-| **P** Performance | Path tracing (hot paths, complexity) | Agent: `subagent_type: "superpowers:code-reviewer"`, `model: "opus"` + performance prompt | N+1 queries, missing indexes, O(n²) loops, memory leaks |
-| **C** Complexity | Structural analysis (function sizes, coupling, duplication) | Agent: `subagent_type: "superpowers:code-reviewer"`, `model: "sonnet"` + complexity prompt | Large functions, high coupling, refactor candidates, duplication |
+| **Primary** | Spec compliance + quality heuristics | Agent: `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"` | Logic defects, spec deviations, quality issues |
+| **S** Security | Threat modeling (STRIDE/OWASP) | Agent: `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"` + STRIDE/OWASP prompt | Vulnerabilities, injection vectors, hardcoded secrets |
+| **P** Performance | Path tracing (hot paths, complexity) | Agent: `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"` + performance prompt | N+1 queries, missing indexes, O(n²) loops, memory leaks |
+| **C** Complexity | Structural analysis (function sizes, coupling, duplication) | Agent: `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "sonnet"` + complexity prompt | Large functions, high coupling, refactor candidates, duplication |
 | **X** Cross-model | Adversarial (different model's perspective) | Bash: `<omo_agent from config.json> oracle "<prompt>"` | Blind spots, alternative approaches, logic errors |
 | **V** Visual | UI deviation detection | Bash: `<omo_agent from config.json> multimodal-looker --file screenshot "<prompt>"` | Visual regressions, spec mismatches |
-| **D** Deslop | Code archaeology (AI pattern detection) | Agent: `subagent_type: "superpowers:code-reviewer"`, `model: "opus"` + deslop prompt | Over-abstraction, dead code, unnecessary complexity |
+| **D** Deslop | Code archaeology (AI pattern detection) | Agent: `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"` + deslop prompt | Over-abstraction, dead code, unnecessary complexity |
 
 ## Parallel Execution
 

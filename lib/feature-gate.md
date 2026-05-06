@@ -39,7 +39,7 @@ omo-agent <agent> "<prompt>"
 
 **If unavailable — Claude-only fallback:**
 - Replace `executor` → use `Agent` tool with `mode=auto` and implementation instructions
-- Replace `code-reviewer` → use `Agent` tool with `subagent_type="superpowers:code-reviewer"` or plain `Agent`
+- Replace `code-reviewer` → use `Agent` tool with `subagent_type="general-purpose"` and a code-review prompt (no superpowers `code-reviewer` agent exists; superpowers ships skills only)
 - Replace `debugger` → use `Agent` tool with debugging instructions
 - Replace `tracer` → use `Agent` tool with tracing instructions
 
