@@ -61,6 +61,11 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 
 NEEDS_DIRECTION only applies to **in-scope findings** (bugs, security, false assumptions, plan deviations) where the **fix itself** is ambiguous. It is NOT a hook for architectural redesign or scope expansion.
 
+**Capture reviewer-flagged direction requests:** Reviewers may append `NEEDS_DIRECTION: <reason>` to in-scope findings (per `references/scope-guard.md`). When you see this tag in raw output:
+1. Apply the Scope Filter first — if the finding itself is out of scope, drop it (the tag does not rescue an out-of-scope finding).
+2. If the finding is in-scope, copy the reviewer's candidate options into the clarification block as starting points for A/B/C. You may add, merge, or reword options based on cross-reviewer evidence.
+3. Always still apply the criteria below — a reviewer flag is a signal, not an automatic pass.
+
 Tag a finding when ANY of these apply to the **fix for a confirmed bug/security/false-assumption finding**:
 
 1. **Two valid fixes exist for the same bug** — e.g., null-check at caller vs callee, retry vs fail-fast for a known race
@@ -146,8 +151,28 @@ If user picks a deferral option without filling these in, step 4 must block unti
 
 ### Template
 
+**Heading rule (MANDATORY):** Every clarification block heading MUST start with `### Decision #<N>:` where `<N>` is the **same finding number** from the synthesis table. Substitute the actual number — do NOT emit the literal `<N>`. This lets the user reply with `<N>: A` without cross-referencing the title. If a single finding raises multiple decisions, suffix with `.a`, `.b` (e.g. `### Decision #5.a:`, `### Decision #5.b:`). Do NOT drop the number.
+
+Concrete example (substituted):
 ```
-### Decision needed: [short title]
+### Decision #2: Tool-call correlation strategy
+**Bottom line:** ...
+```
+
+**Bottom line rule (MANDATORY):** Every block MUST include a `**Bottom line:**` one-liner immediately under the heading, written for a non-technical reader (product owner, operator, ops manager). It MUST name (a) the user-visible thing at stake and (b) the rough shape of the tradeoff in ≤2 short sentences. NO code symbols, NO file names, NO jargon. If you cannot write the bottom line in plain language, the block is too technical — rewrite "What's happening" first.
+
+Examples of good Bottom line:
+- Generic (null-deref): "Login crashes when a returning user has no saved profile. Pick: auto-create a default profile (silent fix, may hide real bugs) or show a sign-up prompt (extra step but explicit)."
+- Domain (correlation): "Tool-call cards in the AG-UI panel may show wrong results when users run multiple tools at once. Pick: slow them down (safe), accept some wrong cards (fast), or limit which tools work (mixed)."
+- Domain (security): "Anyone with the API key can pretend to be any user. Pick: per-user keys (most work, safest), signed proxy headers (medium work, safe-ish), or just warn operators (zero work, unsafe)."
+
+Examples that FAIL (too technical, rewrite):
+- "Single-flight invariant violation in onItemEvent FIFO" — code jargon
+- "Choose between Mode A apiKey and Mode B TokenStore" — internal terms
+
+```
+### Decision #<N>: [short title]
+**Bottom line:** [≤2 plain sentences naming the user-visible stake + tradeoff shape]
 **Axis:** impl | security | product | compliance
 **Severity inheritance:** [CRITICAL / HIGH / MEDIUM / LOW from parent finding]
 
@@ -243,7 +268,7 @@ Do not bury this inside an option's con list. It is its own bug class.
 | 3 | MEDIUM | ... | Claude + GPT | ✓ | — |
 ```
 
-If any row has `NEEDS_DIRECTION = ✓`, append the drafted clarification blocks (one per flagged row) immediately after the table under a `### Clarification needed before fix` heading.
+If any row has `NEEDS_DIRECTION = ✓`, append the drafted clarification blocks (one per flagged row) immediately after the table under a `### Clarification needed before fix` heading. **Block headings MUST be numbered to match the finding row** (`### Decision #2:`, `### Decision #5:`) so the user can reply `2: A`, `5: B` without scanning titles.
 
 ## Next Step
 

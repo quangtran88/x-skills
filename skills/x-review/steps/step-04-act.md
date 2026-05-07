@@ -57,15 +57,22 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 **Procedure:**
 
 1. **Display the Big Picture header** drafted in step 3 — verbatim, before any clarification block. If missing, halt and demand step 3 produce it before proceeding.
-2. **Re-display each clarification block** drafted in step 3 — verbatim, in finding-number order. Do NOT summarize, condense, or skip blocks even if "obvious." Each block must include `Axis:`, `Severity inheritance:`, per-option `Impact:` lines, options A/B/C plus always-D ("Reject framing") and conditionally-E ("Split this fix off"), and `Decider:` footer.
+2. **Re-display each clarification block** drafted in step 3 — verbatim, in finding-number order. Do NOT summarize, condense, or skip blocks even if "obvious." Each block must include the numbered heading (`### Decision #<N>:` matching the table row), `**Bottom line:**` plain-language one-liner, `Axis:`, `Severity inheritance:`, per-option `Impact:` lines, options A/B/C plus always-D ("Reject framing") and conditionally-E ("Split this fix off"), and `Decider:` footer. **If any block lacks a numbered heading or Bottom line, halt and re-draft step 3 — do not present blind blocks to the user.**
 3. **Display the meta-finding** if step 3 emitted one (`META: Plan scope mismatch`). Pause for user reaction before listing per-finding choices.
 4. **Prompt the user** with this exact line after the last block:
 
    ```
-   Resolve the decisions above. For each finding number, reply:
-     <#>: A | B | C | D | E   (or describe a custom direction)
-     <#>: skip         (defer this finding — excluded from Fix Mode)
-   You can answer multiple in one message.
+   Resolve the decisions above. Reply with the decision number + your pick:
+     2: A                       (pick option A for Decision #2)
+     5: B                       (pick option B for Decision #5)
+     5.a: A                     (sub-decision when one finding has 5.a / 5.b blocks)
+     6: C
+        Follow-up required: JIRA-123
+        Owner: alice
+        Deadline: 2026-05-15    (defer with required fields — colon-separated, on their own lines)
+     7: skip                    (defer this finding — excluded from Fix Mode)
+     3: <free text>             (describe a custom direction)
+   Multiple answers in one message OK. Decision numbers match the finding numbers in the table above.
    ```
 
 5. **WAIT for user input.** Do NOT proceed. Do NOT propose answers on the user's behalf. Do NOT auto-pick the recommended option.
