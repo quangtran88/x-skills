@@ -26,6 +26,7 @@ Every skill in x-skills follows the **router principle**: it classifies, it rout
 | **x-skill-improve** | *(not declared)* | Session-based skill alignment analyzer — evaluates how well a skill was followed during a real session |
 | **x-verify** | `verifier` | Completion cascade dispatcher — answers "am I done?" for long-running skills |
 | **x-guide** | `progressive-tutor` | Comprehension-gated tutorial generator — turns docs/specs/code into a progressive, resumable walkthrough with per-project state |
+| **x-worktree** | `worktree-provider` | Isolated git worktree provisioner — base branch + new branch resolution, `wt`/`git worktree` dual provider, machine-readable result envelope. Invoked directly or via `--wt` from `x-do`/`x-bugfix`. |
 | **x-shared** | *(not a skill)* | Shared infrastructure consumed by other skills (not invokable) |
 
 Skills that declare a `role` in their frontmatter have explicit behavioral constraints. The role taxonomy exists to prevent role leakage (e.g., a reviewer applying fixes during review phase). Not all skills declare a role — those without one follow general conventions documented in their SKILL.md body.
@@ -93,6 +94,7 @@ x-skills/
     ├── x-gemini/             # Gemini CLI bridge
     ├── x-skill-improve/      # Skill alignment analyzer
     ├── x-guide/              # Progressive comprehension-gated tutor
+    ├── x-worktree/           # Isolated git worktree provisioner
     └── x-shared/             # Shared references (NOT a skill)
 ```
 

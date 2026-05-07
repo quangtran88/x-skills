@@ -1,0 +1,22 @@
+{
+  "name": "x-worktree",
+  "version": "1.0.0",
+  "role": "worktree-provider",
+  "args": {
+    "target_branch": {
+      "type": "string",
+      "required": false,
+      "default": "<current HEAD>",
+      "description": "Base branch to create the new worktree from"
+    },
+    "new_branch": {
+      "type": "string",
+      "required": false,
+      "default": "<base>-<caller>-<6hex>",
+      "description": "Name of the new branch created in the worktree"
+    }
+  },
+  "providers": ["wt", "git"],
+  "preferred_provider": "wt",
+  "submodules": "best-effort"
+}

@@ -560,6 +560,21 @@ else
     info "gemini_cli capability gated false until coreutils installed"
 fi
 
+# --- 1d. worktrunk CLI (optional, for x-worktree skill) ---
+header "1d. worktrunk wt CLI (optional, for x-worktree skill)"
+
+if command -v wt &>/dev/null; then
+  WT_VERSION=$(wt --version 2>/dev/null | head -1 || echo "unknown")
+  ok "wt found: $WT_VERSION"
+  cap_set worktrunk_cli true
+else
+  warn "wt CLI not found"
+  info "x-worktree falls back to native 'git worktree' — no functional loss"
+  info "Install (optional): brew install worktrunk"
+  missing_add "cli" "worktrunk" "Optional wt CLI for x-worktree (faster, hooks, copy-ignored). Native git fallback works without it." "brew install worktrunk"
+  cap_set worktrunk_cli false
+fi
+
 # --- 2. OpenCode CLI ---
 header "2. OpenCode CLI"
 
@@ -912,6 +927,7 @@ report_skill "x-gemini"       gemini_cli
 report_skill "x-skill-review" omc claude-mem
 report_skill "x-skill-improve" omc
 report_skill "x-guide"         gemini_cli research-mcps
+report_skill "x-worktree"
 report_skill "x-shared"
 
 # ============================================================

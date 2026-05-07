@@ -47,6 +47,12 @@ Classify the bug into ONE mode:
 
 ## Pre-Flight (MANDATORY)
 
+- [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). If present:
+  1. Strip the `--wt …` segment from the prompt before mode detection.
+  2. Dispatch via `Skill: x-skills:x-worktree` with parsed args (empty string for omitted slots).
+  3. Parse the result envelope; pin `WORKTREE_PATH` for the whole bugfix flow.
+  4. Every mutating dispatch (Bash / Agent / OMC `debugger` / `tracer` / OMO / morph-mcp) must run inside `WORKTREE_PATH` per `../x-worktree/SKILL.md` § "CWD propagation". The regression test, the fix, and the verification commands ALL run in the worktree — not the original cwd.
+  5. If x-worktree returns `✗ Worktree FAILED`, abort and report — never silently continue in the original repo.
 - [ ] **Capture baseline:** Record exact error messages, failing test output, and stack traces (copy-paste, not paraphrase). This becomes the before/after comparison for verification.
   - **Behavioral bug?** (duplication, wrong output, timing issue — no error/stack trace exists): Capture expected vs. actual behavior as the baseline instead. Document what the user observes and what correct behavior looks like.
 - [ ] Read error messages carefully — don't skip stack traces

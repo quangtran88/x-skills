@@ -143,6 +143,12 @@ Classify the user's input into ONE mode:
 
 Before starting any mode, complete ALL of these checks:
 
+- [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). If present:
+  1. Strip the entire `--wt …` segment from the prompt — mode classification must NOT see it.
+  2. Dispatch via `Skill: x-skills:x-worktree` with the parsed args (empty string if a slot was omitted).
+  3. Parse the returned envelope. Pin `WORKTREE_PATH` for the rest of this task.
+  4. From this point, **every** mutating Bash / Agent / OMC executor / OMO / morph-mcp dispatch MUST run inside `WORKTREE_PATH` per the cwd-propagation rules in `../x-worktree/SKILL.md` § "CWD propagation". Forward `WORKTREE_PATH` in any handoff envelope (e.g., x-do → x-bugfix).
+  5. If x-worktree returns `✗ Worktree FAILED`, abort and surface the reason — do NOT silently continue in the original cwd.
 - [ ] **Resume detection:** Check for in-progress state (paths in `config.json`):
   - `ralph_state` — incomplete stories → offer to resume
   - `specs_dir` — uncommitted design docs → offer to continue
