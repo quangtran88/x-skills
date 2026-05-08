@@ -59,7 +59,33 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 1. **Display the Big Picture header** drafted in step 3 — verbatim, before any clarification block. If missing, halt and demand step 3 produce it before proceeding.
 2. **Re-display each clarification block** drafted in step 3 — verbatim, in finding-number order. Do NOT summarize, condense, or skip blocks even if "obvious." Each block must include the numbered heading (`### Decision #<N>:` matching the table row), `**Bottom line:**` plain-language one-liner, `Axis:`, `Severity inheritance:`, per-option `Impact:` lines, options A/B/C plus always-D ("Reject framing") and conditionally-E ("Split this fix off"), and `Decider:` footer. **If any block lacks a numbered heading or Bottom line, halt and re-draft step 3 — do not present blind blocks to the user.**
 3. **Display the meta-finding** if step 3 emitted one (`META: Plan scope mismatch`). Pause for user reaction before listing per-finding choices.
-4. **Prompt the user** with this exact line after the last block:
+4. **Display the Follow-up options menu** (paste-verbatim block below) AFTER the last clarification block and BEFORE the per-decision prompt. The menu gives the user a top-level route choice; the per-decision prompt only applies if they pick `[P]`.
+
+   **Follow-up options menu (paste verbatim — do NOT re-derive, do NOT reorder):**
+
+   ```
+   Follow-up options — pick how to proceed:
+   [Y] Yolo — accept every Recommended pick from the clarification blocks above and enter Fix Mode immediately (no per-decision prompt)
+   [P] Pick per-decision — answer A/B/C/D/E for each NEEDS_DIRECTION finding (granular control)
+   [R] Review-only — post findings to the PR, no local fixes (cross-team review)
+   [S] Skip NEEDS_DIRECTION — fix only the unambiguous CRITICAL/HIGH rows; defer the flagged ones with tracker fields
+   [X] Re-dispatch reviewers on a patched diff (you push fixes elsewhere, then come back)
+   [N] Done — stop here, no further action
+   ```
+
+   **Branching:**
+   - `[Y]` Yolo — Before launching: build a one-line summary `"Yolo will apply Recommended for #2:A, #4:A, #7:B and enter Fix Mode — confirm?"` and **WAIT for explicit confirm** (single round-trip). On confirm, lock the recommended option per finding and skip step 5's per-decision prompt. Yolo guardrails:
+     - If any Recommended is a deferral (`C` / `skip` / `v2`) on a `security` or `compliance` axis → REJECT yolo, force `[P]`, restate why deferral is forbidden for that axis.
+     - If any clarification block lacks an explicit `Recommended:` line → REJECT yolo, force `[P]` for that finding.
+     - If meta-finding `META: Plan scope mismatch` is present → REJECT yolo, force `[P]` (plan scope cannot be auto-resolved).
+     - Yolo still routes through `superpowers:receiving-code-review` + `superpowers:verification-before-completion` — it skips the prompt, NOT the fix workflow.
+   - `[P]` Pick per-decision — fall through to step 5 (the existing per-decision prompt below).
+   - `[R]` Review-only — skip Fix Mode entirely. Use the Review-Only Mode checklist under "Act on Verdict / REQUEST CHANGES". Mark every NEEDS_DIRECTION row as `Awaiting author direction` in the handoff context.
+   - `[S]` Skip NEEDS_DIRECTION — record every flagged row as `Deferred — awaiting direction` (require `Follow-up tracker:`, `Owner:`, `Deadline:` from user before continuing; same enforcement as option `C` deferral). Fix only unambiguous CRITICAL/HIGH rows. Same axis-aware tracker enforcement applies — `security`/`compliance` rows with dead-gate / open-surface outcome cannot be skipped.
+   - `[X]` Re-dispatch — Halt here. Tell the user: "Push or paste the patched diff, then I'll re-run reviewers (step 2) on the new state." Do NOT enter Fix Mode.
+   - `[N]` Done — stop. Emit final handoff context block. No fixes, no PR post.
+
+5. **Prompt the user (per-decision)** — only reached if user picked `[P]` above. Use this exact line after the last clarification block:
 
    ```
    Resolve the decisions above. Reply with the decision number + your pick:
@@ -75,14 +101,14 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
    Multiple answers in one message OK. Decision numbers match the finding numbers in the table above.
    ```
 
-5. **WAIT for user input.** Do NOT proceed. Do NOT propose answers on the user's behalf. Do NOT auto-pick the recommended option.
-6. **Lock direction.** When the user replies, record the chosen option per finding. `skip` removes that finding from Fix Mode scope (note it in the handoff context as deferred).
-7. **Tracker enforcement (axis-aware).** If the chosen option is a deferral (C / skip / "v2" / explicit follow-up):
+6. **WAIT for user input.** Do NOT proceed. Do NOT propose answers on the user's behalf. Do NOT auto-pick the recommended option (except via explicit `[Y]` Yolo confirmation in step 4).
+7. **Lock direction.** When the user replies, record the chosen option per finding. `skip` removes that finding from Fix Mode scope (note it in the handoff context as deferred). For Yolo: log every locked option as `recommended (yolo)` in the handoff context so the audit trail shows the user accepted recommendations en bloc rather than per-decision.
+8. **Tracker enforcement (axis-aware).** If the chosen option is a deferral (C / skip / "v2" / explicit follow-up):
    - For axis = `security` or `compliance` with a dead-gate / open-surface outcome → REJECT the choice, restate why deferral is forbidden for this axis, re-prompt.
    - For axis = `impl` or `product` → require the user provide `Follow-up tracker:`, `Owner:`, `Deadline:` before continuing. If absent, re-prompt with the three fields explicitly listed.
-8. **Reject-framing handling (option D).** If user picks D on any finding, halt the entire Fix Mode flow. Surface back: "You're saying the plan itself should change. Restate the new plan goal, then re-run review against it." Do NOT enter Fix Mode for any finding until plan is restated and confirmed.
-9. **Split handling (option E).** If user picks E on any finding, fix only that finding in this PR; record other findings as deferred with tracker fields.
-10. **Only after every NEEDS_DIRECTION row has an answer or skip (and any tracker fields filled)** may you continue to "Act on Verdict".
+9. **Reject-framing handling (option D).** If user picks D on any finding, halt the entire Fix Mode flow. Surface back: "You're saying the plan itself should change. Restate the new plan goal, then re-run review against it." Do NOT enter Fix Mode for any finding until plan is restated and confirmed.
+10. **Split handling (option E).** If user picks E on any finding, fix only that finding in this PR; record other findings as deferred with tracker fields.
+11. **Only after every NEEDS_DIRECTION row has an answer or skip (and any tracker fields filled)** may you continue to "Act on Verdict".
 
 **Rules:**
 
