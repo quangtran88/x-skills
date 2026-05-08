@@ -1,6 +1,6 @@
 # Scope Guard
 
-Prepend this block VERBATIM to every reviewer prompt (Agent code-reviewer, omo-agent oracle, omo-agent --model gpt, requesting-code-review). Do not summarize, paraphrase, or partially include — paste the whole block.
+Prepend this block VERBATIM to every reviewer prompt (Agent code-reviewer, omo-agent oracle, omo-agent --model gpt, gemini-agent --model pro, requesting-code-review). Do not summarize, paraphrase, or partially include — paste the whole block.
 
 ```
 SCOPE: Report only (1) bugs that affect correctness, (2) security issues, (3) false
@@ -39,6 +39,6 @@ surfacing design debates.
 
 ## Why paste-verbatim
 
-Inlining the block as `<SCOPE_GUARD>` placeholder risks lossy paraphrase. The reviewers (oracle, gpt, code-reviewer) calibrate their output to the literal wording. Partial inclusion = partial scope filter = scope creep returns.
+Inlining the block as `<SCOPE_GUARD>` placeholder risks lossy paraphrase. The reviewers (oracle, gpt, code-reviewer, gemini-pro) calibrate their output to the literal wording. Partial inclusion = partial scope filter = scope creep returns.
 
 If you find yourself rewriting the block "in your own words" before sending the prompt, STOP — re-read this file and paste it whole.

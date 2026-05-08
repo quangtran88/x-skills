@@ -53,7 +53,7 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 1. **Deduplicate** — merge overlapping findings from different reviewers
 2. **Rank by severity** — CRITICAL > HIGH > MEDIUM > LOW (see `../../x-shared/severity-guide.md`)
 3. **Flag contradictions** — when reviewers disagree, present both perspectives for user decision
-4. **Cite sources** — attribute each finding to its reviewer (Claude, GPT, etc.)
+4. **Cite sources** — attribute each finding to its reviewer (Claude, GPT, Gemini, etc.)
 5. **Mark verified** — indicate which findings were confirmed against actual code
 6. **Tag NEEDS_DIRECTION** — mark any finding that requires user input before fixing (see criteria below)
 

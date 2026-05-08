@@ -137,7 +137,7 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 **Review-only completion checklist (ALL required):**
 - [ ] Every CRITICAL/HIGH finding verified against actual code
 - [ ] Review posted to PR with structured inline comments
-- [ ] Handoff context block included (see `../x-shared/context-envelope.md`)
+- [ ] Handoff context block included (see `../../x-shared/context-envelope.md`)
 
 #### Fix Mode (own code or user requests fixes)
 
@@ -150,7 +150,7 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 - [ ] Invoke `superpowers:receiving-code-review` for structured fix workflow — do NOT skip even if user says "fix all"
 - [ ] After fixes: invoke `superpowers:verification-before-completion` with evidence — manual checks (tsc, lint, build) are insufficient alone
 - [ ] Offer re-review if CRITICAL/HIGH findings were fixed (significant changes = re-review)
-- [ ] Handoff context block included (see `../x-shared/context-envelope.md`)
+- [ ] Handoff context block included (see `../../x-shared/context-envelope.md`)
 
 ## Completion Checklist (ALL required before finishing)
 
@@ -158,7 +158,7 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 - [ ] Synthesis table includes Source, Verified, and NEEDS_DIRECTION columns
 - [ ] Every NEEDS_DIRECTION row has a recorded user decision (chosen option or skip)
 - [ ] Verdict stated: APPROVE or REQUEST_CHANGES
-- [ ] Handoff context block included (see `../x-shared/context-envelope.md`)
+- [ ] Handoff context block included (see `../../x-shared/context-envelope.md`)
 
 **Do NOT mark review complete until every box is checked.**
 
@@ -167,4 +167,4 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 Review passed? Offer: **[F]** Finish branch (`superpowers:finishing-a-development-branch`) | **[D]** Done.
 Issues found? Invoke `superpowers:receiving-code-review` for structured fixes, then re-review.
 
-Include a [handoff context](../x-shared/context-envelope.md) block.
+Include a [handoff context](../../x-shared/context-envelope.md) block.

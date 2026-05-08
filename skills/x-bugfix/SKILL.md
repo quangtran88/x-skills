@@ -13,6 +13,7 @@ Smart entry point for bugs and investigations. Detects severity, routes through 
 
 0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch.
 1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `../x-omo/gotchas.md`.**
+2. Read `../x-gemini/SKILL.md` if `gemini_cli` capability is pinned. Gemini's 1M context, native Google Search grounding, and multimodal `--file` flag handle three bug scenarios that OMO/MCP cannot: large-log analysis, screenshot/mockup-driven bugs, and fresh CVE/regression web facts.
 
 ## Invocation
 
@@ -22,6 +23,7 @@ For how to invoke skills, OMO agents, and OMC agents, see `../x-shared/invocatio
 
 This skill references shared infrastructure and sibling skills:
 - `../x-omo/SKILL.md` — OMO agent catalog (loaded in Bootstrap)
+- `../x-gemini/SKILL.md` — direct Gemini CLI bridge (large logs, multimodal, fresh-web grounding)
 - `../x-shared/invocation-guide.md` — tool invocation patterns
 - `../x-shared/workflow-chains.md` — cross-skill chaining (handoff to `/x-review`)
 - `../x-shared/context-envelope.md` — handoff context block format
@@ -72,6 +74,9 @@ For MCP tool selection (search, edit, web facts, library docs), see the canonica
 | OMC `tracer` | Competing hypotheses (Mode B) | Agent |
 | OMO `oracle` | Fresh perspective after instrumentation pivot + 3 failed attempts | Bash (omo-agent) |
 | OMO `explore` | Codebase search when `mcp-toolbox.md` primary (`morph-mcp codebase_search`) insufficient — needs parallel multi-tool search | Bash (omo-agent) |
+| `gemini-agent --file <log>` | Large log/trace (>50k tokens) — single-shot analysis without paging | Bash (1M context, gemini-3-pro) |
+| `gemini-agent --file <screenshot>` | Visual bug input (screenshot, mockup, design ref) | Bash (multimodal pro) |
+| `gemini-agent --model pro` | Fresh web facts (CVE advisory, recent regression, library current state) | Bash (native Google Search grounding) |
 
 ## Mode A: Quick Bug
 
@@ -131,7 +136,10 @@ Skip: hypothesis testing, pattern catalog, OMO delegation, debug report. Still r
 | Codebase search needed (simple) | `morph-mcp codebase_search` | Semantic search, no agent overhead |
 | Codebase search needed (complex, multi-tool) | `explore` | Parallel multi-tool search |
 | Stalled >3 iterations (per iteration-patterns.md §2 definitions) | `--model codex` | Deep autonomous worker (replaces UNAVAILABLE `hephaestus`) |
-| Unfamiliar library in stack | `librarian` | External docs specialist |
+| Unfamiliar library in stack | `librarian` OR `gemini-agent --model pro` | External docs specialist; gemini for fresh web grounding |
+| Log/trace >50k tokens | `gemini-agent --file <log>` | 1M context single-shot beats paging |
+| Visual bug (screenshot/mockup) | `gemini-agent --file <image>` | Multimodal pro |
+| Fresh CVE / library regression | `gemini-agent --model pro` | Native Google Search beats stale training cutoff |
 
 ## Red Flags — STOP and Reinvestigate
 

@@ -98,3 +98,7 @@ If `_ingest.md` already exists when Phase 2 runs:
 ## Output of Phase 2
 
 A reference to ingested content (in-memory for Route C, file path for A/B) plus a recorded `ingest_method`. Phase 3 uses this to draft the TOC.
+
+## Next Step
+
+Read fully and follow `step-03-outline.md` to draft the TOC from the ingested content.
