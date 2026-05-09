@@ -1,0 +1,5 @@
+# Append these lines to .config/wt.toml in your repo root to wire up the
+# automatic per-worktree apply / release. The CLI is resolved via PATH —
+# bin/setup symlinks it to ~/.local/bin/x-worktree-isolate.
+post-create = "x-worktree-isolate apply --quiet"
+pre-remove  = "x-worktree-isolate release --quiet"

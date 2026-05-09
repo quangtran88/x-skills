@@ -1,0 +1,82 @@
+{
+  "// schema": "Profile schema v1 — committed to .worktree-isolate/profile.json",
+  "// schema_field": "Always 1 in v1. Inspector aborts if it reads a profile with a different schema.",
+  "schema": 1,
+  "// generator_version": "Version of x-worktree-isolate that emitted this profile.",
+  "generator_version": "0.1.0",
+  "// stack": "Stack adapter. Only docker-compose is implemented in v1.",
+  "stack": "docker-compose",
+  "// compose_files": "Resolved relative to repo root, depth <= 2.",
+  "compose_files": ["docker-compose.yml"],
+  "// compose_override_target": "Where apply writes the merge override (gitignored).",
+  "compose_override_target": "compose.override.yml",
+  "// env_file_target": "Where apply writes per-worktree env overrides (gitignored).",
+  "env_file_target": ".env.worktree",
+  "// port_strategy": "How apply allocates host ports.",
+  "port_strategy": {
+    "// mode": "registry — slot index N tracked in ~/.config/worktree-isolate/<sha1>/registry.json.",
+    "mode": "registry",
+    "// scan_range": "Inclusive lower / upper bound for fallback scan after deterministic candidate.",
+    "scan_range": [18000, 29999],
+    "// ports": "Flat list of host port vars the inspector found (used by allocator). Each var also appears under services_to_strip[*].ports keyed by service name (used by renderer).",
+    "ports": [
+      {
+        "// var": "Env var name written into .env.worktree.",
+        "var": "GATEWAY_PORT",
+        "// service": "compose service that consumes this port (informational; renderer keys on services_to_strip[*].service).",
+        "service": "gateway",
+        "// default": "Slot 0 candidate. Slot N candidate = default + N*1000.",
+        "default": 18789,
+        "// container_port": "Port inside the container (right-hand side of host:container).",
+        "container_port": 18789
+      }
+    ]
+  },
+  "// data_dirs": "Host volume paths that must be unique per worktree.",
+  "data_dirs": [
+    {
+      "var": "HOST_DATA_DIR",
+      "default_relative": "./data",
+      "per_worktree": true,
+      "// dind_identity_mount": "True when compose mount is ${V}:${V} — required for docker.sock-spawned containers.",
+      "dind_identity_mount": false,
+      "rationale": ""
+    }
+  ],
+  "// services_to_strip": "Per-service override targets. Apply emits services.<service>: blocks (Compose merges by service KEY, not container_name). container_name is null when service has no hardcoded container_name but does have hardcoded host ports.",
+  "services_to_strip": [
+    {
+      "// service": "YAML service key in compose.yml (renderer uses this as the override block key).",
+      "service": "gateway",
+      "// container_name": "Hardcoded container_name from base compose (or null if none). When set, renderer emits container_name: !reset null.",
+      "container_name": "oneclaw-gateway",
+      "// ports": "Subset of port_strategy.ports[] entries that belong to this service. Renderer emits ports: !override using these.",
+      "ports": [
+        { "var": "GATEWAY_PORT", "container_port": 18789 }
+      ]
+    }
+  ],
+  "// service_dns_references": "Substring matches between env values and stripped names — informational only.",
+  "service_dns_references": [],
+  "// global_label_warnings": "Cross-worktree footguns. severity=blocker hard-stops apply.",
+  "global_label_warnings": [
+    {
+      "label": "",
+      "found_in": "",
+      "fix_hint": "",
+      "// severity": "blocker = apply halts unless --ignore-warnings; warning = logged only.",
+      "severity": "blocker"
+    }
+  ],
+  "// single_worktree_profiles": "Compose profiles flagged for single-worktree-only services.",
+  "single_worktree_profiles": [
+    {
+      "service": "",
+      "profile": "",
+      "reason": "",
+      "severity": "warning"
+    }
+  ],
+  "post_apply_hints": [],
+  "generated_at": "1970-01-01T00:00:00Z"
+}

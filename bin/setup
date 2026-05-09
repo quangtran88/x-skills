@@ -14,11 +14,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 OMO_AGENT_SRC="$PLUGIN_DIR/bin/omo-agent"
 GEMINI_AGENT_SRC="$PLUGIN_DIR/bin/gemini-agent"
+XWI_AGENT_SRC="$PLUGIN_DIR/bin/x-worktree-isolate"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/x-skills"
 CAPS_FILE="$CONFIG_DIR/capabilities.json"
 LINK_DIR="$HOME/.local/bin"
 LINK_PATH="$LINK_DIR/omo-agent"
 GEMINI_LINK_PATH="$LINK_DIR/gemini-agent"
+XWI_LINK_PATH="$LINK_DIR/x-worktree-isolate"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -214,6 +216,7 @@ manifest_file_list() {
     find "$PLUGIN_DIR/hooks" -maxdepth 1 -name "*.sh" -type f -not -type l 2>/dev/null
     [[ -f "$PLUGIN_DIR/bin/omo-agent" && ! -L "$PLUGIN_DIR/bin/omo-agent" ]] && echo "$PLUGIN_DIR/bin/omo-agent"
     [[ -f "$PLUGIN_DIR/bin/gemini-agent" && ! -L "$PLUGIN_DIR/bin/gemini-agent" ]] && echo "$PLUGIN_DIR/bin/gemini-agent"
+    [[ -f "$PLUGIN_DIR/bin/x-worktree-isolate" && ! -L "$PLUGIN_DIR/bin/x-worktree-isolate" ]] && echo "$PLUGIN_DIR/bin/x-worktree-isolate"
     [[ -f "$PLUGIN_DIR/bin/setup" && ! -L "$PLUGIN_DIR/bin/setup" ]] && echo "$PLUGIN_DIR/bin/setup"
   } | sort -u
 }
@@ -473,6 +476,12 @@ if [[ "$MODE" == "uninstall" ]]; then
   else
     info "No symlink found at $GEMINI_LINK_PATH"
   fi
+  if [[ -L "$XWI_LINK_PATH" ]]; then
+    rm "$XWI_LINK_PATH"
+    ok "Removed symlink $XWI_LINK_PATH"
+  else
+    info "No symlink found at $XWI_LINK_PATH"
+  fi
   if [[ -f "$CAPS_FILE" ]]; then
     rm "$CAPS_FILE"
     ok "Removed capabilities file"
@@ -573,6 +582,19 @@ else
   info "Install (optional): brew install worktrunk"
   missing_add "cli" "worktrunk" "Optional wt CLI for x-worktree (faster, hooks, copy-ignored). Native git fallback works without it." "brew install worktrunk"
   cap_set worktrunk_cli false
+fi
+
+# --- 1e. x-worktree-isolate binding ---
+header "1e. x-worktree-isolate binding"
+
+if [[ ! -f "$XWI_AGENT_SRC" ]]; then
+  warn "x-worktree-isolate launcher not found at $XWI_AGENT_SRC"
+  cap_set x_worktree_isolate false
+else
+  chmod +x "$XWI_AGENT_SRC"
+  ok "x-worktree-isolate launcher is executable"
+  install_symlink "$XWI_AGENT_SRC" "$XWI_LINK_PATH"
+  cap_set x_worktree_isolate true
 fi
 
 # --- 2. OpenCode CLI ---
@@ -820,45 +842,58 @@ if [[ "$MODE" != "check" ]]; then
 
   # M5: atomic write — render to mktemp, then mv. Prevents corrupt manifests
   # on Ctrl-C/OOM mid-write that would later confuse check-version.sh.
+  # Fix #9: build JSON via Python so backslashes/quotes/non-ASCII in
+  # PLUGIN_DIR / OMO_AGENT_SRC / cap values can never produce invalid JSON.
   CAPS_TMP=$(mktemp "${CAPS_FILE}.tmp.XXXXXX") || fail "could not mktemp for $CAPS_FILE"
-  cat > "$CAPS_TMP" <<MANIFEST
-{
-  "version": "1.0.0",
-  "plugin_version": "$PLUGIN_VERSION_VAL",
-  "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "plugin_dir": "$PLUGIN_DIR",
-  "omo_agent": "$OMO_AGENT_SRC",
-  "capabilities": {
-    "opencode": $(cap_json opencode),
-    "omo_plugin": $(cap_json omo_plugin),
-    "omo_mode_all": $(cap_json omo_mode_all),
-    "gemini_cli": $(cap_json gemini_cli),
-    "mcp": {
-      "perplexity": $(cap_json mcp_perplexity),
-      "deepwiki": $(cap_json mcp_deepwiki),
-      "exa": $(cap_json mcp_exa),
-      "context7": $(cap_json mcp_context7),
-      "morph": $(cap_json mcp_morph)
+  GEN_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  python3 - "$CAPS_TMP" <<PYMANIFEST
+import json, sys
+def cap(v):
+    s = str(v)
+    if s == "true":  return True
+    if s == "false": return False
+    return s
+manifest = {
+    "version": "1.0.0",
+    "plugin_version": "$PLUGIN_VERSION_VAL",
+    "generated_at": "$GEN_AT",
+    "plugin_dir": $(printf '%s' "$PLUGIN_DIR" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'),
+    "omo_agent":  $(printf '%s' "$OMO_AGENT_SRC" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'),
+    "capabilities": {
+        "opencode":           cap("$(cap_get opencode)"),
+        "omo_plugin":         cap("$(cap_get omo_plugin)"),
+        "omo_mode_all":       cap("$(cap_get omo_mode_all)"),
+        "gemini_cli":         cap("$(cap_get gemini_cli)"),
+        "x_worktree_isolate": cap("$(cap_get x_worktree_isolate)"),
+        "mcp": {
+            "perplexity": cap("$(cap_get mcp_perplexity)"),
+            "deepwiki":   cap("$(cap_get mcp_deepwiki)"),
+            "exa":        cap("$(cap_get mcp_exa)"),
+            "context7":   cap("$(cap_get mcp_context7)"),
+            "morph":      cap("$(cap_get mcp_morph)"),
+        },
+        "plugins": {
+            "oh_my_claudecode": cap("$(cap_get plugin_oh-my-claudecode)"),
+            "superpowers":      cap("$(cap_get plugin_superpowers)"),
+            "claude_mem":       cap("$(cap_get plugin_claude-mem)"),
+        },
+        "companion_skills": {
+            "ui_ux_pro_max":  cap("$(cap_get skill_ui-ux-pro-max)"),
+            "x_skill_review": cap("$(cap_get skill_x-skill-review)"),
+        },
+        "security_tools": {
+            "schemathesis": cap("$(cap_get tool_schemathesis)"),
+            "nuclei":       cap("$(cap_get tool_nuclei)"),
+            "sqlmap":       cap("$(cap_get tool_sqlmap)"),
+            "spectral":     cap("$(cap_get tool_spectral)"),
+            "interactsh":   cap("$(cap_get tool_interactsh-client)"),
+        },
     },
-    "plugins": {
-      "oh_my_claudecode": $(cap_json plugin_oh-my-claudecode),
-      "superpowers": $(cap_json plugin_superpowers),
-      "claude_mem": $(cap_json plugin_claude-mem)
-    },
-    "companion_skills": {
-      "ui_ux_pro_max": $(cap_json skill_ui-ux-pro-max),
-      "x_skill_review": $(cap_json skill_x-skill-review)
-    },
-    "security_tools": {
-      "schemathesis": $(cap_json tool_schemathesis),
-      "nuclei": $(cap_json tool_nuclei),
-      "sqlmap": $(cap_json tool_sqlmap),
-      "spectral": $(cap_json tool_spectral),
-      "interactsh": $(cap_json tool_interactsh-client)
-    }
-  }
 }
-MANIFEST
+with open(sys.argv[1], "w") as fh:
+    json.dump(manifest, fh, indent=2)
+    fh.write("\n")
+PYMANIFEST
   if command -v jq &>/dev/null && ! jq -e . "$CAPS_TMP" >/dev/null 2>&1; then
     rm -f "$CAPS_TMP"
     fail "rendered manifest is invalid JSON — refusing to overwrite $CAPS_FILE"
@@ -928,6 +963,7 @@ report_skill "x-skill-review" omc claude-mem
 report_skill "x-skill-improve" omc
 report_skill "x-guide"         gemini_cli research-mcps
 report_skill "x-worktree"
+report_skill "x-worktree-isolate"
 report_skill "x-shared"
 
 # ============================================================

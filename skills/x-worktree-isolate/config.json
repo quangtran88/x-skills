@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "name": "x-worktree-isolate",
+  "schema_version": 1,
+  "stack": "docker-compose",
+  "compose_min_version": "2.24",
+  "dependencies": {
+    "hard": ["git>=2.5", "python3", "PyYAML", "docker-compose>=2.24", "lsof"],
+    "optional": ["worktrunk-wt"]
+  }
+}
