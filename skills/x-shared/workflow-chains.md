@@ -11,10 +11,12 @@ Common sequences across x-skills. Not every task needs a full chain — use judg
 | **Skill Improve** | Use x-skill → paste session into `/x-skill-improve` → apply fixes → `/x-skill-review` (validate) |
 | **Quick Fix** | `/x-do` (Mode D: quick task) → `/x-review` (Target C: last commit) |
 | **Architecture Decision** | `/x-research` (Type C: architecture) → `/x-do` (Mode B: implement decision) |
+| **Plan Gate (high-risk)** | plan/spec → `/x-mindful` (extract + walkthrough) → revised plan → `/x-do` (Mode A) → `/x-review` → merge |
 
 ## When to Chain vs. Skip
 
 - **Trivial change** (rename, config edit) → just `/x-do` Mode D, skip research and review
+- **High-risk plan** (touches breaking changes, schema migrations, auth, public APIs, cost cliffs) → run `/x-mindful` before `/x-do` Mode A so the user gates each impact item
 - **Clear bug with stack trace** → skip research, go straight to `/x-bugfix` Mode A
 - **Ambiguous bug, multi-component** → `/x-bugfix` Mode B (or `/x-research` first if codebase is unfamiliar)
 - **Exploratory question** → `/x-research` only, no need to chain forward

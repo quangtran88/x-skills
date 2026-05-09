@@ -5,28 +5,30 @@ Detailed instructions for each detection mode. Referenced from SKILL.md's detect
 ## A: Existing Plan
 
 1. Read the plan fully
-2. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Skip ONLY for trivial plans (< 3 tasks AND single module) OR **mechanical batches** (same structural change repeated across N files — e.g., remove an import + call site identically in 4 adapters). For everything else, launch all 3 reviewers immediately — do NOT ask the user for permission, just announce: *"N tasks across M files — running quick plan review (~90s) before executing."* Then launch reviewers in ONE message. If the user said "fix all" / "just do it" — that means execute everything, NOT skip the review. Collect all results before proceeding.
+2. **Mindfulness Gate (auto-invoke `/x-mindful` on high-risk plans).** Scan the plan content for any of: breaking-change keywords (`breaking change`, `deprecate`, `remove`, `rename`, `migrate`, `migration`, `schema change`, `drop column`, `drop table`, `incompatible`); auth/security keywords (`auth`, `authn`, `authz`, `permission`, `RBAC`, `RLS`, `session`, `token`, `secret`, `CORS`, `CSRF`); cross-boundary keywords (`public API`, `shared library`, `published`, `consumer`, `tenant`, `multi-tenant`, `feature flag rollout`, `dual-write`); cost/capacity keywords (`index`, `full scan`, `backfill`, `N+1`, `fan-out`, `queue`, `cron`, `scheduled job`). If ANY hit AND the plan is not a mechanical batch — invoke `Skill: x-skills:x-mindful` with the plan path / content as input BEFORE proceeding to step 3. Wait for the `<!-- x-mindful-envelope v1 -->` block. Apply the envelope: drop `Rejected` items from the plan, revise the plan to incorporate `Modified` directives, proceed with `Confirmed`. Skip the gate when ALL of: scope is single-file, no shared interface touched, < 3 tasks, no high-risk keywords appear. Skip is also OK for mechanical batches (same change across N files, no architectural decision).
+3. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Skip ONLY for trivial plans (< 3 tasks AND single module) OR **mechanical batches** (same structural change repeated across N files — e.g., remove an import + call site identically in 4 adapters). For everything else, launch all 3 reviewers immediately — do NOT ask the user for permission, just announce: *"N tasks across M files — running quick plan review (~90s) before executing."* Then launch reviewers in ONE message. If the user said "fix all" / "just do it" — that means execute everything, NOT skip the review. Collect all results before proceeding.
    **Research-produced plan exception:** Plans generated from comprehensive x-research (Type A comparison with 10+ sources read) may use reduced plan review (1 reviewer: `--model gpt` blocker-finder only, replacing the UNAVAILABLE `momus` role agent) instead of full 3-reviewer ceremony. The research itself provides grounding that substitutes for broader review.
-3. Execute: `ralph` for 3+ tasks, direct execution for simpler plans. **"Fix all" with 3+ tasks = ralph, not manual batch edits.** Exception: **mechanical batches** (identical change across files) may use direct execution regardless of file count — ralph overhead exceeds the risk.
+4. Execute: `ralph` for 3+ tasks, direct execution for simpler plans. **"Fix all" with 3+ tasks = ralph, not manual batch edits.** Exception: **mechanical batches** (identical change across files) may use direct execution regardless of file count — ralph overhead exceeds the risk.
    **Surgical edit exception:** Direct execution is also acceptable for 3+ tasks when ALL are: (a) single-location edits or new files, (b) no dependencies between them, (c) each describable in 1 sentence, (d) total < 30 lines changed. This is distinct from mechanical batch (same pattern repeated) — it's about *task simplicity*.
-4. **Post-Implementation Review (cross-model, parallel):** Use the exact post-implementation review tool calls from `cross-model-review.md`. All 3 in one message.
+5. **Post-Implementation Review (cross-model, parallel):** Use the exact post-implementation review tool calls from `cross-model-review.md`. All 3 in one message.
    Collect all results, synthesize, flag contradictions.
    **Trivial implementations (< 3 tasks AND single module):** Reduce to 1 reviewer (OMC `code-reviewer` on the diff). Full 3-reviewer ceremony is disproportionate for small changes.
    **Mechanical batches:** Post-impl review is still required (reduced to 1 reviewer: OMC `code-reviewer` on the diff is sufficient).
    **Parent workflow deference:** When x-do runs inside x-skill-improve, defer post-impl review to the parent skill's validation step (`/x-skill-review`). Do not run both.
-5. Verify and finish branch
+6. Verify and finish branch
 
 ## B: New Feature
 
 1. **If requirements are clear:** brainstorm approaches, then plan
 2. **If requirements are vague or cross 3+ modules:** follow the step files in `../steps/` (read one at a time, start with `step-01-gather.md`)
-3. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Same rules as Mode A step 2, including mechanical batch and research-produced plan exceptions.
-4. Execute based on scope:
+3. **Mindfulness Gate (auto-invoke `/x-mindful` on high-risk plans).** Same trigger keywords and skip rules as Mode A step 2 above. Run AFTER plan creation, BEFORE plan review. The envelope feeds the revised plan into step 4.
+4. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Same rules as Mode A step 3, including mechanical batch and research-produced plan exceptions.
+5. Execute based on scope:
    - 3+ tasks → `ralph` (persistence, TDD, verification loop) — **never manual batch edits**
    - 1-2 tasks → OMO `--model codex` (GPT-5.3 Codex, replaces UNAVAILABLE `hephaestus`) or direct execution
    - **Mechanical batch** or **surgical edits** → direct execution regardless of count (same exceptions as Mode A step 3)
-5. **Post-Implementation Review (cross-model, parallel):** Same as Mode A step 4, including trivial/mechanical/parent-deference exceptions.
-6. Verify and finish branch
+6. **Post-Implementation Review (cross-model, parallel):** Same as Mode A step 5, including trivial/mechanical/parent-deference exceptions.
+7. Verify and finish branch
 
 ## C: Bug Fix
 
