@@ -1,6 +1,6 @@
 ---
 name: x-worktree
-description: Use when the user (or a sibling skill via --wt flag) wants to spin up an isolated git worktree for a task — wraps the worktrunk `wt` CLI when present, falls back to native `git worktree`, switches the Bash session cwd into the new worktree, and emits a machine-readable result envelope
+description: Use when the user (or a sibling skill via --wt flag) wants to spin up an isolated git worktree for a task — wraps the worktrunk `wt` CLI when present, falls back to native `git worktree`, switches the Bash session cwd into the new worktree, auto-applies docker isolation when profile present (skip with --no-isolate), and emits a machine-readable result envelope
 role: worktree-provider
 ---
 
@@ -16,8 +16,11 @@ Provisions a fresh worktree on a new branch so callers (x-do, x-bugfix, ad-hoc u
 | `/x-skills:x-worktree <target_branch>` | Base = `<target_branch>`. Auto-generated new branch name. |
 | `/x-skills:x-worktree <target_branch> <new_branch>` | Base = `<target_branch>`. New branch = `<new_branch>`. |
 | `/x-skills:x-worktree "" <new_branch>` | Base = current HEAD. New branch = `<new_branch>`. |
+| `/x-skills:x-worktree <args…> --no-isolate` | Skip the auto-isolate step entirely. Envelope omits `ISOLATE_APPLIED`. |
 
-Args: `$1` = target_branch (optional), `$2` = new_branch (optional).
+Args: `$1` = target_branch (optional), `$2` = new_branch (optional). The `--no-isolate` flag may appear anywhere; strip it from the positional args before parsing.
+
+Env: `XWI_AUTO_ISOLATE=0` disables auto-isolate persistently for the shell session (envelope emits `ISOLATE_APPLIED=skipped, ISOLATE_REASON=env-disabled`). The `--no-isolate` flag wins when both are set (flag → omit line entirely).
 
 ## Hard requirements
 
@@ -44,6 +47,47 @@ Args: `$1` = target_branch (optional), `$2` = new_branch (optional).
 
 6. **Switch session cwd.** `cd "$WORKTREE_PATH" && pwd`. Bash tool persists cwd across calls; subsequent plain Bash calls now run inside the worktree.
 
+6.5. **Auto-isolate (best-effort).** Runs after the cwd switch; never fails the skill itself (worktree creation already succeeded).
+
+   **Gate (skip cases):**
+   - `--no-isolate` flag passed → omit `ISOLATE_APPLIED` line entirely from the envelope (user opted out, no signal needed).
+   - `XWI_AUTO_ISOLATE=0` in env → set `ISOLATE_APPLIED=skipped`, `ISOLATE_REASON=env-disabled`. Skip apply.
+   - `command -v x-worktree-isolate` non-zero → `ISOLATE_APPLIED=skipped`, `ISOLATE_REASON=binary-missing`. Skip apply.
+
+   **Otherwise run apply (cwd is already inside `<WORKTREE_PATH>` from step 6).** Allocate stderr capture files via `mktemp` (NOT `/tmp/xwi-*.$$` — predictable PID paths are vulnerable to symlink attack and collide across parallel invocations):
+   ```bash
+   xwi_stderr="$(mktemp -t xwi-stderr.XXXXXX)"
+   xwi_rel_stderr="$(mktemp -t xwi-rel.XXXXXX)"
+   timeout 5 x-worktree-isolate apply --quiet --if-profile-exists 2>"$xwi_stderr"
+   xwi_rc=$?
+   ```
+   apply.sh resolves the profile from either `<worktree>/.worktree-isolate/profile.json` or `<main-checkout>/.worktree-isolate/profile.json`; x-worktree never replicates that detection.
+
+   **Decide envelope additions by exit code:**
+
+   - `xwi_rc == 0` AND `<WORKTREE_PATH>/.worktree-isolate/state.local.json` exists → success → set `ISOLATE_APPLIED=true`. (No `ISOLATE_REASON`, no `ISOLATE_HINT`.)
+   - `xwi_rc == 0` AND state.local.json absent → `--if-profile-exists` short-circuited (no profile in repo, OR cwd was main checkout) → set `ISOLATE_APPLIED=skipped`, `ISOLATE_REASON=no-profile`.
+   - `xwi_rc == 124` (timeout) → set `ISOLATE_APPLIED=false`, `ISOLATE_REASON=apply-timeout-5s`. Run orphan cleanup (below). Set `ISOLATE_HINT=run x-worktree-isolate apply manually to retry` (or with `release-failed` suffix per below).
+   - `xwi_rc != 0` (other) → set `ISOLATE_APPLIED=false`, `ISOLATE_REASON=$(LC_ALL=C tr -cd '\11\12\15\40-\176' < "$xwi_stderr" | tr '\n\r\t' ' ' | head -c 200)`. Run orphan cleanup (below). Set `ISOLATE_HINT=...` per below.
+
+   **Orphan cleanup (only on `xwi_rc != 0`, includes timeout).** apply.sh writes `state.local.json` BEFORE claiming the registry slot (apply.sh:382 → :406); on SIGTERM mid-apply, the state file can outlive an unclaimed slot. Cleanup is mandatory:
+   ```bash
+   rm -f "$WORKTREE_PATH/.worktree-isolate/state.local.json"
+   x-worktree-isolate release --quiet 2>"$xwi_rel_stderr" || true
+   ```
+   Both run from inside `<WORKTREE_PATH>` (step 6's cwd is still active). `release` is idempotent — no-ops when no claim exists.
+
+   **`ISOLATE_HINT` construction:**
+   - Default (release succeeded): `ISOLATE_HINT=run x-worktree-isolate apply manually to retry`
+   - Release also failed (release stderr non-empty): `ISOLATE_HINT=run x-worktree-isolate apply manually to retry; release-failed: $(LC_ALL=C tr -cd '\11\12\15\40-\176' < "$xwi_rel_stderr" | tr '\n\r\t' ' ' | head -c 100)`
+
+   **Stderr sanitization.** Always pipe stderr through `LC_ALL=C tr -cd '\11\12\15\40-\176'` first (drops every byte outside printable ASCII + tab/LF/CR — kills ANSI escapes, control chars, shell metas), then `tr '\n\r\t' ' '` (collapse to single line), then `head -c 200` (reason) or `head -c 100` (release-failed suffix). Reasoning: `ISOLATE_REASON=` ships into caller LLM prompts as DOCKER CONTEXT material; un-sanitized escape sequences could inject terminal-control or shell-meta characters.
+
+   **Always cleanup tempfiles after envelope emission:**
+   ```bash
+   rm -f "$xwi_stderr" "$xwi_rel_stderr"
+   ```
+
 7. **Emit success envelope** (exactly these lines, nothing above):
    ```
    ✓ Worktree ready
@@ -52,6 +96,9 @@ Args: `$1` = target_branch (optional), `$2` = new_branch (optional).
    BASE=<base-branch-name>
    PROVIDER=<wt|git>
    CWD_SWITCHED=true
+   ISOLATE_APPLIED=<true|false|skipped>      # always present unless --no-isolate
+   ISOLATE_REASON=<one-line>                  # required when false; advisory when skipped
+   ISOLATE_HINT=<one-line>                    # only when false
    ```
 
 ## Error envelope (unified)
@@ -80,7 +127,11 @@ To open an *existing* worktree, use `wt switch <branch> --no-cd` directly — ou
 
 ## Caller integration (x-do, x-bugfix, others)
 
-See `references/caller-integration.md` for: `--wt` flag parsing, dispatch shape, **non-negotiable cwd-propagation rules** for Agent / OMC / OMO / morph-mcp dispatches, and verification.
+See `references/caller-integration.md` for: `--wt` flag parsing, dispatch shape, **non-negotiable cwd-propagation rules** for Agent / OMC / OMO / morph-mcp dispatches, the `--wt-no-isolate` passthrough, the DOCKER CONTEXT block construction, and verification.
+
+## Auto-isolation contract
+
+See `references/auto-isolation.md` for: tri-state `ISOLATE_APPLIED` semantics, skip / failure reason vocabulary, state.local.json schema v1, slot-leak cleanup invariant, idempotence guarantee, and `--no-isolate` ↔ `XWI_AUTO_ISOLATE=0` precedence.
 
 ## Examples
 

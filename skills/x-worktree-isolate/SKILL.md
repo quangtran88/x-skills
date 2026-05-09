@@ -86,6 +86,40 @@ See `gotchas.md`. Highlights:
 - **Optional:** worktrunk `wt` CLI for automatic post-create / pre-remove hooks. Without it, the user invokes `apply` manually after `git worktree add`.
 - **Plugin integration:** `bin/setup` symlinks `bin/x-worktree-isolate` to `~/.local/bin/x-worktree-isolate`. The wt.toml hook resolves the launcher via PATH, never the plugin cache.
 
+## Integration with x-worktree
+
+`/x-skills:x-worktree` (sibling skill) automatically calls `apply --quiet --if-profile-exists` after creating a linked worktree, so users only run ONE command (`/x-skills:x-worktree main feat/x`) and isolation fires when a profile is present. The integration contract:
+
+- x-worktree's step 6.5 invokes `timeout 5 x-worktree-isolate apply --quiet --if-profile-exists` from the new worktree's cwd.
+- apply.sh resolves the profile from either `<worktree>/.worktree-isolate/profile.json` OR `<main-checkout>/.worktree-isolate/profile.json` (apply.sh:58–65). x-worktree never replicates this detection.
+- On success: `state.local.json` is written under `<worktree>/.worktree-isolate/`. x-worktree emits `ISOLATE_APPLIED=true` in its envelope.
+- On `--if-profile-exists` short-circuit (no profile, OR cwd is the main checkout): apply.sh exits 0 silently with no state file written. x-worktree emits `ISOLATE_APPLIED=skipped`, `ISOLATE_REASON=no-profile`.
+- On non-zero exit (blocker, schema mismatch, lock contention) or timeout (124): x-worktree emits `ISOLATE_APPLIED=false` with sanitized `ISOLATE_REASON` + `ISOLATE_HINT`, removes any orphan `state.local.json`, and runs `release --quiet` to unclaim a possibly-claimed slot.
+- Callers needing port / project-name / data-dir info read `<worktree>/.worktree-isolate/state.local.json` directly — that file is the single source of truth (see schema below). The envelope deliberately does NOT cache port lists or launch hints, because the user may add or remove a base `.env` after apply runs.
+
+Detailed envelope semantics + caller read pattern: `../x-worktree/references/auto-isolation.md`.
+
+The wt.toml post-create hook documented below remains supported as a parallel path for raw-`wt` users who never go through the skill. Both paths are safe — apply.sh acquires a registry lock so first-writer wins; a second concurrent apply on the same worktree no-ops with the existing slot reused byte-for-byte.
+
+## state.local.json schema
+
+Written by `apply.sh` to `<worktree>/.worktree-isolate/state.local.json` after every successful apply. Single source of truth for callers needing port / project-name / data-dir info.
+
+| Field | Type | Description |
+|---|---|---|
+| `schema` | int | Schema version. Currently `1`. Callers MUST refuse on mismatch. (Note: same convention as `profile.json` which also uses `schema`.) |
+| `slot` | int | Slot index allocated for this worktree (0-based, monotonically assigned per repo). |
+| `branch` | string | Branch name at apply time (from `git rev-parse --abbrev-ref HEAD`). |
+| `compose_project_name` | string | Sanitized `<repo-slug>-<branch-slug>`. Use as `COMPOSE_PROJECT_NAME` env var. |
+| `allocated_ports` | object | Map of `<VAR>` → host port (int). E.g. `{"POSTGRES_PORT": 18432, "REDIS_PORT": 19000}`. |
+| `data_dir_var` | string | First per-worktree data-dir env-var name. Empty string when no data dirs are profiled. |
+| `data_dir_path` | string | Absolute path of the first per-worktree data dir on the host. Empty string when none. |
+| `applied_at` | string | ISO8601 UTC timestamp (e.g. `2026-05-09T12:34:56Z`). |
+
+Re-applying the same worktree produces a byte-identical file modulo `applied_at` (port reuse via registry lookup at apply.sh:135–164).
+
+The wt.toml hook snippet below is **optional** — only needed for raw-`wt` users who never invoke `/x-skills:x-worktree`. Skill callers don't need it; the skill calls `apply --quiet --if-profile-exists` for them. The wt.toml-only path is on the v2 deprecation track; new repos should adopt `/x-skills:x-worktree`.
+
 ## References
 
 Loaded only when the workflow needs them:

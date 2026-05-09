@@ -11,8 +11,11 @@ The caller MUST detect and strip these tokens from the user's prompt **before** 
 | `--wt` (alone) | Provision worktree. Base = current HEAD. New branch auto-named. |
 | `--wt <branch>` | Provision worktree. Base = `<branch>`. New branch auto-named. |
 | `--wt <branch> --new-branch <name>` (or `--wt <branch>:<name>`) | Provision worktree with explicit new branch name. |
+| `--wt-no-isolate` | (Caller-side flag.) Translates to passing `--no-isolate` through to x-worktree. Skips auto-isolate; envelope omits `ISOLATE_APPLIED` line entirely. Caller MUST NOT then build a DOCKER CONTEXT block (no signal to build one from). |
 
-Strip the entire `--wt …` segment from the prompt before passing the residue to mode classification. Otherwise the classifier sees `--wt` as task content and misroutes.
+Strip the entire `--wt …` segment AND any `--wt-no-isolate` token from the prompt before passing the residue to mode classification. Otherwise the classifier sees them as task content and misroutes.
+
+`--wt-no-isolate` is per-invocation. It does NOT set `XWI_AUTO_ISOLATE=0` — that env var is the user's persistent escape hatch and must be set explicitly by the user, not the caller.
 
 ## Dispatch
 
@@ -41,6 +44,56 @@ x-worktree itself runs a final `cd "$WORKTREE_PATH"` before exiting, so the **Ba
 
 The caller is responsible for keeping `WORKTREE_PATH` in scope across the whole task. If a sub-handoff happens (e.g., x-do → x-bugfix mid-task), forward `WORKTREE_PATH` in the [handoff context envelope](../../x-shared/context-envelope.md).
 
+## DOCKER CONTEXT propagation
+
+When x-worktree's envelope includes `ISOLATE_APPLIED=true`, the caller MUST read `state.local.json` and prepend a DOCKER CONTEXT block to every executor / Agent / OMC / OMO / morph dispatch made for the rest of the task. This block tells downstream workers how to talk to docker without trampling the user's other worktrees' containers.
+
+### When to build the block
+
+| `ISOLATE_APPLIED` value | Action |
+|---|---|
+| `true` | Read state.local.json, validate `schema == 1`, build the block. Prepend to every dispatch. |
+| `false` | Surface `ISOLATE_REASON` + `ISOLATE_HINT` to user. Ask whether to abort or proceed without isolation (default abort). Do NOT build a block. |
+| `skipped` | Proceed normally. No block. |
+| *(line absent — `--no-isolate` was set)* | Proceed normally. No block. |
+
+### How to build the block
+
+```bash
+state_file="$WORKTREE_PATH/.worktree-isolate/state.local.json"
+[ -f "$state_file" ] || fail "ISOLATE_APPLIED=true but state.local.json missing"
+
+schema=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("schema",0))' "$state_file")
+[ "$schema" = "1" ] || fail "state.local.json schema mismatch (got $schema, want 1)"
+
+compose_project=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["compose_project_name"])' "$state_file")
+ports=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(", ".join(f"{k}={v}" for k,v in d["allocated_ports"].items()))' "$state_file")
+data_dir=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data_dir_path"])' "$state_file")
+
+# Reconstruct launch command at dispatch time — never cache.
+if [ -f "$WORKTREE_PATH/.env" ]; then
+  launch="docker compose --env-file .env --env-file .env.worktree"
+else
+  launch="docker compose --env-file .env.worktree"
+fi
+```
+
+### Block content (verbatim — this is the contract)
+
+```
+DOCKER CONTEXT (this worktree is isolated):
+COMPOSE_PROJECT_NAME=<compose_project_name>
+Allocated ports: <VAR>=<port>, <VAR>=<port>, …
+Data dir: <data_dir_path>
+Launch: <launch>
+Use `docker compose exec <service>` (NOT `docker exec <name>`).
+```
+
+Notes:
+- `Data dir:` line is omitted when `data_dir_path` is empty (no per-worktree data dirs in profile).
+- `<launch>` is the reconstructed command from above — `[--env-file .env]` segment depends on `[ -f $WORKTREE_PATH/.env ]` evaluated at *dispatch* time, never cached.
+- The "use `docker compose exec`" guidance is fixed text — `docker exec <name>` would target the wrong container in parallel-worktree setups.
+
 ## Verification step (caller-side)
 
 Before claiming the task done, the caller's verifier (x-verify or otherwise) MUST confirm changes landed in the worktree:
@@ -51,3 +104,11 @@ git -C "$WORKTREE_PATH" log --oneline -5
 ```
 
 If `git -C <orig-repo> status` shows mutations in the original cwd, that is a CWD-leak bug — surface it loudly and ask the user how to recover.
+
+When `ISOLATE_APPLIED=true`, also verify the isolation marker survived the session:
+
+```bash
+[ -f "$WORKTREE_PATH/.worktree-isolate/state.local.json" ] || fail "isolate marker missing"
+schema=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("schema",0))' "$WORKTREE_PATH/.worktree-isolate/state.local.json")
+[ "$schema" = "1" ] || fail "state.local.json schema mismatch (got $schema, want 1)"
+```

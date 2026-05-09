@@ -143,12 +143,17 @@ Classify the user's input into ONE mode:
 
 Before starting any mode, complete ALL of these checks:
 
-- [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). If present:
-  1. Strip the entire `--wt …` segment from the prompt — mode classification must NOT see it.
-  2. Dispatch via `Skill: x-skills:x-worktree` with the parsed args (empty string if a slot was omitted).
+- [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). Also scan for `--wt-no-isolate` (caller-side flag — translates to passing `--no-isolate` through to x-worktree, suppressing auto-isolation). If present:
+  1. Strip the entire `--wt …` segment AND any `--wt-no-isolate` token from the prompt — mode classification must NOT see them.
+  2. Dispatch via `Skill: x-skills:x-worktree` with the parsed args (empty string if a slot was omitted). Append `--no-isolate` to the inner args when `--wt-no-isolate` was set.
   3. Parse the returned envelope. Pin `WORKTREE_PATH` for the rest of this task.
   4. From this point, **every** mutating Bash / Agent / OMC executor / OMO / morph-mcp dispatch MUST run inside `WORKTREE_PATH` per the cwd-propagation rules in `../x-worktree/SKILL.md` § "CWD propagation". Forward `WORKTREE_PATH` in any handoff envelope (e.g., x-do → x-bugfix).
-  5. If x-worktree returns `✗ Worktree FAILED`, abort and surface the reason — do NOT silently continue in the original cwd.
+  5. **Parse `ISOLATE_APPLIED` and act on it** (see `../x-worktree/references/auto-isolation.md` for the full contract):
+     - `ISOLATE_APPLIED=true` → Read `$WORKTREE_PATH/.worktree-isolate/state.local.json`, validate `schema == 1` (refuse on mismatch), build the DOCKER CONTEXT block per `../x-worktree/references/caller-integration.md` § "DOCKER CONTEXT propagation". Prepend that block to **every** subsequent executor / Agent / OMC / OMO / morph dispatch for the rest of the task. Reconstruct `Launch:` line at every dispatch from `[ -f $WORKTREE_PATH/.env ]` — never cache the rendered block.
+     - `ISOLATE_APPLIED=false` → Surface `ISOLATE_REASON` + `ISOLATE_HINT` to the user via AskUserQuestion (2 options, default abort): `(1) abort and let me retry isolate manually` / `(2) proceed without isolation, I accept docker collisions with my other worktrees`. Default = abort.
+     - `ISOLATE_APPLIED=skipped` → Proceed normally. No DOCKER CONTEXT block.
+     - `ISOLATE_APPLIED` line absent (because `--no-isolate` / `--wt-no-isolate` was set) → Proceed normally. No DOCKER CONTEXT block.
+  6. If x-worktree returns `✗ Worktree FAILED`, abort and surface the reason — do NOT silently continue in the original cwd.
 - [ ] **Resume detection:** Check for in-progress state (paths in `config.json`):
   - `ralph_state` — incomplete stories → offer to resume
   - `specs_dir` — uncommitted design docs → offer to continue

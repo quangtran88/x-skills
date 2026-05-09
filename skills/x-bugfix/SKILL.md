@@ -49,12 +49,17 @@ Classify the bug into ONE mode:
 
 ## Pre-Flight (MANDATORY)
 
-- [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). If present:
-  1. Strip the `--wt …` segment from the prompt before mode detection.
-  2. Dispatch via `Skill: x-skills:x-worktree` with parsed args (empty string for omitted slots).
+- [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). Also scan for `--wt-no-isolate` (caller-side flag — translates to passing `--no-isolate` through to x-worktree, suppressing auto-isolation). If present:
+  1. Strip the `--wt …` segment AND any `--wt-no-isolate` token from the prompt before mode detection.
+  2. Dispatch via `Skill: x-skills:x-worktree` with parsed args (empty string for omitted slots). Append `--no-isolate` to the inner args when `--wt-no-isolate` was set.
   3. Parse the result envelope; pin `WORKTREE_PATH` for the whole bugfix flow.
   4. Every mutating dispatch (Bash / Agent / OMC `debugger` / `tracer` / OMO / morph-mcp) must run inside `WORKTREE_PATH` per `../x-worktree/SKILL.md` § "CWD propagation". The regression test, the fix, and the verification commands ALL run in the worktree — not the original cwd.
-  5. If x-worktree returns `✗ Worktree FAILED`, abort and report — never silently continue in the original repo.
+  5. **Parse `ISOLATE_APPLIED` and act on it** (see `../x-worktree/references/auto-isolation.md` for the full contract):
+     - `ISOLATE_APPLIED=true` → Read `$WORKTREE_PATH/.worktree-isolate/state.local.json`, validate `schema == 1` (refuse on mismatch), build the DOCKER CONTEXT block per `../x-worktree/references/caller-integration.md` § "DOCKER CONTEXT propagation". Prepend that block to **every** subsequent executor / Agent / OMC `debugger` / `tracer` / OMO / morph dispatch for the rest of the bugfix flow. Reconstruct `Launch:` line at each dispatch from `[ -f $WORKTREE_PATH/.env ]` — never cache the rendered block.
+     - `ISOLATE_APPLIED=false` → Surface `ISOLATE_REASON` + `ISOLATE_HINT` to the user via AskUserQuestion (2 options, default abort): `(1) abort and let me retry isolate manually` / `(2) proceed without isolation, I accept docker collisions with my other worktrees`. Default = abort.
+     - `ISOLATE_APPLIED=skipped` → Proceed normally. No DOCKER CONTEXT block.
+     - `ISOLATE_APPLIED` line absent (because `--no-isolate` / `--wt-no-isolate` was set) → Proceed normally. No DOCKER CONTEXT block.
+  6. If x-worktree returns `✗ Worktree FAILED`, abort and report — never silently continue in the original repo.
 - [ ] **Capture baseline:** Record exact error messages, failing test output, and stack traces (copy-paste, not paraphrase). This becomes the before/after comparison for verification.
   - **Behavioral bug?** (duplication, wrong output, timing issue — no error/stack trace exists): Capture expected vs. actual behavior as the baseline instead. Document what the user observes and what correct behavior looks like.
 - [ ] Read error messages carefully — don't skip stack traces
