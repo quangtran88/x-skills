@@ -1,6 +1,6 @@
 # x-skills — Intelligent Skill Routers for Claude Code
 
-12 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
+13 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
 
 ## Skills
 
@@ -11,12 +11,14 @@
 | **x-review** | plugin | Code review, plan review, PR review | Best with: opencode, OMC, superpowers |
 | **x-verify** | plugin | Run the completion cascade ("am I done?") | Standalone |
 | **x-bugfix** | plugin | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
+| **x-mindful** | plugin | Pre-implementation impact gate — extracts ARCH/BREAK/SEC/PERF items from a plan, ranks by severity × blast-radius × reversibility, walks the user one item at a time with confirm/modify/reject/skip menu. Auto-invoked by x-do Mode A on high-risk plans. | Standalone; better with: opencode, x-gemini |
 | **x-design** | plugin | Apply visual design systems | Standalone |
 | **x-api-pentest** | plugin | API security testing (OWASP Top 10) | External security CLIs |
 | **x-omo** | plugin | OpenCode multi-model bridge | opencode CLI |
 | **x-gemini** | plugin | Direct Gemini CLI bridge (Google Search, gemini-3.x, no API key) | gemini CLI + jq |
 | **x-guide** | plugin | Step-by-step comprehension-gated tutorials for docs/specs/code | Best with: x-gemini, x-research |
 | **x-worktree** | plugin | Provision an isolated git worktree on a new branch — used by `x-do` / `x-bugfix` `--wt` flag, also invokable directly | git (≥ 2.5); optional: worktrunk `wt` CLI |
+| **x-worktree-isolate** | plugin | Per-worktree docker-compose isolation: scan once → emit profile.json → on each new worktree write `compose.override.yml` (with `!reset null`) and `.env.worktree`. Hard-blocks on cross-worktree footguns. | Requires: docker compose ≥ v2.24, python3 + pyyaml; optional: worktrunk wt |
 | **x-skill-improve** | plugin | Improve skills from session data | Optional: claude-mem |
 | **x-shared** | plugin | Shared references (not invokable) | None |
 | **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/`; optional: claude-mem |
