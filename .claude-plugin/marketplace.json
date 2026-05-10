@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "x-skills",
-      "description": "13 intelligent skill routers + 1 external companion (x-skill-review) with optional multi-model orchestration via OpenCode and direct Gemini CLI. Plugin skills: x-do, x-research, x-review, x-verify, x-bugfix, x-design, x-api-pentest, x-omo, x-gemini, x-skill-improve, x-guide, x-worktree (auto-applies docker-compose isolation when profile present), x-worktree-isolate.",
+      "description": "14 intelligent skill routers + 1 external companion (x-skill-review) with optional multi-model orchestration via OpenCode and direct Gemini CLI. Plugin skills: x-do, x-research, x-review, x-verify, x-bugfix, x-design, x-api-pentest, x-omo, x-gemini, x-skill-improve, x-guide, x-worktree (auto-applies docker-compose isolation when profile present), x-worktree-isolate, x-qa.",
       "version": "1.7.1",
       "author": {
         "name": "Randy Tran"
@@ -25,7 +25,8 @@
         "api-pentest",
         "orchestration",
         "tutorial",
-        "teaching"
+        "teaching",
+        "qa"
       ]
     }
   ]
