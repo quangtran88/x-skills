@@ -1,0 +1,8 @@
+{
+  "name": "sample-http",
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts"
+  },
+  "dependencies": { "fastify": "^4.0.0" }
+}
