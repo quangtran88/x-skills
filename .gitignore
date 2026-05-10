@@ -2,8 +2,14 @@
 # and transcripts. Never force-add (git add -f) without review.
 .omc/
 
+# Claude Code per-project runtime state (lock files, worktree metadata)
+.claude/
+
 # Skill runtime state (alignment logs, caches) — per-user, not source
 skills/*/data/
 
 # x-skills runtime state (per-team feature maps, x-qa profiles, run artifacts)
 .x-skills/
+
+# Local-only implementation plans for in-flight skill work
+docs/plans/
