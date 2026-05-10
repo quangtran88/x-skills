@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "version": "1.0.0",
+  "generated_at": "2026-05-10T10:00:00Z",
+  "generated_by": "x-qa-init",
+  "repo_root": "/path/to/repo",
+  "primary_entry_point": "api",
+  "entry_points": [
+    {
+      "name": "api",
+      "type": "http",
+      "description": "Main REST API",
+      "auto_managed": true,
+      "launch": {
+        "kind": "npm-script",
+        "command": "npm run dev",
+        "teardown": "pkill -f 'node dist/server.js' || true",
+        "working_dir": "."
+      },
+      "base_url_template": "http://localhost:3000",
+      "base_url_fallback": "http://localhost:3000",
+      "health": {
+        "method": "GET",
+        "path": "/health",
+        "expected_status": 200,
+        "timeout_s": 60,
+        "interval_ms": 1000
+      },
+      "primary": true,
+      "verified": false
+    }
+  ]
+}

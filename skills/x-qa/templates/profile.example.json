@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "version": "1.2.0",
+  "generated_at": "2026-05-10T10:00:00Z",
+  "generated_by": "x-qa-init",
+  "repo_root": "/path/to/repo",
+  "primary_entry_point": "api",
+  "entry_points": [
+    {
+      "name": "api",
+      "type": "http",
+      "description": "Main REST API (Fastify)",
+      "auto_managed": true,
+      "launch": {
+        "kind": "docker-compose",
+        "command": "docker compose up -d api",
+        "teardown": "docker compose down",
+        "working_dir": ".",
+        "uses_isolate_profile": true
+      },
+      "base_url_template": "http://localhost:${ISOLATE_PORT_API}",
+      "base_url_fallback": "http://localhost:3000",
+      "health": {
+        "method": "GET",
+        "path": "/health",
+        "expected_status": 200,
+        "timeout_s": 60,
+        "interval_ms": 1000
+      },
+      "auth": {
+        "kind": "bearer",
+        "token_source": "env:TEST_API_TOKEN",
+        "fixture_user": "test@example.com"
+      },
+      "openapi_spec": "openapi.yml",
+      "primary": true,
+      "verified": true,
+      "verified_at": "2026-05-10T10:00:00Z"
+    },
+    {
+      "name": "cli-import",
+      "type": "cli",
+      "description": "Bulk import CLI",
+      "auto_managed": true,
+      "launch": {
+        "kind": "command",
+        "command": "node dist/cli.js import",
+        "working_dir": "."
+      },
+      "args_schema": "subcommand <file>",
+      "primary": false,
+      "verified": false
+    },
+    {
+      "name": "worker-jobs",
+      "type": "worker",
+      "description": "Background job processor (BullMQ)",
+      "auto_managed": false,
+      "launch": {
+        "kind": "docker-compose",
+        "command": "docker compose up -d worker",
+        "teardown": "docker compose stop worker"
+      },
+      "queue_inspect": "redis-cli LLEN bull:jobs",
+      "primary": false,
+      "verified": true,
+      "verified_at": "2026-05-10T10:00:00Z"
+    }
+  ],
+  "fixtures": {
+    "seed_command": "npm run db:seed:test",
+    "reset_command": "npm run db:reset:test",
+    "reset_strategy": "per-category"
+  },
+  "ignore_paths": ["docs/", "examples/"],
+  "metadata": {
+    "framework": "fastify",
+    "language": "typescript",
+    "package_manager": "npm"
+  }
+}

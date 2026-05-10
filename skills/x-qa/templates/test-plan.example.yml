@@ -1,0 +1,69 @@
+feature: user-avatar-upload
+entry_point: api
+acceptance:
+  - "User can upload PNG/JPEG up to 2MB"
+  - "Upload returns avatar URL on success"
+  - "Files >2MB are rejected with 413"
+  - "Non-image MIME types rejected with 415"
+qa_strategy:
+  base_url_var: ISOLATE_PORT_API
+
+test_cases:
+  - id: tc-001
+    category: happy
+    complexity: simple
+    description: Upload 100KB PNG succeeds
+    request:
+      method: POST
+      path: /api/users/me/avatar
+      headers:
+        Authorization: "Bearer ${TEST_API_TOKEN}"
+        Content-Type: image/png
+      body: "@fixtures/avatar-100kb.png"
+    assertions:
+      - { kind: status, op: eq, value: 200 }
+      - { kind: body-jsonpath, expr: $.url, op: matches, value: "^https://.*\\.png$" }
+      - { kind: latency-ms, op: lt, value: 2000 }
+
+  - id: tc-002
+    category: edge
+    complexity: simple
+    description: Upload exactly 2MB succeeds (boundary)
+    request:
+      method: POST
+      path: /api/users/me/avatar
+      headers: { Authorization: "Bearer ${TEST_API_TOKEN}", Content-Type: image/jpeg }
+      body: "@fixtures/avatar-2mb-exact.jpg"
+    assertions:
+      - { kind: status, op: eq, value: 200 }
+
+  - id: tc-003
+    category: error
+    complexity: simple
+    description: Upload >2MB rejected with 413
+    request:
+      method: POST
+      path: /api/users/me/avatar
+      headers: { Authorization: "Bearer ${TEST_API_TOKEN}", Content-Type: image/png }
+      body: "@fixtures/avatar-3mb.png"
+    assertions:
+      - { kind: status, op: eq, value: 413 }
+      - { kind: body-jsonpath, expr: $.error, op: contains, value: "size" }
+
+  - id: tc-004
+    category: auth
+    complexity: simple
+    description: Missing auth returns 401
+    request:
+      method: POST
+      path: /api/users/me/avatar
+      body: "@fixtures/avatar-100kb.png"
+    assertions:
+      - { kind: status, op: eq, value: 401 }
+
+  - id: tc-005
+    category: concurrency
+    complexity: complex
+    description: Two concurrent uploads — last write wins
+    setup: "fixture:seed-user-no-avatar"
+    teardown: "fixture:cleanup-user"
