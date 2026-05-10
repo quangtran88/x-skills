@@ -13,8 +13,8 @@
       "auto_managed": true,
       "launch": {
         "kind": "docker-compose",
-        "command": "docker compose up -d api",
-        "teardown": "docker compose down",
+        "command": "docker compose --env-file .env --env-file .env.worktree up -d api",
+        "teardown": "docker compose --env-file .env --env-file .env.worktree down",
         "working_dir": ".",
         "uses_isolate_profile": true
       },

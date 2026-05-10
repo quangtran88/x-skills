@@ -27,6 +27,34 @@ If accepted, follow up with:
 
 > **Use this entry point as primary target for `run` (default `--service`)?** `[Y/N]`
 
+## Per-worktree isolation (docker-compose entries only)
+
+Ask only when `launch.kind == "docker-compose"`:
+
+> **Do parallel runs of this service share state (database, ports, container names)?**
+>
+> If yes (the default for any docker-compose stack with hardcoded `container_name` or fixed host ports), this entry needs `x-worktree-isolate` so parallel worktrees (e.g. driven by `/x-skills:x-team`) do not collide.
+>
+> Set `launch.uses_isolate_profile: true` and rewrite `launch.command` to stack env-files so `compose.override.yml` and `.env.worktree` actually take effect:
+>
+> Canonical command (when a base `.env` exists):
+> ```
+> docker compose --env-file .env --env-file .env.worktree up -d <service>
+> ```
+>
+> Canonical command (no base `.env`):
+> ```
+> docker compose --env-file .env.worktree up -d <service>
+> ```
+>
+> ⚠ `init.sh` will refuse the profile if `uses_isolate_profile: true` is set but the command does not include `--env-file .env.worktree`. Compose v2 does NOT auto-load `.env.worktree` — without the flag, the override is silently inert and parallel worktrees collide on default ports / share the parent-dir-derived `COMPOSE_PROJECT_NAME`.
+>
+> Also remember to update `base_url_template` to use `${ISOLATE_PORT_<NAME>}` so the probe URL matches the per-worktree allocated port:
+> ```
+> "base_url_template": "http://localhost:${ISOLATE_PORT_API}",
+> "base_url_fallback": "http://localhost:3000"
+> ```
+
 ## Free-form additions
 
 After processing all detected entries:

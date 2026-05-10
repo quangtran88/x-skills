@@ -38,6 +38,27 @@ if ! jq -e '.schema == 1 and (.entry_points | length > 0)' "$PROFILE_INPUT" > /d
   exit 3
 fi
 
+# Integration check: any entry with launch.uses_isolate_profile=true MUST author
+# a launch.command that stacks --env-file .env.worktree, otherwise compose silently
+# ignores x-worktree-isolate's COMPOSE_PROJECT_NAME and per-worktree port vars.
+# Verified failure mode: parallel x-team workers either bind-collide on default
+# ports or share the parent-dir-derived project name and pollute each other's stacks.
+bad_entries=$(jq -r '
+  [ .entry_points[]
+    | select(.launch.uses_isolate_profile == true)
+    | select((.launch.command // "") | test("--env-file[[:space:]]+\\.env\\.worktree") | not)
+    | .name
+  ] | join(", ")
+' "$PROFILE_INPUT")
+if [[ -n "$bad_entries" ]]; then
+  echo "✗ x-qa init FAILED" >&2
+  echo "REASON=entries with uses_isolate_profile=true must author launch.command with '--env-file .env.worktree' stacking: $bad_entries" >&2
+  echo "  Canonical: docker compose --env-file .env --env-file .env.worktree up -d <service>" >&2
+  echo "  Why: x-worktree-isolate writes .env.worktree per worktree (COMPOSE_PROJECT_NAME + ports)." >&2
+  echo "  Compose v2 does NOT auto-load .env.worktree — without --env-file, the override is silently inert." >&2
+  exit 3
+fi
+
 mkdir -p "$PROFILE_DIR"
 cp "$PROFILE_INPUT" "$PROFILE_PATH"
 

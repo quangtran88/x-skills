@@ -23,6 +23,13 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 [[ -z "$PROFILE_PATH" ]] && PROFILE_PATH="$REPO_ROOT/.x-skills/x-qa/profile.json"
 [[ -z "$WORKTREE_PATH" ]] && WORKTREE_PATH="$(pwd)"
 
+# Trust scope: shared across all linked worktrees of the same repo. git-common-dir
+# resolves to the main checkout's .git for both main and linked worktrees, so its
+# parent is the stable per-repo identifier. Without this, every linked worktree
+# created by x-team gets a fresh trust key and exit-4 fails before any test runs.
+TRUST_SCOPE_ROOT="$(cd "$(git rev-parse --git-common-dir)/.." 2>/dev/null && pwd -P)" \
+  || TRUST_SCOPE_ROOT="$(cd "$REPO_ROOT" && pwd -P)"
+
 ep=$(jq -r --arg n "$EP_NAME" '.entry_points[] | select(.name == $n)' "$PROFILE_PATH")
 [[ -z "$ep" ]] && { echo "✗ launch FAILED REASON=entry point '$EP_NAME' not in profile" >&2; exit 2; }
 
@@ -58,7 +65,7 @@ trust_db="${XDG_CONFIG_HOME:-$HOME/.config}/x-skills/x-qa/trusted-profiles.json"
 mkdir -p "$(dirname "$trust_db")"
 [[ -f "$trust_db" ]] || echo '{}' > "$trust_db"
 profile_hash=$(shasum -a 256 "$PROFILE_PATH" | awk '{print $1}')
-trust_key="${canonical_root}::${EP_NAME}::${profile_hash}"
+trust_key="${TRUST_SCOPE_ROOT}::${EP_NAME}::${profile_hash}"
 already_trusted=$(jq --arg k "$trust_key" -r 'has($k) | tostring' "$trust_db")
 
 if [[ "$already_trusted" != "true" && "$TRUST_PROFILE" != true ]]; then
@@ -73,9 +80,28 @@ fi
 
 # Persist trust on this run (so non-interactive CI does not need a re-confirm next time)
 if [[ "$TRUST_PROFILE" == true ]]; then
+  # mkdir-based lock — atomic across N parallel x-qa runs in sibling worktrees.
+  # Without this, concurrent jq read + mv pairs lose-write each other's entries.
+  lock_dir="${trust_db}.lock"
+  acquired=false
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if mkdir "$lock_dir" 2>/dev/null; then
+      acquired=true
+      trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT
+      break
+    fi
+    sleep 0.2
+  done
+  if [[ "$acquired" != true ]]; then
+    echo "✗ launch FAILED" >&2
+    echo "REASON=could not acquire trust DB lock at $lock_dir after 2s" >&2
+    exit 5
+  fi
   tmp=$(mktemp)
   jq --arg k "$trust_key" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
      '. + {($k): {trusted_at: $ts}}' "$trust_db" > "$tmp" && mv "$tmp" "$trust_db"
+  rmdir "$lock_dir" 2>/dev/null || true
+  trap - EXIT
 fi
 
 # Execute via `bash -c` (no eval — no double parsing, no current-env re-expansion of metachars)
