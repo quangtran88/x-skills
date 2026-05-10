@@ -4,3 +4,6 @@
 
 # Skill runtime state (alignment logs, caches) — per-user, not source
 skills/*/data/
+
+# x-skills runtime state (per-team feature maps, x-qa profiles, run artifacts)
+.x-skills/
