@@ -16,7 +16,11 @@ Before any phase:
 4. Verify the x-qa skill is installed: check that `skills/x-qa/SKILL.md` exists in the plugin tree (the skill itself, not just a profile). If missing, refuse with: `x-team requires the x-qa skill. Ensure x-skills plugin is up-to-date (≥ version that includes x-qa).` Then verify `<repo-root>/.x-skills/x-qa/profile.json` exists. If missing, surface:
    > x-team requires an x-qa profile. Run `/x-skills:x-qa init` first.
    Offer to invoke it inline; block until profile ready.
-5. Verify `git rev-parse --is-inside-work-tree` succeeds and the user's main branch is clean (`git status --porcelain` empty), or warn explicitly.
+5. **Isolation prerequisite check.** When any entry in `<repo-root>/.x-skills/x-qa/profile.json` has `launch.uses_isolate_profile == true` AND `--no-isolate` was NOT passed, ALSO require `<repo-root>/.worktree-isolate/profile.json` to exist. If missing, refuse with:
+   > x-team requires an x-worktree-isolate profile because your x-qa profile sets `uses_isolate_profile: true`. Run `x-worktree-isolate init` first, or pass `--no-isolate` to skip per-feature docker isolation (NOT recommended for parallel docker-compose stacks — workers will fail at `docker compose up` with "address already in use").
+
+   Detection: `jq -e '[.entry_points[].launch.uses_isolate_profile] | any' <profile>` returns `true`. Skip the check entirely when `--no-isolate` is set.
+6. Verify `git rev-parse --is-inside-work-tree` succeeds and the user's main branch is clean (`git status --porcelain` empty), or warn explicitly.
 
 ## Invocation
 

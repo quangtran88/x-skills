@@ -21,7 +21,7 @@
 ## QA Gate
 
 10. **x-qa profile drift mid-run.** User edits profile.json while team is running. Workers continue with cached profile (read at start of x-qa run). Doctor on next run catches drift.
-11. **Service launch port collision.** Without x-worktree-isolate, two workers' services try the same port. Workers serialise, second fails health-wait. Mitigation: enable x-worktree-isolate (auto by default if profile exists).
+11. **Service launch port collision.** Without x-worktree-isolate (or with `--no-isolate`), parallel workers each run `docker compose up` against the same hardcoded host ports. Docker does NOT serialise port binds — the second worker fails fast with `Error response from daemon: ... bind: address already in use` at the launch step (not at health-wait). Even worse: when only `container_name` collides but ports come from env, the second `compose up` may find the first worker's containers already running under the parent-dir-derived `COMPOSE_PROJECT_NAME` and silently treat them as up — both workers then test against worker-1's stack. Mitigation: always run with x-worktree-isolate enabled (the default — bootstrap step 5 enforces it when any x-qa entry has `uses_isolate_profile: true`).
 12. **QA report path drift.** Worker emits `qa_report` in metadata as relative path. Lead can't resolve. Worker preamble specifies absolute path.
 
 ## Monitor Loop
