@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# doctor.sh — validate profile against repo state
+# NOTE: Uses python3 for path resolution instead of `realpath -m` (GNU-only flag;
+# macOS BSD realpath has no -m). Portable across Linux and macOS.
+set -euo pipefail
+
+PROFILE_PATH=""
+TEMPLATE_MODE=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --template-mode) TEMPLATE_MODE=true; shift ;;
+    *) PROFILE_PATH="$1"; shift ;;
+  esac
+done
+[[ -z "$PROFILE_PATH" ]] && PROFILE_PATH="$(git rev-parse --show-toplevel)/.x-skills/x-qa/profile.json"
+[[ -f "$PROFILE_PATH" ]] || { echo "✗ doctor FAIL"; echo "reason=profile not found at $PROFILE_PATH"; exit 2; }
+
+repo_root=$(git rev-parse --show-toplevel)
+checks_attempted=0
+checks_passed=0
+warnings=0
+
+fail() {
+  echo "✗ doctor FAIL"
+  echo "checks_attempted=$checks_attempted"
+  echo "checks_passed=$checks_passed"
+  echo "first_failure=$1"
+  echo "reason=$2"
+  exit 1
+}
+attempt() { checks_attempted=$((checks_attempted+1)); }
+pass() { checks_passed=$((checks_passed+1)); }
+
+# Portable substitute for `realpath -m` (resolves path without requiring existence).
+# realpath -m is GNU-only; macOS BSD realpath lacks the -m flag.
+resolve_path() {
+  python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$1"
+}
+
+# Check 1: schema
+attempt
+[[ "$(jq -r '.schema' "$PROFILE_PATH")" == "1" ]] || fail 1 "schema != 1"
+pass
+
+# Check 2: entry_points non-empty
+attempt
+[[ "$(jq -r '.entry_points | length' "$PROFILE_PATH")" -gt 0 ]] || fail 2 "no entry_points"
+pass
+
+# Check 3: exactly one primary, matching top-level primary_entry_point
+attempt
+primary_count=$(jq '[.entry_points[] | select(.primary == true)] | length' "$PROFILE_PATH")
+[[ "$primary_count" == "1" ]] || fail 3 "expected 1 primary entry, found $primary_count"
+top_primary=$(jq -r '.primary_entry_point' "$PROFILE_PATH")
+ep_primary=$(jq -r '.entry_points[] | select(.primary == true) | .name' "$PROFILE_PATH")
+[[ "$top_primary" == "$ep_primary" ]] || fail 3 "primary_entry_point '$top_primary' != entry with primary:true '$ep_primary'"
+pass
+
+# Check 4: auto_managed set on every entry
+attempt
+missing_am=$(jq '[.entry_points[] | select(.auto_managed == null)] | length' "$PROFILE_PATH")
+[[ "$missing_am" == "0" ]] || fail 4 "entries missing auto_managed: $missing_am"
+pass
+
+# Check 5: name slugs (1-40 chars; suffix optional so single-char names like "a" pass)
+attempt
+while IFS= read -r name; do
+  [[ "$name" =~ ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$ ]] || fail 5 "invalid slug: $name"
+done < <(jq -r '.entry_points[].name' "$PROFILE_PATH")
+pass
+
+# Check 6: repo_root matches
+if [[ "$TEMPLATE_MODE" != true ]]; then
+  attempt
+  profile_root=$(jq -r '.repo_root' "$PROFILE_PATH")
+  [[ "$profile_root" == "$repo_root" ]] || fail 6 "repo_root drift: profile=$profile_root actual=$repo_root"
+  pass
+fi
+
+# Check 7: working_dir under repo_root
+if [[ "$TEMPLATE_MODE" != true ]]; then
+  attempt
+  while IFS= read -r ep; do
+    wd=$(jq -r '.launch.working_dir // "."' <<<"$ep")
+    resolved=$(resolve_path "$repo_root/$wd")
+    case "$resolved/" in
+      "$repo_root"/*|"$repo_root/") ;;
+      *) fail 7 "working_dir '$wd' escapes repo_root ($resolved)" ;;
+    esac
+  done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+  pass
+fi
+
+# Check 8: referenced files exist + launch.command non-empty (rule 7)
+if [[ "$TEMPLATE_MODE" != true ]]; then
+  attempt
+  while IFS= read -r ep; do
+    cmd=$(jq -r '.launch.command // empty' <<<"$ep")
+    [[ -n "$cmd" ]] || fail 8 "launch.command is empty for entry $(jq -r '.name' <<<"$ep")"
+    spec=$(jq -r '.openapi_spec // empty' <<<"$ep")
+    if [[ -n "$spec" ]]; then
+      [[ -f "$repo_root/$spec" ]] || fail 8 "openapi_spec missing: $spec"
+    fi
+  done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+  pass
+fi
+
+# Check 9: auth token_source — env or repo-rooted file, no traversal
+attempt
+while IFS= read -r src; do
+  [[ -z "$src" || "$src" == "null" ]] && continue
+  [[ "$src" =~ ^(env:[A-Za-z0-9_]+|file:[A-Za-z0-9_./-]+)$ ]] \
+    || fail 9 "invalid auth token_source: $src (must match env:NAME or file:path)"
+  if [[ "$src" == file:* ]]; then
+    fpath="${src#file:}"
+    [[ "$fpath" != *..* ]] || fail 9 "auth token_source contains '..' (path traversal): $src"
+    if [[ "$TEMPLATE_MODE" != true ]]; then
+      resolved=$(resolve_path "$repo_root/$fpath")
+      case "$resolved/" in "$repo_root"/*|"$repo_root/") ;; *) fail 9 "auth token_source escapes repo_root: $src" ;; esac
+    fi
+  fi
+done < <(jq -r '.entry_points[].auth.token_source // empty' "$PROFILE_PATH")
+pass
+
+# Check 10: type:http has required fields
+attempt
+while IFS= read -r ep; do
+  if [[ "$(jq -r '.type' <<<"$ep")" == "http" ]]; then
+    for f in base_url_template base_url_fallback health; do
+      v=$(jq -r ".$f // empty" <<<"$ep")
+      [[ -n "$v" ]] || fail 10 "http entry missing $f"
+    done
+  fi
+done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+pass
+
+# Check 11: type:cli args_schema recommended (warning)
+attempt
+while IFS= read -r ep; do
+  if [[ "$(jq -r '.type' <<<"$ep")" == "cli" ]]; then
+    [[ "$(jq -r '.args_schema // empty' <<<"$ep")" != "" ]] || warnings=$((warnings+1))
+  fi
+done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+pass
+
+# Check 12: type:worker queue_inspect recommended (warning)
+attempt
+while IFS= read -r ep; do
+  if [[ "$(jq -r '.type' <<<"$ep")" == "worker" ]]; then
+    [[ "$(jq -r '.queue_inspect // empty' <<<"$ep")" != "" ]] || warnings=$((warnings+1))
+  fi
+done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+pass
+
+# Check 13: npm-script presence
+if [[ "$TEMPLATE_MODE" != true ]]; then
+  attempt
+  while IFS= read -r ep; do
+    if [[ "$(jq -r '.launch.kind' <<<"$ep")" == "npm-script" ]]; then
+      cmd=$(jq -r '.launch.command' <<<"$ep")
+      script_name=$(awk '{print $3}' <<<"$cmd")  # `npm run <name>`
+      wd=$(jq -r '.launch.working_dir // "."' <<<"$ep")
+      pkg="$repo_root/$wd/package.json"
+      [[ -f "$pkg" ]] || fail 13 "npm-script entry but $pkg missing"
+      jq -e --arg s "$script_name" '.scripts[$s] // empty' "$pkg" >/dev/null \
+        || fail 13 "npm script '$script_name' not in $pkg"
+    fi
+  done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+  pass
+fi
+
+# Check 14: docker compose file presence
+if [[ "$TEMPLATE_MODE" != true ]]; then
+  attempt
+  while IFS= read -r ep; do
+    cmd=$(jq -r '.launch.command' <<<"$ep")
+    if [[ "$cmd" == *"docker compose"* || "$cmd" == *"docker-compose"* ]]; then
+      wd=$(jq -r '.launch.working_dir // "."' <<<"$ep")
+      have_compose=false
+      for f in docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
+        [[ -f "$repo_root/$wd/$f" ]] && have_compose=true && break
+      done
+      [[ "$have_compose" == true ]] || fail 14 "docker compose referenced but no compose file in $wd"
+    fi
+  done < <(jq -c '.entry_points[]' "$PROFILE_PATH")
+  pass
+fi
+
+echo "✓ doctor PASS"
+echo "checks_attempted=$checks_attempted"
+echo "checks_passed=$checks_passed"
+echo "warnings=$warnings"
