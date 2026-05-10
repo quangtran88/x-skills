@@ -19,14 +19,18 @@ Every skill in x-skills follows the **router principle**: it classifies, it rout
 | **x-research** | *(not declared)* | Universal research router — classifies questions by information-source signal and routes to optimal tools/agents |
 | **x-review** | `reviewer` | Code/plan/PR review orchestrator — cross-model review with Claude + GPT perspectives, structured verdicts |
 | **x-bugfix** | *(not declared)* | Structured debugging — routes through investigation, hypothesis testing, and verified fix with evidence collection |
+| **x-mindful** | *(not declared)* | Pre-implementation impact gate — extracts ARCH/BREAK/SEC/PERF items from a plan and walks the user through them before execution |
 | **x-design** | *(not declared)* | Visual design system integration — resolves brand references to curated DESIGN.md files |
 | **x-api-pentest** | *(not declared)* | API security testing — OWASP API Top 10 testing with schemathesis, nuclei, sqlmap, spectral |
+| **x-qa** | *(not declared)* | Profile-driven E2E QA — scans the project once, persists a launch/test profile, fans tests out across cheap/strong models against an isolated stack |
+| **x-team** | *(not declared)* | Multi-feature team orchestrator — decomposes work into N parallel features, provisions a worktree per feature, gates merges on x-qa passing |
 | **x-omo** | *(not declared)* | OpenCode multi-model bridge — dispatch to GPT-5.4, Gemini, Codex models via role agents or direct model routing |
 | **x-gemini** | *(not declared)* | Direct Gemini CLI bridge — uses Google Ultra subscription, native Google Search grounding, gemini-3.x access |
 | **x-skill-improve** | *(not declared)* | Session-based skill alignment analyzer — evaluates how well a skill was followed during a real session |
 | **x-verify** | `verifier` | Completion cascade dispatcher — answers "am I done?" for long-running skills |
 | **x-guide** | `progressive-tutor` | Comprehension-gated tutorial generator — turns docs/specs/code into a progressive, resumable walkthrough with per-project state |
-| **x-worktree** | `worktree-provider` | Isolated git worktree provisioner — base branch + new branch resolution, `wt`/`git worktree` dual provider, machine-readable result envelope. Invoked directly or via `--wt` from `x-do`/`x-bugfix`. |
+| **x-worktree** | `worktree-provider` | Isolated git worktree provisioner — base branch + new branch resolution, `wt`/`git worktree` dual provider, machine-readable result envelope. Invoked directly or via `--wt` from `x-do`/`x-bugfix`. Auto-applies docker-compose isolation when a profile is present. |
+| **x-worktree-isolate** | *(not declared)* | Per-worktree docker-compose isolation — scan once, emit `profile.json`, write `compose.override.yml` + `.env.worktree` per new worktree. Hard-blocks on cross-worktree footguns. |
 | **x-shared** | *(not a skill)* | Shared infrastructure consumed by other skills (not invokable) |
 
 Skills that declare a `role` in their frontmatter have explicit behavioral constraints. The role taxonomy exists to prevent role leakage (e.g., a reviewer applying fixes during review phase). Not all skills declare a role — those without one follow general conventions documented in their SKILL.md body.
@@ -81,20 +85,24 @@ x-skills/
 ├── lib/
 │   └── feature-gate.md       # Fallback routing reference
 ├── docs/
-│   ├── DEPENDENCY_SYSTEM_DESIGN.md  # Lazy dependency system design
-│   └── [generated docs]      # This documentation set
+│   └── [architecture docs]   # This documentation set
 └── skills/
     ├── x-do/                 # Execution router
     ├── x-research/           # Research router
     ├── x-review/             # Review orchestrator
+    ├── x-verify/             # Completion cascade
     ├── x-bugfix/             # Debugging workflow
+    ├── x-mindful/            # Pre-implementation impact gate
     ├── x-design/             # Design system integration
     ├── x-api-pentest/        # API security testing
+    ├── x-qa/                 # Profile-driven E2E QA
+    ├── x-team/               # Multi-feature team orchestrator
+    ├── x-worktree/           # Isolated git worktree provisioner
+    ├── x-worktree-isolate/   # Per-worktree docker-compose isolation
     ├── x-omo/                # OpenCode bridge
     ├── x-gemini/             # Gemini CLI bridge
     ├── x-skill-improve/      # Skill alignment analyzer
     ├── x-guide/              # Progressive comprehension-gated tutor
-    ├── x-worktree/           # Isolated git worktree provisioner
     └── x-shared/             # Shared references (NOT a skill)
 ```
 

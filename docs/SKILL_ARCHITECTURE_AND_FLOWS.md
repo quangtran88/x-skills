@@ -55,17 +55,21 @@ x-skills/
 │   ├── x-do/                 # Execution router
 │   ├── x-research/           # Research router
 │   ├── x-review/             # Review orchestrator
+│   ├── x-verify/             # Completion cascade verifier
 │   ├── x-bugfix/             # Debugging workflow
+│   ├── x-mindful/            # Pre-implementation impact gate
 │   ├── x-design/             # Design system integration
 │   ├── x-api-pentest/        # API security testing
+│   ├── x-qa/                 # Profile-driven E2E QA
+│   ├── x-team/               # Multi-feature team orchestrator
+│   ├── x-worktree/           # Isolated git worktree provisioner
+│   ├── x-worktree-isolate/   # Per-worktree docker-compose isolation
 │   ├── x-omo/                # OpenCode bridge
 │   ├── x-gemini/             # Gemini CLI bridge
-│   ├── x-verify/             # Completion cascade verifier
+│   ├── x-guide/              # Progressive comprehension-gated tutor
 │   ├── x-skill-improve/      # Session-based alignment analyzer
 │   └── x-shared/             # Shared references (NOT a skill)
-├── docs/
-│   ├── DEPENDENCY_SYSTEM_DESIGN.md
-│   └── x-skill-improvements/ # Proposals 01-07
+├── docs/                     # Architecture documentation
 └── README.md
 ```
 

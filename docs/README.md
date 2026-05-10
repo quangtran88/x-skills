@@ -6,7 +6,7 @@ This directory contains comprehensive documentation describing the internal flow
 
 | Document | What It Covers |
 |----------|---------------|
-| [SKILLS_OVERVIEW.md](SKILLS_OVERVIEW.md) | Overview of all 10 skills, role taxonomy, design principles, capability tiers |
+| [SKILLS_OVERVIEW.md](SKILLS_OVERVIEW.md) | Overview of all skills, role taxonomy, design principles, capability tiers |
 | [INTERNAL_ARCHITECTURE.md](INTERNAL_ARCHITECTURE.md) | Plugin lifecycle, skill loading, execution flow, tool invocation patterns, orchestration primitives, precedence ladder |
 | [BOOTSTRAP_AND_CAPABILITY_SYSTEM.md](BOOTSTRAP_AND_CAPABILITY_SYSTEM.md) | Capability manifest, detection in `bin/setup`, skill bootstrap sequence, drift handling, opt-out |
 | [SKILL_ROUTING_AND_MODES.md](SKILL_ROUTING_AND_MODES.md) | How x-do classifies tasks into 6 modes, x-research signal→tool routing, x-bugfix investigation workflow, x-review step architecture, x-design pipeline, x-api-pentest steps |
@@ -14,19 +14,16 @@ This directory contains comprehensive documentation describing the internal flow
 | [SHARED_INFRASTRUCTURE.md](SHARED_INFRASTRUCTURE.md) | x-shared reference library contents, capability loading, invocation guide, precedence ladder, orchestration primitives, slot schema, MCP toolbox, severity guide, reactions vocabulary |
 | [VERIFICATION_AND_COMPLETION.md](VERIFICATION_AND_COMPLETION.md) | Completion cascade specification, SCOPE gate, 5-step cascade, verdict formats, when to apply per skill, x-verify role, prevention gate |
 | [WORKFLOW_CHAINS.md](WORKFLOW_CHAINS.md) | Common skill chain sequences, handoff context format, orchestration primitives in chains, when to chain vs skip |
-| [SETUP_AND_DEPENDENCIES.md](SETUP_AND_DEPENDENCIES.md) | `bin/setup` script, SessionStart hooks, lazy dependency system design, `xskill-deps` CLI, capability tiers |
-| [DEPENDENCY_SYSTEM_DESIGN.md](DEPENDENCY_SYSTEM_DESIGN.md) | (Existing) Full design document for the lazy dependency system |
-| [SKILL_ARCHITECTURE_AND_FLOWS.md](SKILL_ARCHITECTURE_AND_FLOWS.md) | (Existing) Single comprehensive architecture doc covering all skills |
+| [SETUP_AND_DEPENDENCIES.md](SETUP_AND_DEPENDENCIES.md) | `bin/setup` script, SessionStart hooks, capability detection, capability tiers |
+| [SKILL_ARCHITECTURE_AND_FLOWS.md](SKILL_ARCHITECTURE_AND_FLOWS.md) | Single comprehensive architecture doc covering all skills |
 
 ### Subdirectories
 
 | Subdirectory | Contents |
 |-------------|----------|
-| [SKILLS/](SKILLS/) | Individual skill flow docs (x-do, x-research, x-review, x-bugfix, x-verify, x-omo, x-design, x-api-pentest, x-gemini, x-skill-improve, x-shared) |
+| [SKILLS/](SKILLS/) | Individual skill flow docs (x-do, x-research, x-review, x-bugfix, x-mindful, x-verify, x-omo, x-design, x-api-pentest, x-qa, x-team, x-worktree, x-worktree-isolate, x-gemini, x-skill-improve, x-guide, x-shared) |
 | [WORKFLOWS/](WORKFLOWS/) | Cross-skill patterns and chain sequences |
 | [ARCHITECTURE/](ARCHITECTURE/) | Structural conventions (skill file structure, frontmatter schema) |
-| [x-skill-improvements/](x-skill-improvements/) | Proposals 01-07: stagnation detection, reactions block, orchestration primitives, role separation, plugin slots, state detection cascade, prompt assembly layers |
-| [x-skill-improvements/](x-skill-improvements/) | Proposals 01-07: stagnation detection, reactions block, orchestration primitives, role separation, plugin slots, state detection cascade, prompt assembly layers |
 
 ## Quick Start
 
@@ -48,6 +45,9 @@ User request
     ├─── /x-api-pentest ──→ Step 1-6 ──→ Report (markdown + SARIF)
     ├─── /x-omo ──→ Agent/model dispatch ──→ Result
     ├─── /x-gemini ──→ Gemini CLI ──→ Result
+    ├─── /x-qa ──→ Profile scan/run ──→ Per-test fanout ──→ Verdict envelope
+    ├─── /x-team ──→ Decompose features ──→ Spawn workers ──→ x-qa gate ──→ Merge queue
+    ├─── /x-worktree ──→ Branch + worktree ──→ Optional auto-isolation
     └─── /x-skill-improve ──→ Session analysis ──→ Alignment report ──→ Apply fixes
 ```
 
