@@ -2,8 +2,6 @@
 
 The canonical set of triggers an x-skill's `reactions:` block may fire. Skills only fire triggers from this vocabulary. If a skill needs a new trigger, add it here — do not invent ad hoc.
 
-See proposal `docs/x-skill-improvements/02-reactions-block.md` for the full schema and design rationale.
-
 ## Trigger list
 
 | Trigger | Fires when |

@@ -138,6 +138,4 @@ Every command in Phase 4 writes back to `progress.json` and updates `GUIDE.md` R
 
 ## See Also
 
-- Design spec: [x-guide-design.md](x-guide-design.md)
-- Implementation plan: [x-guide-plan.md](x-guide-plan.md)
-- Skill source: `skills/x-guide/`
+- Skill source: [`skills/x-guide/SKILL.md`](../../skills/x-guide/SKILL.md)
