@@ -54,6 +54,7 @@ Gather requirements analysis and codebase context in parallel before planning.
    - Requirements: what oracle identified (scope, risks, hidden requirements)
    - Context: what explore found (related code, conventions, patterns to follow)
    - Constraints: anything that limits the approach
+   - **Commit recompose hint** (optional): if the user mentioned a preference for how to group commits at the end (e.g., "keep granular commits", "squash by feature", "one commit per domain"), persist as `commit_recompose_hint` in run state. Allowed values: `"preserve"` (skip recompose) or `"axis:<topic|domain|feature|item>"` (force axis). Step-04 reads this before dispatching the `commit` skill.
 
 4. **Present to user** for validation before planning:
    > Here's what I found. Does this match your intent? Anything to add or change before I create a plan?

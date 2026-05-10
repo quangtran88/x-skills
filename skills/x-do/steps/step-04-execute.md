@@ -58,7 +58,7 @@ OMC `executor` and `ralph` commit frequently — often one per file or micro-ste
 Run after verification passes, before branch finish. Read `config.json` → `commit_recompose`:
 
 - `enabled: false` → skip entirely
-- `min_commits: N` → skip if range has fewer than N commits (default 3)
+- `min_commits: N` → skip if range has fewer than N commits (default 2; safety floor — primary decision is concern-based, see table below)
 - `auto: true` → recompose without prompting; `auto: false` → show plan, wait for OK
 
 Inspect the range:
@@ -67,17 +67,20 @@ Inspect the range:
 git log --oneline ${BASE_SHA}..HEAD
 ```
 
-| New commit count | Action |
-|------------------|--------|
-| 0 (executor amended / nothing committed) | Skip |
-| 1 | Skip — already atomic |
-| 2 | Recompose only if both touch overlapping concerns |
-| `>= min_commits` | **Recompose** — default behavior |
+| Range shape | Action |
+|---|---|
+| 0 / 1 commit (or fewer than `min_commits`) | Skip |
+| All commits share `(type, scope)` — e.g. all `feat(x-qa):` | Recompose into 1 |
+| Mixed scopes/types | Recompose to N = unique `(scope, intent)` tuples; aim for fewest atomic groups |
+| Range crosses a merge commit | Abort, surface to user |
+
+The goal is **fewest atomic commits where each commit is one logical concern** (one feature, one fix, one domain) — not a fixed count. Drop count-based heuristics; classify by concern boundary.
 
 ### Skip conditions (auto-skip, no prompt)
 
 - Branch already pushed AND has remote tracking AND any pushed commit is in the range — warn the user, offer "squash on merge via PR" instead. Never rewrite published history without explicit confirmation.
 - User explicitly requested per-step commits preserved (e.g., "keep the granular commits", "don't squash") — surfaced in step-01 gather or in-prompt.
+- Step-01 gather captured `commit_recompose_hint: "preserve"` in run state — explicit user opt-out persisted from gather.
 - Range crosses a merge commit — abort recomposition, surface to user.
 
 ### Recompose procedure
@@ -88,8 +91,27 @@ git log --oneline ${BASE_SHA}..HEAD
    git reset --soft "${BASE_SHA}"
    ```
    All changes now staged on the working tree; original commits live in reflog.
-3. **Dispatch `Skill` tool → `commit`.** That skill analyzes staged changes, groups them by domain/concern, and creates atomic commits using the repo's existing message style (it reads `git log` first).
-4. **Verify the rewrite:** `git log --oneline ${BASE_SHA}..HEAD` should now show the grouped commits. `git diff ${BASE_SHA}..HEAD` against the pre-reset HEAD must be empty (zero net change in tree contents) — if non-empty, abort and `git reset --hard ORIG_HEAD` to restore.
+3. **Dispatch `Skill` tool → `commit` with grouping directive.** Pass this payload in the args slot:
+
+   > "Group staged changes by `${target_axis}`. Target the fewest atomic commits where each commit is one logical concern (one feature, one fix, one domain). Preserve dependency order: `feat` before its `fix`. Read `git log` for repo message style."
+
+   `target_axis` resolves in priority order:
+   1. In-prompt override (e.g., user typed "group by feature")
+   2. `commit_recompose_hint: "axis:<value>"` from step-01 run state
+   3. `config.json` → `commit_recompose.target_axis`
+   4. Default: `domain`
+
+   Allowed axis values: `topic` | `domain` | `feature` | `item`.
+
+3.5. **Preview before committing** (when `auto: false`): Ask the `commit` skill for a plan-only summary first — one line per proposed commit in the form `<type>(<scope>): <subject> — <files touched>`. Surface to the user. Wait for one of:
+   - `y` → proceed to write the commits
+   - `tweak: <new directive>` → re-plan with the tweak (e.g., "tweak: split x-team into skeleton and integration")
+   - `n` → abort, leave changes staged, no commits written
+
+   Skip 3.5 only when `auto: true` is set in config AND no in-prompt override requested preview.
+4. **Verify the rewrite:**
+   - **Tree equivalence:** `git log --oneline ${BASE_SHA}..HEAD` should now show the grouped commits. `git diff ${BASE_SHA}..HEAD` against the pre-reset HEAD must be empty (zero net change in tree contents) — if non-empty, abort and `git reset --hard ORIG_HEAD` to restore.
+   - **Group count match** (when `auto: false`): actual commit count must equal the previewed plan's count. Mismatch → abort + `git reset --hard ORIG_HEAD` and report which group was dropped/merged.
 5. **Surface the result** to the user as a before/after diff of `git log` output. Do NOT force-push. Branch finish (`superpowers:finishing-a-development-branch`) handles push/PR.
 
 ### Failure recovery

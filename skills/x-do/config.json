@@ -9,7 +9,8 @@
   "state_dir": ".omc/state",
   "commit_recompose": {
     "enabled": true,
-    "min_commits": 3,
-    "auto": false
+    "min_commits": 2,
+    "auto": false,
+    "target_axis": "domain"
   }
 }
