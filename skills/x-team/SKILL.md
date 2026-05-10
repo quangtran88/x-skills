@@ -30,16 +30,142 @@ Before any phase:
 | `/x-skills:x-team --resume <team-slug>` | Resume an interrupted run. |
 | `/x-skills:x-team --no-isolate` | Skip `x-worktree-isolate` per-feature (passes the equivalent flag through to `x-worktree`). |
 
-## Phases
+## Phase 1: Decompose
 
-1. Parse request. Decompose into features per `references/decomposition-rules.md`.
-2. `TeamCreate` with slug derived from request.
-3. Per feature: `Skill: x-skills:x-worktree <base> <feat-slug>` → capture `WORKTREE_PATH_i`.
-4. `TaskCreate` per feature with metadata (branch, worktree, phase).
-5. `TaskUpdate(owner=worker-N)` to pre-assign.
-6. Spawn `Task(subagent_type=executor, team_name, name=worker-N, working_directory=WORKTREE_PATH_i, prompt=preamble + feature-spec)` in parallel.
-7. Monitor loop per `references/monitor-loop.md`.
-8. On all features terminal: shutdown protocol, `TeamDelete`, cleanup.
+Per `references/decomposition-rules.md`:
+
+1. Read user request.
+2. If `--features <N>` not given: use morph-mcp to scan project, propose feature split, ask user via `AskUserQuestion` (header: "Feature split"). Allow edit/cancel.
+3. For each feature, generate:
+   - `name` (short slug)
+   - `spec` (full description)
+   - `acceptance` (bullet list)
+   - `branch` slug: `feat-<name>-<6hex>`
+4. If total features > `--max-features` (default 3), run in waves of `--max-features` parallel: provision the first wave's worktrees now, queue the rest as `pending`. NEVER drop features — the monitor loop's `advance_queue()` (see `references/monitor-loop.md`) provisions each pending feature's worktree and spawns its worker as in-flight slots free up. Surface the wave plan to the user.
+
+## Phase 2: TeamCreate
+
+Slug: `<sanitized request 30char>-<6hex>` e.g. `ship-q2-features-a1b2c3`.
+
+```
+TeamCreate {
+  "team_name": "ship-q2-features-a1b2c3",
+  "description": "<original user request, truncated 200>"
+}
+```
+
+The current session becomes `team-lead@<slug>`.
+
+## Phase 3: Provision Worktrees
+
+For each feature in this wave (parallel):
+
+```
+Skill: x-skills:x-worktree <base-branch> <feature-branch>
+```
+
+Pass `--no-isolate` if `--no-isolate` flag is set on x-team invocation.
+
+Capture each envelope:
+- `WORKTREE_PATH=<abs>`
+- `BRANCH=<feat-...>`
+- `ISOLATE_APPLIED=true|false|skipped`
+
+If any worktree provisioning fails: abort the wave, run `TeamDelete`, surface to user.
+
+## Phase 4: TaskCreate + Pre-assign
+
+For each feature:
+
+```
+TaskCreate {
+  "subject": "<feature name>",
+  "description": "<full spec + acceptance>",
+  "activeForm": "Implementing <feature name>"
+}
+→ task_id
+
+TaskUpdate { "taskId": "<id>", "owner": "worker-<n>" }
+```
+
+Initialize feature-map:
+
+```bash
+Bash: scripts/feature-map-init.sh --team-slug <slug> --request "<req>" --base <branch> --features-json <features.json>
+```
+
+## Phase 5: Spawn Workers
+
+Spawn ALL workers in parallel via `Task()` with `team_name`, `name`, and `working_directory`. Inject `references/worker-preamble.md` with substitutions filled in:
+
+```
+Task {
+  "subagent_type": "executor",
+  "team_name": "<slug>",
+  "name": "worker-<n>",
+  "working_directory": "<WORKTREE_PATH_n>",
+  "prompt": "<filled-in worker preamble + feature spec + acceptance criteria>"
+}
+```
+
+Update feature-map: `phase: running`.
+
+## Phase 6: Monitor Loop
+
+See `references/monitor-loop.md`. Per inbound `SendMessage`, classify by `summary` prefix (kind) and extract structured payload from the first ` ```json … ``` ` fence in `content` — OMC's SendMessage has no `metadata` field. Recognized prefixes: `feature_done`, `blocker`, `feature_blocked`, `progress_note`. Per kind:
+
+- `feature_done` → idempotence guard: skip if `feature_map.status == done` or `merged_at` non-null. Otherwise optionally invoke `merge-feature.sh --branch <branch> --base <feature_map.base_branch> --worktree <wt>`. Update map. Wave-next: spawn next pending feature if any.
+- `blocker` → `AskUserQuestion`, relay back via SendMessage with `summary: blocker_resolution:{TASK_ID}` and a JSON-fence payload. Update `map.blocker`.
+- `feature_blocked` → mark failed in map. Continue (do not abort sibling features).
+
+Concurrency: keep at most `--max-features` workers in `in_progress` simultaneously. As features reach terminal state, advance the queue.
+
+## Phase 7: Shutdown
+
+When all features are terminal (`done` or `failed`):
+
+For each active worker:
+```
+SendMessage {
+  "type": "shutdown_request",
+  "recipient": "worker-<n>",
+  "content": "All features complete; shutting down"
+}
+```
+
+Wait up to 30s per worker for `shutdown_response`. Then:
+
+```
+TeamDelete { "team_name": "<slug>" }
+```
+
+Update feature-map: `phase: complete` (or `aborted` if user cancelled).
+
+## Phase 8: Final Summary
+
+Print to user:
+
+```
+✓ x-team complete
+Team: <slug>
+Features: <n>
+  Done: <m>
+  Failed: <k>
+  Auto-merged: <a>
+  Awaiting human merge: <b>
+
+Awaiting merge:
+  - <feature-name> @ <branch> (worktree: <path>) — QA: pass (<p>/<t>)
+    Merge: git merge --no-ff <branch>
+
+Failed:
+  - <feature-name> @ <branch> — see <qa_report> for failures
+    Inspect: cd <worktree>
+
+Feature map: .x-skills/x-team/teams/<slug>/feature-map.json
+```
+
+If `--auto-merge` and any merges failed (conflict, protected branch): list separately with reasons.
 
 ## Hard Requirements
 
