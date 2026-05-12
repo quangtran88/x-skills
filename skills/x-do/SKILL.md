@@ -210,6 +210,16 @@ See `references/mode-guidance.md` for detailed per-mode instructions. Key rules:
 
 See `references/delegation-and-scaling.md` for the full scaling table. Key: single-file → skip brainstorming; 5+ files → full pipeline; mechanical batch → direct execution with reduced review.
 
+## Implementation Discipline (MANDATORY)
+
+Every executor / ralph / `--model codex` / direct-execution route MUST carry the three rules from `../x-shared/instrument-and-verify.md` into the implementation:
+
+1. **Log on first pass** — structured logs at decision points (entry/exit, branches, state transitions, error catches, external boundaries) ship in the same diff as the implementation. Not a debugging afterthought.
+2. **Test-first for unknowns** — before calling any unfamiliar lib/API/upstream-path, run a scratch script (REPL, `node -e`, `curl -v`, 10-line `/tmp/scratch.*`) and observe the REAL return shape / error class. Cite the artifact in the implementation rationale.
+3. **Never guess** — every claim ("this lib returns X", "this endpoint accepts Y") needs a citation: `file:line`, test output, log line, doc URL, or a re-readable tool call result. Words like "probably", "I think", "should work" are STOP signals — go run an experiment instead.
+
+These rules are forwarded into every executor dispatch via the `[STANDING CONSTRAINTS]` block in `steps/step-04-execute.md` § "Forward Intelligence". Do NOT strip them when composing the executor prompt.
+
 ## Post-Implementation Verification (MANDATORY)
 
 After completing implementation in any TS/JS project, run before claiming done:

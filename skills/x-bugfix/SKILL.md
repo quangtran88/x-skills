@@ -97,6 +97,8 @@ Output: a **root cause hypothesis** — specific and testable.
 
 Scientific method — one variable at a time. Form a single hypothesis, test minimally, verify. If wrong, form a NEW hypothesis — don't stack fixes.
 
+**Hypothesis must be evidence-backed (rule 3 of `../x-shared/instrument-and-verify.md`).** The hypothesis MUST cite a real artifact: a stack frame, a log line, a test output, a `file:line`, or a doc URL. If you can only say "probably X" or "I think Y is the issue", that is a STOP signal — go produce evidence first (rule 2: run a scratch script, add a log, read the lib source) and return with a citation. Speculation without evidence is the #1 reason debugging stalls.
+
 **Instrumentation Pivot (after 2 failed iterations) — MANDATORY before another guess:** When two trial fixes haven't moved the needle, STOP speculating and instrument the system before the next attempt. Add targeted debug logs along the suspected call chain, run the live system to reproduce, then read the logs in chronological order. Form the next hypothesis from observed state, not assumptions.
 
 - **Cover the full chain, don't be selective.** Log every entry point, branch, state transition, callback boundary, and error catch on the suspected path. Selective logging hides the gap you can't see — the bug always lives in the branch you didn't instrument.
@@ -112,7 +114,7 @@ Scientific method — one variable at a time. Form a single hypothesis, test min
 1. Write a regression test that **fails** without the fix
    - **No test harness?** If the affected component has no test infrastructure: note "NO_TEST_HARNESS" in the debug report, write a manual verification protocol (exact steps to confirm the fix works), and add a TODO comment in the code for future test coverage. Do not skip silently.
    - **Behavioral/runtime bug requiring live system?** If a unit-level regression test isn't feasible (e.g., requires running chat bot, async pipeline, external service), note "LIVE_SYSTEM_REQUIRED" in the debug report and document: (1) the code-path trace showing before/after behavior, (2) why a unit test isn't feasible, (3) what integration test would cover it. Do not silently skip the test step.
-2. Implement a **single fix** addressing root cause — minimal diff
+2. Implement a **single fix** addressing root cause — minimal diff. **Ship logs in the same diff (rule 1 of `../x-shared/instrument-and-verify.md`).** Add structured logs at decision points on the affected call chain (entry/exit, branches, state transitions, error catches). Log decision variables (IDs, flags, lengths), not just "got here" markers. These logs STAY after the fix lands — downgrade to debug level if noisy, but do NOT strip them. Rationale: the same call chain will break again, and the next debugger should not have to re-instrument from scratch.
 3. Run test suite — no regressions (if no suite exists for the component, run the nearest available suite for regression safety)
 4. Fresh verification — reproduce original scenario using captured baseline, confirm fixed with before/after comparison
    - **Behavioral/runtime bug?** If reproduction requires a running system (chat bot, server, async pipeline), trace the code path manually: walk through the fix with concrete input values, document the expected before/after behavior change in the debug report. This substitutes for live reproduction, not for verification itself.

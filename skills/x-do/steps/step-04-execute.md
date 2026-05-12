@@ -30,6 +30,33 @@ Before executing, gather key constraints discovered in earlier steps and inject 
 
 Format as a brief `[CONSTRAINTS]` block at the top of the execution prompt. This prevents the execution agent from re-discovering or contradicting decisions already made.
 
+### Standing Constraints (always include — not optional)
+
+In addition to the run-specific `[CONSTRAINTS]` block above, every executor dispatch (ralph, `--model codex`, OMC `executor`, OMO agents, direct execution) MUST carry a `[STANDING CONSTRAINTS]` block with the three rules from `../../x-shared/instrument-and-verify.md`. These constraints are NOT derived from steps 1-3 — they apply to every implementation regardless of task type:
+
+```
+[STANDING CONSTRAINTS — always apply, per ../../x-shared/instrument-and-verify.md]
+1. LOG ON FIRST PASS. Ship structured logs at decision points (entry/exit, branches,
+   state transitions, error catches, external boundaries) in the SAME DIFF as the
+   implementation. Log decision variables (IDs, flags, lengths) — not "got here" strings.
+   Use the project's existing logger (read 2-3 nearby files to find it). Logs stay
+   after the task lands; downgrade to debug level if noisy, do NOT strip.
+
+2. TEST-FIRST FOR UNKNOWNS. Before calling any unfamiliar lib / API / upstream-path,
+   FIRST run a scratch experiment: REPL, `node -e "..."`, `python -c "..."`, `curl -v`,
+   or a 10-line `/tmp/scratch.{ts,py,sh}`. Observe the REAL return shape and error class.
+   Cite the artifact in the commit message or inline rationale when behavior is
+   non-obvious. Delete the scratch after copying the knowledge into the implementation —
+   do NOT commit `/tmp/scratch.*`.
+
+3. NEVER GUESS. Every claim about library behavior, API shape, or runtime semantics
+   needs a citation: file:line, test output, log line, doc URL, or a re-readable tool
+   call result. Phrases like "probably", "I think", "should work", "usually" are STOP
+   signals — go produce evidence (rule 2) instead of writing code on top of an assumption.
+```
+
+This block is mandatory for Modes A/B/F and for any 3+ task ralph run. For Mode D (quick tasks), rules 2 and 3 still apply; rule 1 scales down (a one-line config edit does not need a log).
+
 ## Execution
 
 1. **Select route** based on task count and complexity (use depth calibration from SKILL.md).

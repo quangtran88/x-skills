@@ -58,3 +58,19 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 **Root cause:** Claude is trying to solve a problem that would benefit from a different model's perspective or a specialized agent's tool access.
 
 **Fix:** After 2 failed attempts at the same issue, proactively delegate to `oracle` (for debugging/architecture advice) or `--model codex` (for implementation; replaces UNAVAILABLE `hephaestus`). State the delegation reason to the user. See "Proactive OMO Delegation" in SKILL.md.
+
+## Implementing Against an Unfamiliar Lib Without a Scratch-Test First
+
+**Symptom:** Executor (or direct-execution path) writes code calling a library or upstream module it hasn't observed. Result: the call signature is wrong, the returned shape doesn't match, the error class is the wrong one. tsc may pass (if types are loose or `any` leaks in), but the code throws at runtime — or worse, silently does the wrong thing.
+
+**Root cause:** Skipping rule 2 of `../x-shared/instrument-and-verify.md` — implementing against an assumed API shape rather than an observed one. The executor's training data may be stale, the lib may have changed, or the docs may be ambiguous. Without a scratch verification, every assumption is a guess.
+
+**Fix:** Before any implementation call into unfamiliar territory, run a scratch script: `node -e "..."`, `python -c "..."`, `curl -v`, or a 10-line `/tmp/scratch.{ts,py,sh}`. Paste the real output into the implementation rationale. Delete the scratch after copying the knowledge into code. This is mandatory for: unfamiliar libs, upstream modules you haven't traced, external APIs, anything where you can't cite a `file:line` or doc URL for the behavior you're depending on.
+
+## Stripping Logs After the Bug Is Fixed
+
+**Symptom:** A bugfix lands with comprehensive logs at every decision point on the affected call chain. PR review (or the executor itself) then "cleans up" by deleting those logs before merge. Three months later the same code path breaks again — and there is no observability.
+
+**Root cause:** Treating diagnostic logs as scaffolding to remove rather than production-survivable instrumentation to keep. The "clean diff" instinct wins over the "next debugger will thank me" instinct.
+
+**Fix:** Logs added during a bugfix STAY. Downgrade noisy ones to debug level (`logger.debug(...)` or equivalent) if they would spam the production log stream, but do NOT delete them. See `../x-shared/instrument-and-verify.md` § rule 1.
