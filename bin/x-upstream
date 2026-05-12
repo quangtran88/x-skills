@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# x-upstream — PATH-resolvable launcher for the skill's dispatcher.
+# bin/setup symlinks this to ~/.local/bin/x-upstream so the skill can be invoked
+# by name from any project without referencing the plugin-cache absolute path.
+
+set -euo pipefail
+
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [[ -L "$SCRIPT_PATH" ]]; do
+  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+  if [[ "$LINK_TARGET" = /* ]]; then
+    SCRIPT_PATH="$LINK_TARGET"
+  else
+    SCRIPT_PATH="$(cd "$(dirname "$SCRIPT_PATH")" && cd "$(dirname "$LINK_TARGET")" && pwd -P)/$(basename "$LINK_TARGET")"
+  fi
+done
+
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd -P)"
+PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
+
+exec bash "$PLUGIN_DIR/skills/x-upstream/scripts/x-upstream.sh" "$@"

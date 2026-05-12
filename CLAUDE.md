@@ -1,6 +1,6 @@
 # x-skills — Intelligent Skill Routers for Claude Code
 
-13 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
+14 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
 
 ## Skills
 
@@ -19,6 +19,7 @@
 | **x-guide** | plugin | Step-by-step comprehension-gated tutorials for docs/specs/code | Best with: x-gemini, x-research |
 | **x-worktree** | plugin | Provision an isolated git worktree on a new branch — used by `x-do` / `x-bugfix` `--wt` flag, also invokable directly | git (≥ 2.5); optional: worktrunk `wt` CLI |
 | **x-worktree-isolate** | plugin | Per-worktree docker-compose isolation: scan once → emit profile.json → on each new worktree write `compose.override.yml` (with `!reset null`) and `.env.worktree`. Hard-blocks on cross-worktree footguns. | Requires: docker compose ≥ v2.24, python3 + pyyaml; optional: worktrunk wt |
+| **x-upstream** | plugin | Pin upstream repos as `research/<owner>/<repo>` submodules at latest stable release. Commands: add / update (one or all) / list / remove. Stable detection: `gh release` non-prerelease → semver tag fallback. | git ≥ 2.13; optional: gh + jq (without them, semver-tag fallback only) |
 | **x-skill-improve** | plugin | Improve skills from session data | Optional: claude-mem |
 | **x-shared** | plugin | Shared references (not invokable) | None |
 | **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/`; optional: claude-mem |
@@ -95,3 +96,47 @@ Or invoke the setup skill: `/x-skills:setup`
 The skills in this repo resolve conflicting instructions via the precedence ladder in `skills/x-shared/invocation-guide.md` § "Prompt Assembly — Precedence Ladder".
 
 TL;DR: inviolable principles > user in-prompt > project `CLAUDE.md` > **this file** > advisory memory > `~/.claude/CLAUDE.md` > skill frontmatter > skill body > harness.
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **x-skills** (2527 symbols, 2608 relationships, 6 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/x-skills/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/x-skills/clusters` | All functional areas |
+| `gitnexus://repo/x-skills/processes` | All execution flows |
+| `gitnexus://repo/x-skills/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->
