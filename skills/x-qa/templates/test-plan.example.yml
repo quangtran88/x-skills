@@ -1,69 +1,39 @@
-feature: user-avatar-upload
+feature: avatar-upload
 entry_point: api
 acceptance:
-  - "User can upload PNG/JPEG up to 2MB"
-  - "Upload returns avatar URL on success"
-  - "Files >2MB are rejected with 413"
-  - "Non-image MIME types rejected with 415"
+  - "User can upload a jpeg ≤ 2MB"
+  - "Server rejects >2MB with 413"
 qa_strategy:
-  base_url_var: ISOLATE_PORT_API
-
+  base_url_var: BASE_URL
 test_cases:
   - id: tc-001
     category: happy
     complexity: simple
-    description: Upload 100KB PNG succeeds
-    request:
-      method: POST
-      path: /api/users/me/avatar
-      headers:
-        Authorization: "Bearer ${TEST_API_TOKEN}"
-        Content-Type: image/png
-      body: "@fixtures/avatar-100kb.png"
+    description: "GET /health responds 200"
+    request: { method: GET, path: /health }
     assertions:
-      - { kind: status, op: eq, value: 200 }
-      - { kind: body-jsonpath, expr: $.url, op: matches, value: "^https://.*\\.png$" }
-      - { kind: latency-ms, op: lt, value: 2000 }
+      - { kind: status, expr: "", op: eq, value: 200 }
 
   - id: tc-002
-    category: edge
-    complexity: simple
-    description: Upload exactly 2MB succeeds (boundary)
+    category: auth
+    complexity: complex
+    description: "POST /auth/login returns token"
     request:
       method: POST
-      path: /api/users/me/avatar
-      headers: { Authorization: "Bearer ${TEST_API_TOKEN}", Content-Type: image/jpeg }
-      body: "@fixtures/avatar-2mb-exact.jpg"
+      path: /auth/login
+      body: { user: "${FIXTURE_USER}", pass: "${FIXTURE_PASS}" }
     assertions:
-      - { kind: status, op: eq, value: 200 }
+      - { kind: status, expr: "", op: eq, value: 200 }
+      - { kind: body-jsonpath, expr: "$.token", op: matches, value: "^[A-Za-z0-9._-]+$" }
 
   - id: tc-003
-    category: error
-    complexity: simple
-    description: Upload >2MB rejected with 413
-    request:
-      method: POST
-      path: /api/users/me/avatar
-      headers: { Authorization: "Bearer ${TEST_API_TOKEN}", Content-Type: image/png }
-      body: "@fixtures/avatar-3mb.png"
-    assertions:
-      - { kind: status, op: eq, value: 413 }
-      - { kind: body-jsonpath, expr: $.error, op: contains, value: "size" }
-
-  - id: tc-004
-    category: auth
-    complexity: simple
-    description: Missing auth returns 401
-    request:
-      method: POST
-      path: /api/users/me/avatar
-      body: "@fixtures/avatar-100kb.png"
-    assertions:
-      - { kind: status, op: eq, value: 401 }
-
-  - id: tc-005
-    category: concurrency
+    category: happy
     complexity: complex
-    description: Two concurrent uploads — last write wins
-    setup: "fixture:seed-user-no-avatar"
-    teardown: "fixture:cleanup-user"
+    description: "Upload avatar with token from tc-002"
+    depends_on: [tc-002]
+    request:
+      method: POST
+      path: /me/avatar
+      headers: { Authorization: "Bearer ${TC_002_TOKEN}" }
+    assertions:
+      - { kind: status, expr: "", op: eq, value: 201 }

@@ -27,3 +27,23 @@
 
 12. **Only `type: http` runs.** v1 `run` skips cli/grpc/graphql/worker/websocket entries with a clear notice. Schema persists them for v2.
 13. **No nested OMC team.** v1 fanout is bg-dispatch only. For >50 concurrent cases, you'll feel the local concurrency cap.
+
+## Intent classification & scout
+
+14. **Single-token prose misclassified.** `x-qa run foo` with no `foo` file
+    and no `foo` entry returns `prose, low` and triggers the ask-when-
+    ambiguous gate. Tab-complete or quote the input for clarity.
+15. **Scout context overflow on large repos.** A `prose` intent in a monorepo
+    can balloon scope. Scout caps output at 20 endpoints / 40 edge cases
+    (`references/scout-prompt.md`). If the cap fires, the planner sees a
+    truncated surface — surface this in QA_REPORT.md as a warning.
+16. **Cycle in `depends_on`.** `topo-order.sh` refuses with exit 2 and a
+    one-line stderr. An *unknown* dependency id (typo) exits 1 instead.
+    Inspect the plan YAML and either fix the typo (exit 1) or remove the
+    cycle (exit 2).
+17. **Skipped vs failed cases.** A `fail` in wave N skips downstream
+    dependents. They show `verdict: skipped` in QA_REPORT.md and do NOT
+    count toward `flaky_rate`. Only `fail` blocks the run verdict.
+18. **Scout dispatched without gemini_cli.** When `gemini_cli` capability is
+    unpinned, `X_QA_SIMPLE_RUNNER` resolves to OMC executor / Explore.
+    Scout latency rises (~3-5x); cost lower. Acceptable.

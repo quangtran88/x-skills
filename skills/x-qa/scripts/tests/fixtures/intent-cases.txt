@@ -1,0 +1,11 @@
+# format: <expected-intent>|<input>|<setup-hint>
+branch||
+pr|PR #42|
+pr|#42|
+pr|https://github.com/o/r/pull/42|
+service|api|profile-has-api
+spec|docs/avatar.md|create-file-docs/avatar.md
+artifact|src/api/users.ts|create-file-src/api/users.ts
+artifact-dir|src/api|create-dir-src/api
+prose|avatar upload should resize|
+prose|qwertyfoobar|

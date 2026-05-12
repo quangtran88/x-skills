@@ -6,6 +6,14 @@ role: qa-orchestrator
 
 # x-qa — Profile-Driven E2E QA Orchestrator
 
+## Input Contract
+
+`run` accepts a free-form `{{ARGUMENTS}}` — empty string, `PR #<n>`, an
+entry-point name, a file path, a directory, or prose describing a feature.
+The bootstrap classifier (Run Phase 3) resolves it. Explicit flags
+(`--pr`/`--branch`/`--service`/`--plan`) override classification. Do NOT
+add new user-facing flags for input source — the classifier handles it.
+
 ## Bootstrap (MANDATORY)
 
 Before any subcommand:
@@ -76,23 +84,25 @@ Refer to:
 - `inspect`: `scripts/inspect.sh` (read-only mode)
 - `doctor`: `references/doctor-checks.md` + `scripts/doctor.sh`
 - `generate`: `references/test-plan-schema.md` (LLM-generated inline; `scripts/plan-generate.sh` is a v2 placeholder, not shipped in v1)
-- `run`: see "Run Phases" below
+- `run`: see "Run Phases" below; intent via `references/intent-detection.md`; scout via `references/scout-prompt.md`
 
 ## Run Phases
 
 1. Bootstrap (above).
 2. Auto-doctor (skippable via `--skip-doctor`).
-3. Resolve target: `--service <name>` or `profile.primary_entry_point`. Refuse if entry point's `type != http` (v1 limitation).
-4. Plan: read `--plan <path>` if given, else generate per `references/test-plan-schema.md` using profile catalog as ground truth.
-5. Launch service via `scripts/launch-entry-point.sh` (skipped on `--no-launch` or `--service <ext-url>`).
-6. Health wait via `scripts/health-wait.sh`.
-7. Classify cases per `references/classification-rules.md` (simple vs complex).
-8. Dispatch fanout — capped at `--max-bg`, all `run_in_background: true`. Templates in `references/case-runner-prompts.md`.
-9. Collect every dispatch terminal state (mandatory per `~/.claude/rules/background-agents.md`). Never `background_cancel(all=true)` before collection.
-10. Retry flaky inline up to `--retry-flaky`.
-11. Teardown via launch entry's `launch.teardown` (skipped if Phase 5 was skipped).
-12. Aggregate via `scripts/aggregate-results.sh` → `QA_REPORT.md`.
-13. Emit envelope.
+3. **Classify intent.** Run `scripts/classify-intent.sh "{{ARGUMENTS}}"`, persist to `<run-dir>/intent.json`. If `confidence == "low"` OR multiple candidates surface, ask the user ONE question per `references/intent-detection.md § Ask-When-Ambiguous`, then rewrite intent.json with `confidence: high`.
+4. Resolve target from intent: `service` → entry name; `branch`/`pr` → PR-surface derivation (`references/pr-surface-derivation.md`); `spec`/`artifact`/`artifact-dir`/`prose` → trigger Phase 5 (Scout). Refuse if resolved entry's `type != http` (v1 limitation).
+5. **Scout (conditional).** Only when intent ∈ {`spec`, `artifact`, `artifact-dir`, `prose`}: dispatch `$X_QA_SIMPLE_RUNNER` inline per `references/scout-prompt.md`. Persist `<run-dir>/scope.json`. On invalid JSON / timeout, use whole-profile coverage and warn.
+6. Plan: read `--plan <path>` if given, else generate per `references/test-plan-schema.md` using profile catalog + (if present) `scope.json` as ground truth.
+7. Launch service via `scripts/launch-entry-point.sh` (skipped on `--no-launch` or `--service <ext-url>`).
+8. Health wait via `scripts/health-wait.sh`.
+9. Classify cases per `references/classification-rules.md` (simple vs complex).
+10. **Compute dispatch waves.** Pipe plan JSON through `scripts/lib/topo-order.sh`. Refuse plan on cycle (exit 2) or unknown dependency id (exit 1). Each wave dispatches in parallel (capped at `--max-bg`, all `run_in_background: true`); next wave starts when every case in current wave reaches terminal state. Cases whose deps failed are marked `skipped`, not `fail`. Templates in `references/case-runner-prompts.md`.
+11. Collect every dispatch terminal state (mandatory per `~/.claude/rules/background-agents.md`). Never `background_cancel(all=true)` before collection.
+12. Retry flaky inline up to `--retry-flaky`.
+13. Teardown via launch entry's `launch.teardown` (skipped if Phase 7 was skipped).
+14. Aggregate via `scripts/aggregate-results.sh` → `QA_REPORT.md`. Propagate `scope.json.open_questions` into the report's notes section.
+15. Emit envelope.
 
 ## After This Skill
 
