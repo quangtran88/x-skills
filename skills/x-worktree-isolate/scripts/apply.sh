@@ -73,35 +73,60 @@ if [[ -z "$PROFILE" ]]; then
   exit 1
 fi
 
-# Schema check.
-SCHEMA_OK="$(python3 - "$PROFILE" <<'PY'
-import json, sys
-with open(sys.argv[1]) as fh:
-    data = json.load(fh)
-print("ok" if data.get("schema") == 1 else f"bad:{data.get('schema')}")
-PY
-)"
-if [[ "$SCHEMA_OK" != "ok" ]]; then
-  echo "x-worktree-isolate apply: profile schema mismatch ($SCHEMA_OK). Re-run init." >&2
+# Hard-reject schema:1 (v0.2.0+ requires schema:2). Print precise migration command.
+SCHEMA="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("schema"))' "$PROFILE")"
+if [[ "$SCHEMA" == "1" ]]; then
+  cat >&2 <<EOF
+x-worktree-isolate apply: profile schema 1 is no longer supported by v0.2.0+.
+  Profile: $PROFILE
+
+  Migrate by running init --rescan from the main checkout:
+
+    cd <main-checkout> && x-worktree-isolate init --rescan
+
+  init --rescan will write ${PROFILE}.new alongside the existing profile and
+  print the exact diff + merge commands you should run next. Do not edit
+  ${PROFILE} by hand.
+EOF
+  exit 1
+fi
+if [[ "$SCHEMA" != "2" ]]; then
+  echo "x-worktree-isolate apply: unsupported profile schema ($SCHEMA). Expected 2." >&2
   exit 1
 fi
 
 # --- Evaluate blocker warnings BEFORE allocating (so we don't burn slots on a no-go). ---
-BLOCKER_LIST="$(python3 - "$PROFILE" <<'PY'
-import json, sys
-with open(sys.argv[1]) as fh:
-    profile = json.load(fh)
-blockers = []
+# Unified collector: global_label_warnings + single_worktree_profiles + singletons[kind=host].
+OVERRIDES_FILE="$REPO_ROOT/.worktree-isolate/feature-overrides.local.json"
+BLOCKER_LIST="$(python3 - "$PROFILE" "$OVERRIDES_FILE" <<'PY'
+import json, os, sys
+profile = json.load(open(sys.argv[1]))
+ov_path = sys.argv[2]
+overrides = {}
+if os.path.isfile(ov_path):
+    try: overrides = {o["id"]: o["state"] for o in json.load(open(ov_path)).get("overrides", []) if isinstance(o, dict) and "id" in o and "state" in o}
+    except (OSError, json.JSONDecodeError): pass
+
+lines = []
 for w in profile.get("global_label_warnings", []):
     if not isinstance(w, dict): continue
     if not w.get("label"): continue
     if w.get("severity") == "blocker":
-        blockers.append(f"  - [{w.get('found_in','?')}] label={w.get('label')}\n    fix_hint: {w.get('fix_hint','(none)')}")
+        lines.append(f"  - [{w.get('found_in','?')}] label={w.get('label')}\n    fix_hint: {w.get('fix_hint','(none)')}")
 for w in profile.get("single_worktree_profiles", []):
     if not isinstance(w, dict): continue
     if w.get("severity") == "blocker" and w.get("service"):
-        blockers.append(f"  - profile={w.get('profile')} on service {w.get('service')}: {w.get('reason')}")
-print("\n".join(blockers))
+        lines.append(f"  - profile={w.get('profile')} on service {w.get('service')}: {w.get('reason')}")
+for s in profile.get("singletons", []) or []:
+    if s.get("kind") != "host": continue
+    state = overrides.get(s.get("id"), s.get("default_in_worktree", "disabled"))
+    if state == "acknowledged": continue
+    if s.get("severity") != "blocker": continue
+    lines.append(
+        f"  - host-singleton {s.get('id')}: {s.get('host_artifact','')}\n"
+        f"    fix: {s.get('manual_fix_hint','run x-worktree-isolate ack-host-singletons')}"
+    )
+print("\n".join(lines))
 PY
 )"
 if [[ -n "$BLOCKER_LIST" && "$IGNORE_WARNINGS" -eq 0 ]]; then
@@ -109,8 +134,9 @@ if [[ -n "$BLOCKER_LIST" && "$IGNORE_WARNINGS" -eq 0 ]]; then
 x-worktree-isolate apply: BLOCKED — unresolved cross-worktree footguns:
 $BLOCKER_LIST
 
-Resolve the issues above (apply the fix_hint), or re-run with --ignore-warnings
-to acknowledge the footgun explicitly.
+Resolve the issues above (apply the fix_hint), or:
+  - for host-singletons, run: x-worktree-isolate ack-host-singletons
+  - or re-run with --ignore-warnings to acknowledge the footguns explicitly.
 EOF
   exit 1
 fi
@@ -267,39 +293,64 @@ ENV_PATH="$REPO_ROOT/.env.worktree"
 STATE_DIR="$REPO_ROOT/.worktree-isolate"
 STATE_PATH="$STATE_DIR/state.local.json"
 
-# Build per-service override blocks. Fix #1: key the override by SERVICE name
-# (Compose merges by service key, not container_name). Each services_to_strip
-# entry binds {service, container_name, ports[]}. Emit:
-#   services.<service>:
-#     container_name: !reset null   (only when service had a hardcoded one)
-#     ports: !override              (only when service had hardcoded host ports)
-#       - "127.0.0.1:${VAR}:CPORT"
-OVERRIDE_BODY="$(python3 - "$PROFILE" <<'PY'
+# Single-pass render: merge services_to_strip (container_name/ports) + singleton
+# compose_service_fields (deploy/profiles) into ONE dict per service so
+# compose.override.yml has exactly one `services.<svc>:` block per service.
+RENDER_JSON="$(python3 "$SCRIPT_DIR/render-singletons.py" --profile "$PROFILE" --overrides "$OVERRIDES_FILE")"
+
+# Surface render-side warnings (e.g., replicas-zero on standalone compose).
+RENDER_WARNINGS="$(printf '%s' "$RENDER_JSON" | python3 -c 'import json,sys; print("\n".join(f"⚠ {w}" for w in json.load(sys.stdin).get("warnings", [])))')"
+if [[ -n "$RENDER_WARNINGS" ]]; then
+  printf '%s\n' "$RENDER_WARNINGS" >&2
+fi
+
+OVERRIDE_BODY="$(python3 - "$PROFILE" "$RENDER_JSON" <<'PY'
 import json, sys
 profile = json.load(open(sys.argv[1]))
-entries = profile.get("services_to_strip", [])
-lines = ["services:"]
-seen = set()
-for e in entries:
+render = json.loads(sys.argv[2])
+svc_fields = render.get("compose_service_fields", {})
+
+merged: dict = {}
+for e in profile.get("services_to_strip", []) or []:
     if not isinstance(e, dict): continue
     svc = e.get("service")
-    if not svc or svc in seen: continue
-    seen.add(svc)
-    cname = e.get("container_name")
-    ports = e.get("ports") or []
-    if not cname and not ports:
-        continue   # nothing to override
+    if not svc: continue
+    entry = merged.setdefault(svc, {})
+    if e.get("container_name"):
+        entry["container_name_reset"] = True
+    if e.get("ports"):
+        entry["ports"] = list(e.get("ports") or [])
+for svc, fields in (svc_fields or {}).items():
+    entry = merged.setdefault(svc, {})
+    if "deploy" in fields:
+        entry["deploy"] = fields["deploy"]
+    if "profiles" in fields:
+        entry.setdefault("profiles", [])
+        for p in fields["profiles"]:
+            if p not in entry["profiles"]:
+                entry["profiles"].append(p)
+
+lines = ["services:"]
+for svc, entry in merged.items():
+    if not entry:
+        continue
     lines.append(f"  {svc}:")
-    if cname:
+    if entry.get("container_name_reset"):
         lines.append("    container_name: !reset null")
-    if ports:
+    if entry.get("ports"):
         lines.append("    ports: !override")
-        for p in ports:
-            var = p.get("var")
-            cport = p.get("container_port")
-            if not var or cport is None:
-                continue
+        for p in entry["ports"]:
+            var = p.get("var"); cport = p.get("container_port")
+            if not var or cport is None: continue
             lines.append(f'      - "127.0.0.1:${{{var}}}:{cport}"')
+    if entry.get("deploy"):
+        lines.append("    deploy:")
+        for k, v in entry["deploy"].items():
+            lines.append(f"      {k}: {json.dumps(v)}")
+    if entry.get("profiles"):
+        lines.append("    profiles:")
+        for p in entry["profiles"]:
+            lines.append(f"      - {p}")
 print("\n".join(lines))
 PY
 )"
@@ -330,13 +381,18 @@ for ((i=0; i<${#SELECTED_VARS[@]}; i++)); do
   ENV_LINES="${ENV_LINES}
 ${SELECTED_VARS[$i]}=${SELECTED_PORTS[$i]}"
 done
+SINGLETON_ENV_LINES="$(printf '%s' "$RENDER_JSON" | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("env_lines", [])))')"
+if [[ -n "$SINGLETON_ENV_LINES" ]]; then
+  ENV_LINES="${ENV_LINES}
+${SINGLETON_ENV_LINES}"
+fi
 ENV_CONTENT="# Auto-generated by x-worktree-isolate — do not edit by hand.
 # Regenerate via: x-worktree-isolate apply
 # Launch: ${LAUNCH_HINT}
 ${ENV_LINES}"
 
 # --- Build state.local.json + ports map for registry ---
-PORTS_MAP_JSON="$(python3 - "${SELECTED_VARS[*]}" "${SELECTED_PORTS[*]}" <<'PY'
+PORTS_MAP_JSON="$(python3 - "${SELECTED_VARS[*]:-}" "${SELECTED_PORTS[*]:-}" <<'PY'
 import json, sys
 keys = sys.argv[1].split()
 vals = sys.argv[2].split()
@@ -388,6 +444,7 @@ LINES=(
   ".env.worktree"
   "compose.override.yml"
   ".worktree-isolate/state.local.json"
+  ".worktree-isolate/feature-overrides.local.json"
 )
 touch "$GITIGNORE"
 for line in "${LINES[@]}"; do
@@ -404,6 +461,26 @@ done
 
 # --- Claim registry slot ---
 xwi_claim_slot "$SLOT" "$REPO_ROOT" "$BRANCH" "$PORTS_MAP_JSON" "$DATA_PATH"
+
+# Singleton ownership bookkeeping (declarative; not a runtime lock).
+ENABLED_IDS="$(python3 - "$PROFILE" "$OVERRIDES_FILE" <<'PY'
+import json, os, sys
+prof = json.load(open(sys.argv[1]))
+ov_path = sys.argv[2]
+overrides = {}
+if os.path.isfile(ov_path):
+    try: overrides = {o["id"]: o["state"] for o in json.load(open(ov_path)).get("overrides", []) if isinstance(o, dict) and "id" in o and "state" in o}
+    except (OSError, json.JSONDecodeError): pass
+out=[]
+for s in prof.get("singletons", []) or []:
+    sid = s["id"]
+    state = overrides.get(sid, s.get("default_in_worktree","disabled"))
+    if state == "enabled":
+        out.append(sid)
+print(",".join(out))
+PY
+)"
+xwi_set_singleton_owners "$REPO_ROOT" "$ENABLED_IDS"
 
 # --- Print Next Steps ---
 if [[ "$QUIET" -eq 0 ]]; then

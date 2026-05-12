@@ -51,7 +51,7 @@ write_profile() {
   mkdir -p "$repo/.worktree-isolate"
   if [ -z "$body" ]; then
     body='{
-  "schema": 1,
+  "schema": 2,
   "stack": "compose",
   "port_strategy": {
     "scan_range": [18000, 29999],
@@ -69,7 +69,7 @@ write_profile() {
   ],
   "global_label_warnings": [],
   "single_worktree_profiles": []
-}'
+,"singletons": [], "detection_guardrails": {"scan_max_depth": 4, "scan_max_file_bytes": 1048576, "exclude_dirs": [], "exclude_globs": []}}'
   fi
   printf '%s\n' "$body" > "$repo/.worktree-isolate/profile.json"
 }

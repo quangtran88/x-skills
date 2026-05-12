@@ -26,6 +26,7 @@ xwi_acquire_lock || exit 1
 trap 'xwi_release_lock' EXIT
 
 xwi_release_slot "$REPO_ROOT"
+xwi_clear_singleton_owners_for "$REPO_ROOT"
 
 # Fix #10: only delete generated files when their first line matches the
 # auto-generated header. Otherwise leave them alone and warn — the user may

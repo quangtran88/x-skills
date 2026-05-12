@@ -17,22 +17,32 @@ SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 WRITE=1   # default: persist (init writes profile)
 DRY_RUN=0
 RESCAN=0
+INTERACTIVE=1
+NON_INTERACTIVE=0
 for arg in "$@"; do
   case "$arg" in
-    --write)   WRITE=1 ;;
-    --dry-run) WRITE=0; DRY_RUN=1 ;;
-    --rescan)  RESCAN=1; WRITE=1 ;;
+    --write)             WRITE=1 ;;
+    --dry-run)           WRITE=0; DRY_RUN=1; INTERACTIVE=0 ;;
+    --rescan)            RESCAN=1; WRITE=1 ;;
+    --non-interactive)   NON_INTERACTIVE=1; INTERACTIVE=0 ;;
+    --interactive)       INTERACTIVE=1; NON_INTERACTIVE=0 ;;
     --help|-h)
       cat <<'EOF'
 inspect.sh — Phase 1: build profile.json draft.
-  (default)   persist to .worktree-isolate/profile.json + patch .gitignore
-  --dry-run   print profile JSON to stdout, do not touch disk
-  --rescan    write .worktree-isolate/profile.json.new and print a diff command
+  (default)            persist to profile.json + interactive singleton prompts (when TTY)
+  --non-interactive    skip prompts, accept all detected singleton candidates as disabled
+  --dry-run            print profile JSON to stdout, do not touch disk
+  --rescan             write .worktree-isolate/profile.json.new and print a diff command
 EOF
       exit 0 ;;
     *) echo "inspect.sh: unknown flag: $arg" >&2; exit 1 ;;
   esac
 done
+# If stdin is not a TTY, force non-interactive (CI / pipe safety).
+if [[ "$INTERACTIVE" -eq 1 ]] && [[ ! -t 0 ]]; then
+  INTERACTIVE=0
+  NON_INTERACTIVE=1
+fi
 
 # --- Preflight ---
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -140,12 +150,75 @@ print(json.dumps(warns))
 PY
 )"
 
+# --- Detect singletons (Tasks 3-5) ---
+GUARDRAILS_DEFAULT='{"scan_max_depth":4,"scan_max_file_bytes":1048576,"exclude_dirs":["node_modules","vendor",".git","dist","build","__pycache__","target",".next",".venv","tests/fixtures"],"exclude_globs":["*.min.js","*.lock","package-lock.json","pnpm-lock.yaml","yarn.lock","Cargo.lock"]}'
+SINGLETONS_RAW="$(python3 "$SCRIPT_DIR/detect-singletons.py" --repo "$REPO_ROOT" --guardrails "$GUARDRAILS_DEFAULT")"
+SINGLETONS_LIST_JSON="$(printf '%s' "$SINGLETONS_RAW" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("singletons",[])))')"
+
+# Interactive prompt loop. Heredoc-fed stdin + command-substitution stdout would
+# both break input() — script reads/writes /dev/tty explicitly, passes JSON via
+# tmpfiles.
+if [[ "$INTERACTIVE" -eq 1 ]]; then
+  PROMPT_IN="$(mktemp -t xwi-cands-in.XXXXXX)"
+  PROMPT_OUT="$(mktemp -t xwi-cands-out.XXXXXX)"
+  PROMPT_SCRIPT="$(mktemp -t xwi-prompt.XXXXXX.py)"
+  # Trap-clean tmp files even on SIGINT / python crash / set -e abort.
+  trap 'rm -f "$PROMPT_IN" "$PROMPT_OUT" "$PROMPT_SCRIPT"' EXIT
+  printf '%s' "$SINGLETONS_LIST_JSON" > "$PROMPT_IN"
+  cat > "$PROMPT_SCRIPT" <<'PY'
+import json, sys
+
+with open(sys.argv[1]) as fh:
+    cands = json.load(fh)
+
+try:
+    tty = open("/dev/tty", "r+", buffering=1)
+except OSError:
+    json.dump(cands, open(sys.argv[2], "w"))
+    sys.exit(0)
+
+def ask(prompt):
+    tty.write(prompt)
+    tty.flush()
+    return tty.readline().strip()
+
+kept = []
+if cands:
+    tty.write("\nx-worktree-isolate init: review detected singletons (these will be disabled in worktrees):\n")
+for c in cands:
+    tty.write(f"\n  [{c['id']}] kind={c['kind']} severity={c['severity']}\n")
+    tty.write(f"    rationale: {c['rationale']}\n")
+    for ev in c['evidence']:
+        tty.write(f"    evidence:  {ev}\n")
+    suffix = "/c" if c["kind"] == "env-flag" else ""
+    while True:
+        ans = ask(f"    Disable in worktrees? [Y/n{suffix}]: ").lower()
+        if ans in ("", "y", "yes"):
+            kept.append(c); break
+        if ans in ("n", "no"):
+            c["default_in_worktree"] = "enabled"; kept.append(c); break
+        if c["kind"] == "env-flag" and ans in ("c", "customize"):
+            new_var = ask(f"    Env var name [{c['env_var']}]: ")
+            if new_var: c["env_var"] = new_var
+            kept.append(c); break
+        tty.write(f"      (please answer y / n{suffix})\n")
+
+with open(sys.argv[2], "w") as fh:
+    json.dump(kept, fh)
+PY
+  python3 "$PROMPT_SCRIPT" "$PROMPT_IN" "$PROMPT_OUT"
+  SINGLETONS_LIST_JSON="$(cat "$PROMPT_OUT")"
+  rm -f "$PROMPT_IN" "$PROMPT_OUT" "$PROMPT_SCRIPT"
+fi
+
 # --- Build profile.json ---
-PROFILE_JSON="$(python3 - "$PARSED_JSON" "$LABEL_WARNINGS_JSON" "$REPO_ROOT" <<'PY'
+PROFILE_JSON="$(python3 - "$PARSED_JSON" "$LABEL_WARNINGS_JSON" "$REPO_ROOT" "$SINGLETONS_LIST_JSON" "$GUARDRAILS_DEFAULT" <<'PY'
 import json, os, sys, time
 parsed = json.loads(sys.argv[1])
 label_warnings = json.loads(sys.argv[2])
 repo_root = sys.argv[3]
+singletons_list = json.loads(sys.argv[4])
+guardrails = json.loads(sys.argv[5])
 
 compose_files_meta = parsed.get("compose_files", [])
 
@@ -246,8 +319,8 @@ for cf in compose_files_meta:
 services_to_strip_list = list(services_to_strip.values())
 
 profile = {
-    "schema": 1,
-    "generator_version": "0.1.0",
+    "schema": 2,
+    "generator_version": "0.2.0",
     "stack": "docker-compose",
     "compose_files": [os.path.relpath(cf["file"], repo_root) for cf in compose_files_meta],
     "compose_override_target": "compose.override.yml",
@@ -264,6 +337,8 @@ profile = {
     "single_worktree_profiles": single_worktree_profiles,
     "post_apply_hints": [],
     "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "singletons": singletons_list,
+    "detection_guardrails": guardrails,
 }
 print(json.dumps(profile, indent=2))
 PY
@@ -302,6 +377,7 @@ LINES=(
   ".env.worktree"
   "compose.override.yml"
   ".worktree-isolate/state.local.json"
+  ".worktree-isolate/feature-overrides.local.json"
 )
 touch "$GITIGNORE"
 for line in "${LINES[@]}"; do

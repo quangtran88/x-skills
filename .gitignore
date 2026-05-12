@@ -13,3 +13,7 @@ skills/*/data/
 
 # Local-only implementation plans for in-flight skill work
 docs/plans/
+
+# Python bytecode from in-tree helper scripts
+__pycache__/
+*.pyc

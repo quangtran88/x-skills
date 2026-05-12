@@ -14,7 +14,7 @@ SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 export XWI_SKILL_DIR="$SKILL_DIR"
 export XWI_SCRIPT_DIR="$SCRIPT_DIR"
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 usage() {
   cat <<'EOF'
@@ -31,6 +31,10 @@ Subcommands:
   release [--quiet]                 Free this worktree's registry slot.
   doctor                            Run validation suite.
   list                              Show all claimed slots from registry.
+  features                          List profiled singletons + per-worktree state.
+  enable <id>                       Mark singleton as enabled in this worktree.
+  disable <id>                      Mark singleton as disabled (default).
+  ack-host-singletons               Acknowledge all host-tier singletons (per worktree).
   version                           Print version.
 
 See SKILL.md for full documentation.
@@ -57,6 +61,9 @@ case "$cmd" in
     ;;
   list)
     exec bash "$SCRIPT_DIR/allocate-ports.sh" list "$@"
+    ;;
+  features|enable|disable|ack-host-singletons)
+    exec bash "$SCRIPT_DIR/feature-overrides.sh" "$cmd" "$@"
     ;;
   version|--version|-v)
     echo "x-worktree-isolate $VERSION"

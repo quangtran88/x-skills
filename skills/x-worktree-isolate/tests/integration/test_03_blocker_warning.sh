@@ -11,7 +11,7 @@ make_repo "$MAIN"
 
 # Profile with a blocker warning.
 blocker_profile='{
-  "schema": 1,
+  "schema": 2,
   "stack": "compose",
   "port_strategy": {
     "scan_range": [18000, 29999],
@@ -25,7 +25,7 @@ blocker_profile='{
     {"label": "app.sandbox=1", "found_in": "Makefile:42", "severity": "blocker", "fix_hint": "scope the label to COMPOSE_PROJECT_NAME"}
   ],
   "single_worktree_profiles": []
-}'
+,"singletons": [], "detection_guardrails": {"scan_max_depth":4,"scan_max_file_bytes":1048576,"exclude_dirs":[],"exclude_globs":[]}}'
 write_profile "$MAIN" "$blocker_profile"
 commit_profile "$MAIN"
 

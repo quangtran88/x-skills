@@ -52,24 +52,53 @@ xwi_registry_lock_dir() {
 }
 
 # --- Lock primitives ---
+# PID-stamped lock with stale detection. The holder writes $$ into lock_dir/pid;
+# a contender that finds the lock checks if the holder PID is still alive via
+# `kill -0`. If not, take over the lock. Prevents a crashed/killed apply from
+# wedging every subsequent invocation behind a manual rmdir.
 xwi_acquire_lock() {
-  local lock_dir
+  local lock_dir pid_file holder
   lock_dir="$(xwi_registry_lock_dir)" || return 1
+  pid_file="$lock_dir/pid"
   local i
   for i in 1 2 3 4 5; do
     if mkdir "$lock_dir" 2>/dev/null; then
+      printf '%s\n' "$$" > "$pid_file" 2>/dev/null || true
       return 0
+    fi
+    # Lock exists — check if the holder is alive.
+    if [[ -f "$pid_file" ]]; then
+      holder="$(cat "$pid_file" 2>/dev/null || true)"
+      if [[ -n "$holder" ]] && ! kill -0 "$holder" 2>/dev/null; then
+        # Holder is dead → take over.
+        rm -f "$pid_file" 2>/dev/null || true
+        rmdir "$lock_dir" 2>/dev/null || true
+        if mkdir "$lock_dir" 2>/dev/null; then
+          printf '%s\n' "$$" > "$pid_file" 2>/dev/null || true
+          echo "x-worktree-isolate: took over stale lock (PID $holder was not alive)" >&2
+          return 0
+        fi
+      fi
     fi
     sleep 0.2
   done
   echo "x-worktree-isolate: could not acquire registry lock at $lock_dir after 5 retries." >&2
-  echo "If no other apply/release is running, remove it manually: rmdir '$lock_dir'" >&2
+  echo "If no other apply/release is running, remove it manually: rm -rf '$lock_dir'" >&2
   return 1
 }
 
 xwi_release_lock() {
-  local lock_dir
+  local lock_dir pid_file
   lock_dir="$(xwi_registry_lock_dir)" 2>/dev/null || return 0
+  pid_file="$lock_dir/pid"
+  # Only release if we own it (PID match) — guards against the rare case
+  # where a stale-takeover happened and the original holder revives.
+  if [[ -f "$pid_file" ]]; then
+    local holder
+    holder="$(cat "$pid_file" 2>/dev/null || true)"
+    [[ "$holder" != "$$" ]] && return 0
+    rm -f "$pid_file" 2>/dev/null || true
+  fi
   rmdir "$lock_dir" 2>/dev/null || true
 }
 
@@ -258,6 +287,35 @@ for s in slots:
     ports = ",".join(f"{k}={v}" for k, v in (s.get("ports") or {}).items())
     print(f"{s.get('slot'):<5} {str(s.get('branch') or '')[:36]:<36} {ports[:40]:<40}  {s.get('worktree_path')}")
 PY
+}
+
+# --- Singleton ownership (declarative bookkeeping) ---
+# Records which worktree currently has each singleton enabled. Not a runtime
+# lock — the env-flag in .env.worktree is what actually prevents dual-execution.
+xwi_set_singleton_owners() {
+  local wpath="$1" ids="$2"
+  python3 - "$wpath" "$ids" "$(xwi_registry_file)" <<'PY'
+import json, os, sys
+wpath, ids_csv, path = sys.argv[1:]
+ids = [i for i in ids_csv.split(",") if i]
+data = {"slots": [], "singleton_owners": {}}
+if os.path.isfile(path):
+    try: data = json.load(open(path))
+    except json.JSONDecodeError: data = {"slots": [], "singleton_owners": {}}
+owners = data.get("singleton_owners") or {}
+owners = {k: v for k, v in owners.items() if v != wpath}
+for sid in ids:
+    owners[sid] = wpath
+data["singleton_owners"] = owners
+tmp = path + ".tmp"
+with open(tmp, "w") as fh: json.dump(data, fh, indent=2)
+os.replace(tmp, path)
+PY
+}
+
+xwi_clear_singleton_owners_for() {
+  local wpath="$1"
+  xwi_set_singleton_owners "$wpath" ""
 }
 
 # CLI passthrough so dispatch.sh can call `allocate-ports.sh list`.

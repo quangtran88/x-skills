@@ -77,3 +77,29 @@ The registry directory is `~/.config/worktree-isolate/<sha1(realpath(git rev-par
 ## 13. `parse-compose.py` requires PyYAML
 
 Hard requirement, no stdlib fallback. The script aborts with `pip install --user pyyaml` if the import fails. A bespoke regex parser would silently mis-read anchors, multi-line scalars, and merge keys — the cost of those bugs is higher than asking the user to `pip install`.
+
+## 14. Singleton false positives from vendored deps
+
+`detect-singletons.py` greps source files for patterns like `node-cron`, `bullmq`, `SLACK_BOT_TOKEN`. Vendored dependencies (`node_modules/`, `vendor/`, etc.) match these too. The `detection_guardrails.exclude_dirs` default excludes the common ones — but if a singleton with evidence pointing at a vendor path shows up after `init`, add that path to `detection_guardrails.exclude_dirs` in `profile.json` and re-run `init --rescan`.
+
+## 15. Host-tier ack is per-worktree, not per-repo
+
+`x-worktree-isolate ack-host-singletons` writes to `<worktree>/.worktree-isolate/feature-overrides.local.json`. Each new worktree starts with no ack; the user must re-ack before `apply` will succeed there. By design — the ack is the user explicitly saying "I will disable the host crontab before running THIS worktree's stack." A repo-wide ack would defeat the safety the host-tier blocker is providing.
+
+## 16. `singleton_owners` is declarative, not a runtime lock
+
+The registry's `singleton_owners` map records which worktree currently has each singleton enabled. It does NOT prevent two worktrees from both enabling the same singleton — the env-flag in `.env.worktree` is what actually short-circuits the listener in app code. The registry is bookkeeping for `features` output and future tooling. Don't expect "I killed worktree A but worktree B still won't enable" — that's not what this map does.
+
+## 17. `profile-gate` uses the `xwi-disabled` sentinel — do not put it in `COMPOSE_PROFILES`
+
+The Tier-1 default `disable_method` is `profile-gate`. Apply emits `services.<svc>.profiles: [xwi-disabled]`; `docker compose up` skips any service whose profile is not in `COMPOSE_PROFILES`. The sentinel is intentionally namespaced (not "singleton") so a user who exports `COMPOSE_PROFILES=...` for unrelated reasons cannot accidentally re-enable disabled services. **Never put `xwi-disabled` in `COMPOSE_PROFILES` for any worktree** — that re-enables every singleton you asked the skill to suppress.
+
+Confirm with:
+```
+docker compose --env-file .env --env-file .env.worktree config | grep -A1 '^<svc>:'
+```
+The singleton service should be absent from the rendered config. If it appears, check whether `COMPOSE_PROFILES` contains `xwi-disabled` (it shouldn't); otherwise switch the candidate's `disable_method` in `profile.json` from `profile-gate` to `replicas-zero` (Swarm-mode only — standalone Compose ignores `deploy.replicas:0`).
+
+## 18. Schema:1 → schema:2 hard rejection
+
+`apply` on a schema:1 profile exits non-zero with a precise migration command. Existing v0.1 repos must run `x-worktree-isolate init --rescan` from the main checkout, hand-merge the `.new` file, and commit before any worktree can run `apply` again. There is no soft fallback; this is intentional so that v0.2 can rely on `singletons[]` and `detection_guardrails{}` always existing in the profile shape.

@@ -28,10 +28,10 @@ if [[ ! -f "$PROFILE" ]]; then
   bad "profile.json not found (.worktree-isolate/profile.json)"
 else
   schema="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("schema"))' "$PROFILE" 2>/dev/null || echo bad)"
-  if [[ "$schema" == "1" ]]; then
-    ok "profile.json schema=1 ($PROFILE)"
+  if [[ "$schema" == "2" ]]; then
+    ok "profile.json schema=2 ($PROFILE)"
   else
-    bad "profile.json schema mismatch (got '$schema', want 1)"
+    bad "profile.json schema mismatch (got '$schema', want 2)"
   fi
 fi
 
@@ -151,13 +151,76 @@ if [[ -f "$ENV_WT" && -f "$REPO_ROOT/compose.override.yml" ]] && command -v dock
     RENDERED="$(cd "$REPO_ROOT" && docker compose --env-file .env.worktree config 2>/dev/null || true)"
   fi
   if [[ -n "$RENDERED" ]]; then
-    if printf '%s' "$RENDERED" | grep -qE '127\.0\.0\.1:[0-9]+:[0-9]+'; then
+    # Only assert presence of host port mappings when the profile declares any
+    # ports. A profile with only singletons (no `port_strategy.ports` and no
+    # services_to_strip with ports) emits no `127.0.0.1:H:C` mappings even when
+    # apply did the right thing — flagging that as "override not merging" is a
+    # false negative.
+    HAS_PORTS="$(python3 -c '
+import json,sys
+p=json.load(open(sys.argv[1]))
+has=bool((p.get("port_strategy") or {}).get("ports")) or any(
+    (e.get("ports") or []) for e in p.get("services_to_strip", []) or []
+)
+print("1" if has else "0")
+' "$PROFILE")"
+    if [[ "$HAS_PORTS" != "1" ]]; then
+      ok "docker compose config rendered (no host port mappings expected — profile declares none)"
+    elif printf '%s' "$RENDERED" | grep -qE '127\.0\.0\.1:[0-9]+:[0-9]+'; then
       ok "docker compose config exposes overridden host ports"
     else
       bad "docker compose config does NOT show overridden host ports — override likely not merging"
     fi
   else
     warn "docker compose config returned empty (compose v2 not on PATH or compose syntax error)"
+  fi
+fi
+
+# 8. Singleton invariants (env-flag echo + host-ack) — only when state.local.json exists.
+STATE="$REPO_ROOT/.worktree-isolate/state.local.json"
+if [[ -f "$PROFILE" && -f "$STATE" ]]; then
+  OV_FILE="$REPO_ROOT/.worktree-isolate/feature-overrides.local.json"
+  SINGLETON_REPORT="$(python3 - "$REPO_ROOT" "$PROFILE" "$OV_FILE" <<'PY'
+import json, os, sys
+repo, profile_path, ov_path = sys.argv[1:]
+profile = json.load(open(profile_path))
+overrides = {}
+if os.path.isfile(ov_path):
+    try: overrides = {o["id"]: o["state"] for o in json.load(open(ov_path)).get("overrides", []) if isinstance(o, dict) and "id" in o and "state" in o}
+    except (OSError, json.JSONDecodeError): pass
+
+env_path = os.path.join(repo, ".env.worktree")
+env_text = open(env_path).read() if os.path.isfile(env_path) else ""
+failures = []
+checks = 0
+
+for s in profile.get("singletons", []) or []:
+    sid = s["id"]; kind = s["kind"]
+    state = overrides.get(sid, s.get("default_in_worktree", "disabled"))
+    if state == "enabled":
+        continue
+    if kind == "env-flag":
+        checks += 1
+        line = f"{s.get('env_var','')}={s.get('env_disabled_value','false')}"
+        if line not in env_text:
+            failures.append(f"singleton-env-flag {sid}: expected `{line}` in .env.worktree")
+    elif kind == "host" and state != "acknowledged":
+        checks += 1
+        failures.append(f"singleton-host {sid}: not acknowledged (run `x-worktree-isolate ack-host-singletons`)")
+
+print(f"checks={checks}")
+for f in failures:
+    print(f"FAIL: {f}")
+PY
+)"
+  CHECK_COUNT="$(echo "$SINGLETON_REPORT" | grep -E '^checks=' | head -1 | cut -d= -f2)"
+  FAILURES="$(echo "$SINGLETON_REPORT" | grep -E '^FAIL: ' || true)"
+  if [[ -z "$FAILURES" ]]; then
+    ok "singleton-invariants ($CHECK_COUNT check(s)) PASS"
+  else
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && bad "${line#FAIL: }"
+    done <<<"$FAILURES"
   fi
 fi
 

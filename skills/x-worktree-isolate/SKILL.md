@@ -1,14 +1,16 @@
 ---
 name: x-worktree-isolate
-description: Use when the user runs multiple git worktrees of the same repo in parallel and hits docker-compose container_name / port / volume collisions, or asks to set up per-worktree compose isolation, or invokes `init worktree-isolate`. Wraps inspector + override emitter + worktrunk hook.
+description: Use when the user runs multiple git worktrees of the same repo in parallel and hits docker-compose container_name / port / volume collisions OR has stateful singletons (Slack/Discord bots, schedulers, webhook receivers, host crontabs) that must not run concurrently across worktrees. Singleton-aware in v0.2. Wraps inspector + override emitter + worktrunk hook.
 ---
 
 # x-worktree-isolate — Per-Worktree Docker Compose Isolation
 
+> **v0.2 migration (schema 1 → 2):** Existing repos on v0.1 must run `x-worktree-isolate init --rescan` from the main checkout, hand-merge the `.new` file, and commit the updated profile. `apply` hard-rejects schema:1 profiles with a precise migration message. There is no soft fallback — schema:2 introduces `singletons[]` and `detection_guardrails{}` that the rest of v0.2 depends on.
+
 Two-phase model:
 
-1. **INSPECT (once per repo, committed)** — scan compose files, draft `profile.json` capturing hardcoded `container_name`s, fixed ports, identity-mount data dirs, cross-worktree footguns. User reviews + commits.
-2. **APPLY (every new worktree, automatic)** — read profile, allocate a slot from a per-repo registry, write `compose.override.yml` (with `!reset null` + `!override` ports) and `.env.worktree` (`COMPOSE_PROJECT_NAME` + ports + data dir). Triggered by worktrunk's `wt` post-create hook.
+1. **INSPECT (once per repo, committed)** — scan compose files + source + host artifacts, draft `profile.json` capturing hardcoded `container_name`s, fixed ports, identity-mount data dirs, cross-worktree footguns, AND stateful singletons across three tiers (compose-service / env-flag / host). User reviews interactively + commits.
+2. **APPLY (every new worktree, automatic)** — read profile, allocate a slot from a per-repo registry, write `compose.override.yml` (with `!reset null` + `!override` ports + singleton `profiles: [xwi-disabled]` / `deploy.replicas: 0`) and `.env.worktree` (`COMPOSE_PROJECT_NAME` + ports + data dir + singleton env-flags). Hard-blocks on host-tier singletons until acknowledged. Triggered by worktrunk's `wt` post-create hook.
 
 The skill never runs `docker compose up`, never reads or writes the user's `.env`, and never auto-patches their Makefile.
 
@@ -25,11 +27,15 @@ The skill never runs `docker compose up`, never reads or writes the user's `.env
 
 | Signal | Subcommand |
 |---|---|
-| User asks to "isolate worktrees", "make compose work in parallel worktrees", "container name conflict in second worktree", or types `init worktree-isolate` | `init` |
+| User asks to "isolate worktrees", "make compose work in parallel worktrees", "container name conflict in second worktree", or types `init worktree-isolate` | `init` (interactive; pass `--non-interactive` for CI) |
 | Just ran `wt switch -c <branch>` (or `git worktree add`) and started seeing port/name collisions | `apply` (auto via wt post-create hook; manual run also valid) |
 | `docker compose up` in a second worktree binds to the same host ports as the first / silently uses the same `container_name` | `doctor` |
 | `wt remove` was just run and the registry needs cleanup | `release` (auto via wt pre-remove hook) |
 | User wants to see all currently-claimed slots | `list` |
+| User wants to inspect singletons profiled for this worktree | `features` |
+| User wants the Slack bot ON in this worktree | `enable <id>` |
+| User wants to revert a singleton to default-disabled in this worktree | `disable <id>` |
+| Host-tier singleton (crontab/systemd) blocks apply — user disabled the host state manually | `ack-host-singletons` |
 
 ## When NOT to use
 
@@ -52,7 +58,11 @@ The dispatch.sh router exposes one subcommand per workflow stage:
 9. **`release`** — drop this worktree's registry slot. Removes generated files only when their first line still matches the auto-generated header.
 10. **`doctor`** — validation suite. Asserts `docker compose --env-file .env.worktree config` (with `--env-file .env` stacked first when a base `.env` exists) actually exposes overridden host ports.
 11. **`list`** — print all slots claimed in the per-repo registry.
-12. **`version`** — print version (currently `0.1.0`).
+12. **`version`** — print version (currently `0.2.0`).
+13. **`features`** — list profiled singletons + per-worktree state (`disabled` / `enabled` / `acknowledged`).
+14. **`enable <id>`** — mark singleton as enabled in this worktree. Regenerates override + `.env.worktree`. Records ownership in registry's `singleton_owners` (declarative).
+15. **`disable <id>`** — revert to disabled (default). Same regeneration.
+16. **`ack-host-singletons`** — write `acknowledged` for every host-tier singleton in `feature-overrides.local.json`. Required (per-worktree) when host singletons present, otherwise `apply` blocks.
 
 ## Anti-patterns
 
@@ -61,6 +71,20 @@ The dispatch.sh router exposes one subcommand per workflow stage:
 - **Never run `docker compose up` from this skill** — that's the user's Makefile / launch tooling. Apply only writes files and prints the launch command.
 - **Never auto-patch a user's Makefile** — Makefile global label filters are reported as `severity: blocker` warnings; the user fixes them by hand. Out of scope for v1.
 - **Never use the plugin-cache path in wt.toml** — plugin caches rotate on upgrade. Always use the PATH-resolved `x-worktree-isolate` (symlinked by `bin/setup`).
+
+## Singletons (v0.2)
+
+Stateful features that must not run concurrently across parallel worktrees. Three tiers:
+
+| Tier | What's detected | Disable mechanism (in worktree) |
+|---|---|---|
+| 1 — compose-service | Compose service env contains Slack/Discord/Telegram/Stripe/GitHub-App token, or image matches ngrok/watchtower | `services.<svc>.profiles: [xwi-disabled]` (default) or `deploy.replicas: 0` (Swarm only) — written into `compose.override.yml` |
+| 2 — env-flag | Source code matches `node-cron`/`bullmq`/`celery beat`/`slack-bolt`/`telegraf`/`agenda`/`chokidar`/Procfile worker line | `<VAR>=false` line appended to `.env.worktree` (app code reads the flag) |
+| 3 — host | Repo-tracked `*.crontab`, `crontab`, `*.service`, `*.timer` | NONE — `apply` hard-blocks until `x-worktree-isolate ack-host-singletons` (per-worktree) |
+
+`init` scans + prompts (interactive by default; `--non-interactive` for CI accepts all candidates as disabled). Detection is bounded by `profile.detection_guardrails` — `scan_max_depth`, `scan_max_file_bytes`, `exclude_dirs`, `exclude_globs`. The pattern catalog lives in `scripts/singleton-patterns.py`; see `references/singleton-patterns.md` for per-tier rationale and the "why no host auto-disable" answer.
+
+Per-worktree overrides via `features` / `enable <id>` / `disable <id>` write to `<worktree>/.worktree-isolate/feature-overrides.local.json` (gitignored). `apply` re-renders both files honoring those overrides.
 
 ## Gotchas
 
@@ -120,11 +144,29 @@ Re-applying the same worktree produces a byte-identical file modulo `applied_at`
 
 The wt.toml hook snippet below is **optional** — only needed for raw-`wt` users who never invoke `/x-skills:x-worktree`. Skill callers don't need it; the skill calls `apply --quiet --if-profile-exists` for them. The wt.toml-only path is on the v2 deprecation track; new repos should adopt `/x-skills:x-worktree`.
 
+## feature-overrides.local.json (v0.2 sibling)
+
+Written by `enable` / `disable` / `ack-host-singletons` to `<worktree>/.worktree-isolate/feature-overrides.local.json` (gitignored). Per-worktree state for each profiled singleton:
+
+```jsonc
+{
+  "schema": 1,
+  "overrides": [
+    {"id": "slack-listener", "state": "enabled"},
+    {"id": "host-crontab",   "state": "acknowledged"}
+  ],
+  "updated_at": "2026-05-11T12:00:00Z"
+}
+```
+
+State values: `enabled` | `disabled` | `acknowledged` (host-tier only). Absent entry = use `default_in_worktree` from `profile.singletons[]` (always `disabled` for non-host tiers; host requires explicit `acknowledged`). `apply` reads this file before rendering override + env.
+
 ## References
 
 Loaded only when the workflow needs them:
 
-- `references/detection-heuristics.md` — what the inspector probes for and why
+- `references/detection-heuristics.md` — what the inspector probes for and why (incl. v0.2 singleton probes)
+- `references/singleton-patterns.md` — singleton pattern catalog, evidence formats, severity assignment, ID contract
 - `references/compose-override-cookbook.md` — `!reset null` empirical verification
 - `references/port-strategies.md` — slot formula, collision behavior, range
 - `references/worktrunk-integration.md` — wt.toml snippet, manual fallback

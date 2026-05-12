@@ -1,9 +1,9 @@
 {
-  "// schema": "Profile schema v1 — committed to .worktree-isolate/profile.json",
-  "// schema_field": "Always 1 in v1. Inspector aborts if it reads a profile with a different schema.",
-  "schema": 1,
+  "// schema": "Profile schema v2 — committed to .worktree-isolate/profile.json",
+  "// schema_field": "Always 2 in v0.2.x. Inspector aborts if it reads a profile with a different schema. apply hard-rejects schema:1 with a migration command.",
+  "schema": 2,
   "// generator_version": "Version of x-worktree-isolate that emitted this profile.",
-  "generator_version": "0.1.0",
+  "generator_version": "0.2.0",
   "// stack": "Stack adapter. Only docker-compose is implemented in v1.",
   "stack": "docker-compose",
   "// compose_files": "Resolved relative to repo root, depth <= 2.",
@@ -77,6 +77,18 @@
       "severity": "warning"
     }
   ],
+  "// singletons": "v0.2 three-tier singleton awareness. Each entry has a 'kind' (compose-service | env-flag | host) plus kind-specific fields. Empty array by default; populated by init when singleton heuristics fire.",
+  "// singletons_example_compose_service": "{ \"kind\": \"compose-service\", \"service\": \"prometheus\", \"reason\": \"single-binding port + persistent volume\", \"severity\": \"warning\" }",
+  "// singletons_example_env_flag": "{ \"kind\": \"env-flag\", \"var\": \"ENABLE_BACKGROUND_WORKER\", \"found_in\": \".env.example:14\", \"reason\": \"flag toggles cluster-wide cron leader\", \"severity\": \"warning\" }",
+  "// singletons_example_host": "{ \"kind\": \"host\", \"path\": \"/var/run/docker.sock\", \"found_in\": \"docker-compose.yml:42\", \"reason\": \"host socket mount — shared across worktrees\", \"severity\": \"warning\" }",
+  "singletons": [],
+  "// detection_guardrails": "Inspector resource limits. Prevents init from walking node_modules / huge generated trees or reading multi-MB minified files.",
+  "detection_guardrails": {
+    "scan_max_depth": 4,
+    "scan_max_file_bytes": 1048576,
+    "exclude_dirs": ["node_modules", "vendor", ".git", "dist", "build", "__pycache__", "target", ".next", ".venv", "tests/fixtures"],
+    "exclude_globs": ["*.min.js", "*.lock", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "Cargo.lock"]
+  },
   "post_apply_hints": [],
   "generated_at": "1970-01-01T00:00:00Z"
 }
