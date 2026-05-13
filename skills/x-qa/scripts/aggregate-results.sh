@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# aggregate-results.sh — merge cases/*.json into QA_REPORT.md + emit envelope
-# Usage: aggregate-results.sh --run-dir <path> --plan <path> [--allow-flaky-rate <pct>]
+# aggregate-results.sh — merge cases/*.json into QA_REPORT.md + emit envelope.
+# When --kb is set (default true unless --no-kb), also invokes kb-writeback.sh
+# (baselines + ledger) and kb-promote.sh --auto (corpus promotion).
+# Usage: aggregate-results.sh --run-dir <path> --plan <path> [--allow-flaky-rate <pct>] [--no-kb]
 set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 RUN_DIR=""
 PLAN=""
@@ -9,6 +13,7 @@ ALLOW_FLAKY_RATE="0"
 ENTRY_POINT=""
 SERVICE_LAUNCHED="false"
 EVIDENCE_INLINE_MAX_BYTES=4096
+KB_ENABLED=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -17,6 +22,7 @@ while [[ $# -gt 0 ]]; do
     --allow-flaky-rate) ALLOW_FLAKY_RATE="$2"; shift 2 ;;
     --entry-point) ENTRY_POINT="$2"; shift 2 ;;
     --service-launched) SERVICE_LAUNCHED="$2"; shift 2 ;;
+    --no-kb) KB_ENABLED=false; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -142,6 +148,41 @@ cases_yaml=$(jq -r '.[] |
   jq -r '.[] | select(.verdict == "fail") | "### \(.id)\n\nError: \(.error)\n\n"' <<<"$results"
 } > "$report_path"
 
+# KB write-back + auto-promote (skipped on --no-kb).
+kb_drift=0
+kb_promoted=0
+kb_demoted=0
+kb_status="disabled"
+kb_reused=0
+kb_generated=0
+if [[ "$KB_ENABLED" == true ]]; then
+  # Read planner counters if it dropped a sidecar.
+  if [[ -f "$RUN_DIR/kb-counters.env" ]]; then
+    # shellcheck disable=SC1090
+    . "$RUN_DIR/kb-counters.env"
+    kb_reused="${KB_REUSED:-0}"
+    kb_generated="${KB_GENERATED:-0}"
+  fi
+  if writeback_out=$("$SCRIPT_DIR/kb-writeback.sh" --run-dir "$RUN_DIR" --plan "$PLAN" 2>&1); then
+    kb_drift=$(awk -F= '/^KB_DRIFT=/{print $2}' <<<"$writeback_out")
+    : "${kb_drift:=0}"
+  else
+    echo "$writeback_out" >&2
+    kb_status="error"
+  fi
+  if [[ "$kb_status" != "error" ]]; then
+    if promote_out=$("$SCRIPT_DIR/kb-promote.sh" --auto 2>&1); then
+      kb_promoted=$(awk -F= '/^KB_PROMOTED=/{print $2}' <<<"$promote_out")
+      kb_demoted=$(awk  -F= '/^KB_DEMOTED=/{print  $2}' <<<"$promote_out")
+      kb_status=$(awk   -F= '/^KB_PROMOTE_STATUS=/{print $2}' <<<"$promote_out")
+      : "${kb_promoted:=0}"; : "${kb_demoted:=0}"; : "${kb_status:=ok}"
+    else
+      echo "$promote_out" >&2
+      kb_status="error"
+    fi
+  fi
+fi
+
 # Emit envelope
 echo "✓ x-qa run complete"
 echo "QA_VERDICT=$verdict"
@@ -156,3 +197,9 @@ echo "QA_RUN_ID=$run_id"
 echo "DURATION_S=$duration_s"
 echo "ENTRY_POINT=$ENTRY_POINT"
 echo "SERVICE_LAUNCHED=$SERVICE_LAUNCHED"
+echo "KB_REUSED=$kb_reused"
+echo "KB_GENERATED=$kb_generated"
+echo "KB_PROMOTED=$kb_promoted"
+echo "KB_DEMOTED=$kb_demoted"
+echo "KB_DRIFT=$kb_drift"
+echo "KB_PROMOTE_STATUS=$kb_status"

@@ -1,0 +1,25 @@
+schema: 1
+id: fl-user-signup-then-avatar
+provenance:
+  source: generated
+  first_seen_run: 2026-04-25-1500-22aa
+  promoted_from_run: 2026-05-01-0830-44de
+  promoted_at: 2026-05-01T09:00:00Z
+  author: x-qa-planner
+description: "New user signs up, logs in, sets an avatar — the canonical onboarding path"
+endpoint_set:
+  - "POST /auth/signup"
+  - "POST /auth/login"
+  - "POST /api/users/me/avatar"
+steps:
+  - case_id: tc-signup-happy
+  - case_id: tc-login-bearer
+    depends_on: [tc-signup-happy]
+    capture:
+      - { from: "$.token", as: BEARER }
+  - case_id: tc-avatar-happy-jpeg
+    depends_on: [tc-login-bearer]
+    inject:
+      headers:
+        Authorization: "Bearer ${BEARER}"
+tags: [auth, upload, golden-path]

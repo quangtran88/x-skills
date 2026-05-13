@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "version": "1.0.0",
+  "generated_at": "2026-05-12T10:00:00Z",
+  "repo_root": "/path/to/repo",
+  "cases": {
+    "tc-avatar-happy-jpeg": {
+      "file": "cases/tc-avatar-happy-jpeg.yaml",
+      "endpoint": "POST /api/users/me/avatar",
+      "category": "happy",
+      "promoted_at": "2026-04-30T12:00:00Z",
+      "promoted_from_run": "2026-04-30-1142-9f0c",
+      "green_streak": 7,
+      "last_run_id": "2026-05-12-0900-aa11",
+      "last_verdict": "pass",
+      "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "tc-avatar-reject-oversize": {
+      "file": "cases/tc-avatar-reject-oversize.yaml",
+      "endpoint": "POST /api/users/me/avatar",
+      "category": "error",
+      "promoted_at": "2026-05-02T08:30:00Z",
+      "promoted_from_run": "2026-05-02-0815-2bcd",
+      "green_streak": 4,
+      "last_run_id": "2026-05-12-0900-aa11",
+      "last_verdict": "pass",
+      "checksum": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  "flows": {
+    "fl-user-signup-then-avatar": {
+      "file": "flows/fl-user-signup-then-avatar.yaml",
+      "case_ids": ["tc-signup-happy", "tc-login-bearer", "tc-avatar-happy-jpeg"],
+      "promoted_at": "2026-05-01T09:00:00Z",
+      "promoted_from_run": "2026-05-01-0830-44de",
+      "green_streak": 4,
+      "last_run_id": "2026-05-12-0900-aa11",
+      "last_verdict": "pass",
+      "checksum": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  },
+  "baselines": {
+    "POST /api/users/me/avatar": {
+      "file": "baselines/post__api_users_me_avatar.json",
+      "samples": 42,
+      "window": 50,
+      "last_seen_at": "2026-05-12T09:00:42Z"
+    }
+  }
+}

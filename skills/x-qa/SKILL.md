@@ -32,11 +32,29 @@ Before any subcommand:
 | `/x-skills:x-qa init [--non-interactive] [--skip-verify] [--profile-from <path>]` | One-time scan + interview, writes `.x-skills/x-qa/profile.json`. |
 | `/x-skills:x-qa update [--non-interactive]` | Re-scan, diff vs profile, ask only about deltas. |
 | `/x-skills:x-qa inspect` | Print profile + scan findings. No writes. |
-| `/x-skills:x-qa doctor` | Validate profile against repo state. |
-| `/x-skills:x-qa generate <feature-spec> [--persist <path>] [--force]` | Plan only. Uses profile catalog. |
-| `/x-skills:x-qa run [opts]` | Default action. Generate-or-read plan, launch service, dispatch fanout, aggregate. |
+| `/x-skills:x-qa doctor` | Validate profile + KB against repo state. |
+| `/x-skills:x-qa generate <feature-spec> [--persist <path>] [--force]` | Plan only. Uses profile catalog + KB corpus. |
+| `/x-skills:x-qa run [opts]` | Default action. Generate-or-read plan, launch service, dispatch fanout, aggregate, auto-promote KB. |
+| `/x-skills:x-qa kb <subcmd>` | Knowledge-base ops. See "KB Subcommands". |
 
-`run` flags: `--worktree <path>`, `--service <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`.
+`run` flags: `--worktree <path>`, `--service <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`.
+
+## KB Subcommands
+
+The KB (`.x-skills/x-qa/kb/`) is the team-shared, git-tracked layer that
+makes future runs faster and lets teams reuse proven test scripts.
+Full schema: `references/kb-schema.md`. Curation rules:
+`references/kb-curation.md`.
+
+| Form | Purpose |
+|---|---|
+| `/x-skills:x-qa kb list [--cases\|--flows\|--baselines] [--tag <t>]` | Tabulate KB contents. |
+| `/x-skills:x-qa kb inspect <id>` | Pretty-print a case/flow + ledger history. |
+| `/x-skills:x-qa kb promote [--force <id>] [--dry-run]` | Run auto-promotion pass manually, or force a single ID. |
+| `/x-skills:x-qa kb demote <id>` | Quarantine a promoted case. |
+| `/x-skills:x-qa kb prune [--orphans\|--baselines --older-than <d>\|--ledger]` | Reconcile filesystem vs index, age out stale baselines. |
+| `/x-skills:x-qa kb export <out.tgz>` | Tar+gz the KB for transfer/share. |
+| `/x-skills:x-qa kb import <in.tgz> [--rename-collisions]` | Merge a foreign KB into the current one. |
 
 ## Capability Routing
 
@@ -66,6 +84,12 @@ QA_RUN_ID=<id>
 DURATION_S=<float>
 ENTRY_POINT=<name>
 SERVICE_LAUNCHED=true|false
+KB_REUSED=<n>          # cases pulled from corpus (not regenerated)
+KB_GENERATED=<n>       # cases minted this run
+KB_PROMOTED=<n>        # cases auto-promoted to corpus this run
+KB_DEMOTED=<n>         # cases quarantined this run
+KB_DRIFT=<n>           # baseline drift signals raised
+KB_PROMOTE_STATUS=ok|disabled|error
 ```
 
 Failure:
@@ -82,9 +106,10 @@ Refer to:
 - `init`: `references/init-interview.md` + `scripts/init.sh`
 - `update`: `references/update-diff-rules.md` + `scripts/update.sh`
 - `inspect`: `scripts/inspect.sh` (read-only mode)
-- `doctor`: `references/doctor-checks.md` + `scripts/doctor.sh`
-- `generate`: `references/test-plan-schema.md` (LLM-generated inline; `scripts/plan-generate.sh` is a v2 placeholder, not shipped in v1)
-- `run`: see "Run Phases" below; intent via `references/intent-detection.md`; scout via `references/scout-prompt.md`
+- `doctor`: `references/doctor-checks.md` + `scripts/doctor.sh` (validates both profile and `kb/index.json`)
+- `generate`: `references/test-plan-schema.md` (LLM-generated inline; `scripts/plan-generate.sh` is a v2 placeholder, not shipped in v1). Planner MUST consult `kb/cases/` + `kb/flows/` first per the corpus contract in `references/test-plan-schema.md § Corpus Reuse`.
+- `run`: see "Run Phases" below; intent via `references/intent-detection.md`; scout via `references/scout-prompt.md`; KB layer via `references/kb-schema.md` + `references/kb-curation.md`
+- `kb <subcmd>`: dispatched to `scripts/kb-<subcmd>.sh`. No LLM in the loop — these are pure-shell maintenance commands.
 
 ## Run Phases
 
@@ -93,16 +118,18 @@ Refer to:
 3. **Classify intent.** Run `scripts/classify-intent.sh "{{ARGUMENTS}}"`, persist to `<run-dir>/intent.json`. If `confidence == "low"` OR multiple candidates surface, ask the user ONE question per `references/intent-detection.md § Ask-When-Ambiguous`, then rewrite intent.json with `confidence: high`.
 4. Resolve target from intent: `service` → entry name; `branch`/`pr` → PR-surface derivation (`references/pr-surface-derivation.md`); `spec`/`artifact`/`artifact-dir`/`prose` → trigger Phase 5 (Scout). Refuse if resolved entry's `type != http` (v1 limitation).
 5. **Scout (conditional).** Only when intent ∈ {`spec`, `artifact`, `artifact-dir`, `prose`}: dispatch `$X_QA_SIMPLE_RUNNER` inline per `references/scout-prompt.md`. Persist `<run-dir>/scope.json`. On invalid JSON / timeout, use whole-profile coverage and warn.
-6. Plan: read `--plan <path>` if given, else generate per `references/test-plan-schema.md` using profile catalog + (if present) `scope.json` as ground truth.
-7. Launch service via `scripts/launch-entry-point.sh` (skipped on `--no-launch` or `--service <ext-url>`).
-8. Health wait via `scripts/health-wait.sh`.
-9. Classify cases per `references/classification-rules.md` (simple vs complex).
-10. **Compute dispatch waves.** Pipe plan JSON through `scripts/lib/topo-order.sh`. Refuse plan on cycle (exit 2) or unknown dependency id (exit 1). Each wave dispatches in parallel (capped at `--max-bg`, all `run_in_background: true`); next wave starts when every case in current wave reaches terminal state. Cases whose deps failed are marked `skipped`, not `fail`. Templates in `references/case-runner-prompts.md`.
-11. Collect every dispatch terminal state (mandatory per `~/.claude/rules/background-agents.md`). Never `background_cancel(all=true)` before collection.
-12. Retry flaky inline up to `--retry-flaky`.
-13. Teardown via launch entry's `launch.teardown` (skipped if Phase 7 was skipped).
-14. Aggregate via `scripts/aggregate-results.sh` → `QA_REPORT.md`. Propagate `scope.json.open_questions` into the report's notes section.
-15. Emit envelope.
+6. **KB consult (skipped on `--no-kb`).** Read `kb/index.json`. For every endpoint in scope (from scout or PR-surface), collect matching `kb/cases/*.yaml` (not `quarantined`) and `kb/flows/*.yaml`. Pass this corpus to the planner.
+7. Plan: read `--plan <path>` if given, else generate per `references/test-plan-schema.md § Corpus Reuse` using profile catalog + `scope.json` + KB corpus as ground truth. The planner SHALL prefer corpus IDs over fresh generation when the endpoint+category already has a green case.
+8. Launch service via `scripts/launch-entry-point.sh` (skipped on `--no-launch` or `--service <ext-url>`).
+9. Health wait via `scripts/health-wait.sh`.
+10. Classify cases per `references/classification-rules.md` (simple vs complex).
+11. **Compute dispatch waves.** Pipe plan JSON through `scripts/lib/topo-order.sh`. Refuse plan on cycle (exit 2) or unknown dependency id (exit 1). Each wave dispatches in parallel (capped at `--max-bg`, all `run_in_background: true`); next wave starts when every case in current wave reaches terminal state. Cases whose deps failed are marked `skipped`, not `fail`. Templates in `references/case-runner-prompts.md`.
+12. Collect every dispatch terminal state (mandatory per `~/.claude/rules/background-agents.md`). Never `background_cancel(all=true)` before collection.
+13. Retry flaky inline up to `--retry-flaky`.
+14. Teardown via launch entry's `launch.teardown` (skipped if Phase 8 was skipped).
+15. Aggregate via `scripts/aggregate-results.sh` → `QA_REPORT.md`. Propagate `scope.json.open_questions` into the report's notes section. **KB write-back** (skipped on `--no-kb`): update `kb/baselines/<endpoint>.json` for every case, append a run summary line to `kb/.ledger.jsonl`, compute drift signals.
+16. **KB auto-promote** (skipped on `--no-kb` or `--kb-disable-auto-promote`). Invoke `scripts/kb-promote.sh --auto`. Emits `KB_PROMOTED=` / `KB_DEMOTED=` for the envelope.
+17. Emit envelope.
 
 ## After This Skill
 

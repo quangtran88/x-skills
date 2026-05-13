@@ -62,10 +62,12 @@ EOF
 aggregate_out=$("$SKILL_DIR/scripts/aggregate-results.sh" --run-dir "$RUN_DIR" --plan "$RUN_DIR/plan.yml")
 grep -q '^QA_VERDICT=pass' <<<"$aggregate_out"
 
-# --- chained smoke tests (added 2026-05-11) ---
+# --- chained smoke tests ---
 echo "→ running classify smoke"
 bash "$SKILL_DIR/scripts/tests/classify.sh"
 echo "→ running topo-order smoke"
 bash "$SKILL_DIR/scripts/tests/topo.sh"
+echo "→ running kb smoke"
+bash "$SKILL_DIR/scripts/tests/kb-smoke.sh"
 
 echo "✓ x-qa smoke passed"

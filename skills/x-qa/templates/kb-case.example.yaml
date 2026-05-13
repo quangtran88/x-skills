@@ -1,0 +1,28 @@
+schema: 1
+id: tc-avatar-happy-jpeg
+provenance:
+  source: generated
+  first_seen_run: 2026-04-12-1023-7e3f
+  promoted_from_run: 2026-04-30-1142-9f0c
+  promoted_at: 2026-04-30T12:00:00Z
+  author: x-qa-planner
+category: happy
+complexity: simple
+description: "Avatar upload accepts a 200KB JPEG and returns the stored URL"
+endpoint: "POST /api/users/me/avatar"
+setup: ""
+request:
+  method: POST
+  path: /api/users/me/avatar
+  headers:
+    Content-Type: multipart/form-data
+    Authorization: "Bearer ${BEARER}"
+  body:
+    file: "@fixtures/avatar-200k.jpg"
+assertions:
+  - { kind: status, expr: "", op: eq, value: 200 }
+  - { kind: body-jsonpath, expr: "$.url", op: matches, value: "^https?://" }
+  - { kind: body-jsonpath, expr: "$.size_bytes", op: lt, value: 250000 }
+teardown: ""
+timeout_ms: 5000
+tags: [upload, multipart, golden-path]

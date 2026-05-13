@@ -47,3 +47,44 @@
 18. **Scout dispatched without gemini_cli.** When `gemini_cli` capability is
     unpinned, `X_QA_SIMPLE_RUNNER` resolves to OMC executor / Explore.
     Scout latency rises (~3-5x); cost lower. Acceptable.
+
+## Knowledge base (KB)
+
+19. **Stale baseline trap.** `kb/baselines/*.json` are observational, not
+    ground-truth. A baseline that hasn't been hit for weeks can encode an
+    old endpoint shape; doctor warns via `last_seen_at`. Prune with
+    `kb-prune.sh --baselines --older-than 90d --apply` when in doubt.
+20. **Corpus drift on endpoint rename.** When code renames an endpoint
+    (`POST /api/v1/x` → `/api/v2/x`), the matching corpus case still
+    targets the old path. The planner emits `corpus-stale` and skips the
+    case; doctor does NOT auto-fail. Decision: rename the case + bump
+    `kb/index.json.version`, or `kb-demote <id>` and let the planner mint
+    a fresh one.
+21. **Schema migration.** `schema: 1` is hard-pinned in `kb/index.json`,
+    every `kb/cases/*.yaml`, every `kb/flows/*.yaml`, every
+    `kb/baselines/*.json`. `kb-migrate.sh` is a v2 placeholder; v1 has no
+    predecessor and refuses unknown schema.
+22. **Cross-team merge conflicts.** Two devs auto-promoting the same case
+    in parallel branches produces conflicting `kb/index.json` entries +
+    duplicate `cases/*.yaml`. Resolution: keep the entry with the higher
+    `green_streak`; manually merge YAML if bodies differ. `kb-prune.sh
+    --orphans` cleans up dangling files post-merge.
+23. **Auto-promotion of flaky cases.** A `pass` from a flaky-recovered
+    retry does NOT count toward the streak (only the verdict literally
+    `pass` does). However, a case that consistently passes after a transient
+    fail can still drift in. Mitigation: `X_QA_KB_FAIL_ON_DRIFT=p95,shape`
+    promotes drift signals to verdict-flipping, raising the bar.
+24. **Empty body_path in ledger.** If a case JSON is malformed, its
+    `body_path` may be absent from the ledger line. Auto-promote skips
+    these with `[skip] <id>: streak=N but no body file recorded`. Look
+    at runner stderr to fix the upstream JSON shape.
+25. **Flow promotion needs all-promoted constituents.** A flow only
+    promotes when every case in its chain is already a corpus case. New
+    chains light up on the run *immediately after* the last constituent
+    promotes. Expect a one-run lag.
+26. **`--no-kb` skips ALL KB ops.** No corpus consult, no baseline
+    update, no ledger append, no auto-promote. Use for one-off
+    experimental runs you do not want to pollute the corpus.
+27. **bash 3.2 compatibility.** macOS ships bash 3.2 — no `declare -A`.
+    All KB scripts compute streaks / fail-streaks via jq instead of
+    associative arrays so they run on stock macOS.

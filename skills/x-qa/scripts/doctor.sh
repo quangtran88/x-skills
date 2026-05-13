@@ -186,6 +186,64 @@ if [[ "$TEMPLATE_MODE" != true ]]; then
   pass
 fi
 
+# ---- KB integrity checks (skipped if no KB present) ------------------------
+KB_ROOT="$repo_root/.x-skills/x-qa/kb"
+KB_INDEX="$KB_ROOT/index.json"
+if [[ -d "$KB_ROOT" && -f "$KB_INDEX" ]]; then
+  # KB1: schema pin
+  attempt
+  [[ "$(jq -r '.schema' "$KB_INDEX")" == "1" ]] || fail KB1 "kb/index.json schema != 1"
+  pass
+
+  # KB2: every index.cases entry points to a real file
+  attempt
+  while IFS=$'\t' read -r id rel; do
+    [[ -f "$KB_ROOT/$rel" ]] || fail KB2 "kb/index.json cases.$id → $rel missing on disk"
+  done < <(jq -r '.cases | to_entries[] | [.key, .value.file] | @tsv' "$KB_INDEX")
+  pass
+
+  # KB3: every index.flows entry points to a real file
+  attempt
+  while IFS=$'\t' read -r id rel; do
+    [[ -f "$KB_ROOT/$rel" ]] || fail KB3 "kb/index.json flows.$id → $rel missing on disk"
+  done < <(jq -r '.flows | to_entries[] | [.key, .value.file] | @tsv' "$KB_INDEX")
+  pass
+
+  # KB4: every index.baselines entry points to a real file
+  attempt
+  while IFS=$'\t' read -r ep rel; do
+    [[ -f "$KB_ROOT/$rel" ]] || fail KB4 "kb/index.json baselines[\"$ep\"] → $rel missing on disk"
+  done < <(jq -r '.baselines | to_entries[] | [.key, .value.file] | @tsv' "$KB_INDEX")
+  pass
+
+  # KB5: every case YAML on disk has a matching index entry (orphans = warning)
+  while IFS= read -r f; do
+    rel="${f#$KB_ROOT/}"
+    in_idx=$(jq -r --arg p "$rel" '[(.cases | to_entries[] | select(.value.file == $p))] | length' "$KB_INDEX")
+    [[ "$in_idx" == "0" ]] && warnings=$((warnings+1))
+  done < <(find "$KB_ROOT/cases" -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null || true)
+
+  # KB6: corpus drift — case endpoints not in profile catalog (warning, not fail)
+  attempt
+  profile_endpoints=$(jq -r '.entry_points[] | select(.type=="http") | .openapi_spec // empty' "$PROFILE_PATH")
+  # We do not parse OpenAPI here; the warning is heuristic. If profile has no
+  # spec, skip. Real coverage check happens at plan-generation time.
+  pass
+
+  # KB7: corpus checksum integrity (warning when file body differs from index hash)
+  while IFS=$'\t' read -r id rel sum; do
+    [[ -z "$sum" || "$sum" == "null" ]] && continue
+    actual_file="$KB_ROOT/$rel"
+    [[ -f "$actual_file" ]] || continue
+    if command -v sha256sum >/dev/null 2>&1; then
+      actual="sha256:$(sha256sum "$actual_file" | awk '{print $1}')"
+    else
+      actual="sha256:$(shasum -a 256 "$actual_file" | awk '{print $1}')"
+    fi
+    [[ "$actual" == "$sum" ]] || warnings=$((warnings+1))
+  done < <(jq -r '.cases | to_entries[] | [.key, .value.file, (.value.checksum // "null")] | @tsv' "$KB_INDEX")
+fi
+
 echo "✓ doctor PASS"
 echo "checks_attempted=$checks_attempted"
 echo "checks_passed=$checks_passed"

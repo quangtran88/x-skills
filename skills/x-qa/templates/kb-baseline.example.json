@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "endpoint": "POST /api/users/me/avatar",
+  "first_seen_at": "2026-04-12T10:23:00Z",
+  "last_seen_at": "2026-05-12T09:00:42Z",
+  "window": 50,
+  "samples": 42,
+  "response_shape": {
+    "type": "object",
+    "properties": {
+      "url": { "type": "string" },
+      "size_bytes": { "type": "integer" }
+    },
+    "required": ["url", "size_bytes"]
+  },
+  "status_codes": {
+    "200": 38,
+    "400": 3,
+    "413": 1
+  },
+  "latency_ms": {
+    "samples": 42,
+    "p50": 142,
+    "p95": 388,
+    "p99": 612,
+    "max": 1240,
+    "ewma": 156
+  },
+  "flaky_rate": {
+    "window": 50,
+    "samples": 42,
+    "fails": 1,
+    "flaky_recovered": 1,
+    "rate": 0.024
+  },
+  "drift_signals": {
+    "new_status_code_seen": false,
+    "shape_added_required_field": false,
+    "latency_p95_regression_pct": 0,
+    "flaky_rate_spike": false
+  }
+}
