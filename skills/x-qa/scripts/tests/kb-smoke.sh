@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kb-smoke.sh — KB layer smoke: writeback + auto-promote + idempotence + demote.
+# kb-smoke.sh — KB layer smoke: writeback + auto-promote + idempotence + flow promo.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -52,13 +52,12 @@ assert_env() {
   [[ "$actual" == "$expected" ]] || { echo "FAIL: run $1 expected $key=$expected got $actual"; exit 1; }
 }
 
-echo "→ run 1 (pass)";   mkrun r1 pass
-echo "→ run 2 (pass)";   mkrun r2 pass
+echo "→ run 1 (pass)"; mkrun r1 pass
+echo "→ run 2 (pass)"; mkrun r2 pass
 echo "→ run 3 (pass) — expect promote=3 (2 cases + 1 flow)"
 mkrun r3 pass
 
 assert_env r3 KB_PROMOTED 3
-assert_env r3 KB_DEMOTED  0
 assert_env r3 KB_PROMOTE_STATUS ok
 
 n_cases=$(jq -r '.cases | length' "$TEST_REPO/.x-skills/x-qa/kb/index.json")
@@ -75,42 +74,10 @@ echo "→ run 4 (pass) — expect promote=0"
 mkrun r4 pass
 assert_env r4 KB_PROMOTED 0
 
-# Demote path: 3 consecutive fails → quarantine.
-echo "→ runs 5/6/7 (fail) — expect demote"
-mkrun r5 fail
-mkrun r6 fail
-mkrun r7 fail
-q=$(jq -r '.cases."tc-login".quarantined // false' "$TEST_REPO/.x-skills/x-qa/kb/index.json")
-[[ "$q" == "true" ]] || { echo "FAIL: expected tc-login quarantined after 3 fails, got $q"; exit 1; }
-
-# kb-list works
-"$SKILL_DIR/scripts/kb-list.sh" >/dev/null
-
-# kb-prune --ledger trims
-for _ in $(seq 1 210); do echo '{"run_id":"x","cases":[],"flow_observations":[]}' >> "$TEST_REPO/.x-skills/x-qa/kb/.ledger.jsonl"; done
-X_QA_KB_LEDGER_RETAIN=200 "$SKILL_DIR/scripts/kb-prune.sh" --ledger >/dev/null
-lines=$(wc -l < "$TEST_REPO/.x-skills/x-qa/kb/.ledger.jsonl" | tr -d ' ')
-[[ "$lines" == "200" ]] || { echo "FAIL: ledger trim expected 200 got $lines"; exit 1; }
-
-# Export + import roundtrip
-"$SKILL_DIR/scripts/kb-export.sh" /tmp/kb-export.tgz >/dev/null
-[[ -f /tmp/kb-export.tgz ]] || { echo "FAIL: export not created"; exit 1; }
-
-# Concurrent promote/demote — both must land, no lost updates.
-echo "→ concurrent kb-promote under contention"
-# Reset to a clean known-good state, then seed ledger so each parallel run
-# tries to mutate the index for a different case.
-rm -rf "$TEST_REPO/.x-skills/x-qa/kb"
-"$SKILL_DIR/scripts/kb-promote.sh" --auto >/dev/null  # bootstrap empty kb
-INDEX_BEFORE=$(jq -c '{cases: .cases | length, flows: .flows | length}' "$TEST_REPO/.x-skills/x-qa/kb/index.json")
-
-# Build two distinct ledgers worth of green streaks. Easier: replay 3 runs
-# again in this fresh kb, then race two manual force-promotes for hypothetical
-# IDs (which the script handles regardless of streak).
-for r in c1 c2 c3; do mkrun "$r" pass; done
-# At this point tc-login and tc-fetch are promoted. Now do parallel demote +
-# promote-force on a new id to stress the lock.
-cat > "$TEST_REPO/.x-skills/x-qa/runs/c3/plan-cases/tc-fake.yaml" <<'EOF'
+# Force-promote a hypothetical id from a runs-tree body — sanity for manual override.
+echo "→ force-promote a fresh id"
+mkdir -p "$TEST_REPO/.x-skills/x-qa/runs/r4/plan-cases"
+cat > "$TEST_REPO/.x-skills/x-qa/runs/r4/plan-cases/tc-fake.yaml" <<'EOF'
 schema: 1
 id: tc-fake
 category: happy
@@ -119,19 +86,14 @@ endpoint: "GET /fake"
 request: { method: GET, path: /fake }
 assertions: [ { kind: status, expr: "", op: eq, value: 200 } ]
 EOF
-"$SKILL_DIR/scripts/kb-demote.sh" tc-login --reason "concurrent-test" &
-"$SKILL_DIR/scripts/kb-promote.sh" --force tc-fake &
-wait
-q=$(jq -r '.cases."tc-login".quarantined // false' "$TEST_REPO/.x-skills/x-qa/kb/index.json")
+"$SKILL_DIR/scripts/kb-promote.sh" --force tc-fake >/dev/null
 has_fake=$(jq -r '.cases | has("tc-fake")' "$TEST_REPO/.x-skills/x-qa/kb/index.json")
-[[ "$q" == "true" && "$has_fake" == "true" ]] \
-  || { echo "FAIL: concurrent ops lost an update — tc-login.quarantined=$q tc-fake.exists=$has_fake"; exit 1; }
+[[ "$has_fake" == "true" ]] || { echo "FAIL: --force did not land tc-fake"; exit 1; }
 
-# Drift signal must NOT fire on first observation of an endpoint.
-rm -rf "$TEST_REPO/.x-skills/x-qa/kb"
-mkrun fresh pass
-drift=$(awk -F= '/^KB_DRIFT=/{print $2}' "$TEST_REPO/.x-skills/x-qa/runs/fresh/envelope.txt")
-[[ "$drift" == "0" ]] \
-  || { echo "FAIL: KB_DRIFT=$drift on first observation (expected 0)"; exit 1; }
+# kb-list works
+"$SKILL_DIR/scripts/kb-list.sh" >/dev/null
+
+# kb-prune --orphans is dry-run by default
+"$SKILL_DIR/scripts/kb-prune.sh" --orphans >/dev/null
 
 echo "✓ kb-smoke passed"

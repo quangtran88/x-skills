@@ -149,9 +149,7 @@ cases_yaml=$(jq -r '.[] |
 } > "$report_path"
 
 # KB write-back + auto-promote (skipped on --no-kb).
-kb_drift=0
 kb_promoted=0
-kb_demoted=0
 kb_status="disabled"
 kb_reused=0
 kb_generated=0
@@ -163,19 +161,15 @@ if [[ "$KB_ENABLED" == true ]]; then
     kb_reused="${KB_REUSED:-0}"
     kb_generated="${KB_GENERATED:-0}"
   fi
-  if writeback_out=$("$SCRIPT_DIR/kb-writeback.sh" --run-dir "$RUN_DIR" --plan "$PLAN" 2>&1); then
-    kb_drift=$(awk -F= '/^KB_DRIFT=/{print $2}' <<<"$writeback_out")
-    : "${kb_drift:=0}"
-  else
+  if ! writeback_out=$("$SCRIPT_DIR/kb-writeback.sh" --run-dir "$RUN_DIR" --plan "$PLAN" 2>&1); then
     echo "$writeback_out" >&2
     kb_status="error"
   fi
   if [[ "$kb_status" != "error" ]]; then
     if promote_out=$("$SCRIPT_DIR/kb-promote.sh" --auto 2>&1); then
       kb_promoted=$(awk -F= '/^KB_PROMOTED=/{print $2}' <<<"$promote_out")
-      kb_demoted=$(awk  -F= '/^KB_DEMOTED=/{print  $2}' <<<"$promote_out")
       kb_status=$(awk   -F= '/^KB_PROMOTE_STATUS=/{print $2}' <<<"$promote_out")
-      : "${kb_promoted:=0}"; : "${kb_demoted:=0}"; : "${kb_status:=ok}"
+      : "${kb_promoted:=0}"; : "${kb_status:=ok}"
     else
       echo "$promote_out" >&2
       kb_status="error"
@@ -200,6 +194,4 @@ echo "SERVICE_LAUNCHED=$SERVICE_LAUNCHED"
 echo "KB_REUSED=$kb_reused"
 echo "KB_GENERATED=$kb_generated"
 echo "KB_PROMOTED=$kb_promoted"
-echo "KB_DEMOTED=$kb_demoted"
-echo "KB_DRIFT=$kb_drift"
 echo "KB_PROMOTE_STATUS=$kb_status"

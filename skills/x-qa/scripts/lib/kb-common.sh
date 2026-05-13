@@ -5,10 +5,6 @@ set -euo pipefail
 
 # Tunables — env vars with documented defaults (see references/kb-curation.md).
 : "${X_QA_KB_PROMOTE_AFTER:=3}"
-: "${X_QA_KB_DEMOTE_AFTER:=3}"
-: "${X_QA_KB_BASELINE_WINDOW:=50}"
-: "${X_QA_KB_FLOW_MIN_LENGTH:=2}"
-: "${X_QA_KB_LEDGER_RETAIN:=200}"
 : "${X_QA_KB_DISABLE_AUTO_PROMOTE:=}"
 
 kb_root() {
@@ -78,27 +74,3 @@ kb_sha256() {
 
 # ISO-8601 UTC now.
 kb_now()  { date -u +%Y-%m-%dT%H:%M:%SZ; }
-
-# kb_with_lock <path> <cmd...> — run cmd while holding an exclusive lock on the
-# given file's lock-sidecar. Required for read-modify-write on kb/index.json
-# and kb/baselines/<ep>.json when multiple x-qa runs share a worktree or
-# submodule KB. Uses flock(1) where available; falls back to `mkdir` (which IS
-# atomic on POSIX) when not — macOS does not ship flock.
-kb_with_lock() {
-  local target="$1"; shift
-  local lock="${target}.lock"
-  if command -v flock >/dev/null 2>&1; then
-    ( flock -x 9; "$@" ) 9> "$lock"
-  else
-    local n=0
-    while ! mkdir "$lock" 2>/dev/null; do
-      n=$((n + 1))
-      (( n > 600 )) && { echo "✗ kb_with_lock: timeout on $lock" >&2; return 1; }
-      sleep 0.1
-    done
-    trap 'rmdir "'"$lock"'" 2>/dev/null || true' RETURN
-    "$@"
-    rmdir "$lock" 2>/dev/null || true
-    trap - RETURN
-  fi
-}

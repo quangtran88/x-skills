@@ -48,13 +48,13 @@ Full schema: `references/kb-schema.md`. Curation rules:
 
 | Form | Purpose |
 |---|---|
-| `/x-skills:x-qa kb list [--cases\|--flows\|--baselines] [--tag <t>]` | Tabulate KB contents. |
+| `/x-skills:x-qa kb list [--cases\|--flows\|--baselines]` | Tabulate KB contents. |
 | `/x-skills:x-qa kb inspect <id>` | Pretty-print a case/flow + ledger history. |
 | `/x-skills:x-qa kb promote [--force <id>] [--dry-run]` | Run auto-promotion pass manually, or force a single ID. |
-| `/x-skills:x-qa kb demote <id>` | Quarantine a promoted case. |
-| `/x-skills:x-qa kb prune [--orphans\|--baselines --older-than <d>\|--ledger]` | Reconcile filesystem vs index, age out stale baselines. |
-| `/x-skills:x-qa kb export <out.tgz>` | Tar+gz the KB for transfer/share. |
-| `/x-skills:x-qa kb import <in.tgz> [--rename-collisions]` | Merge a foreign KB into the current one. |
+| `/x-skills:x-qa kb prune --orphans [--apply]` | Reconcile filesystem vs index (orphan files / dangling entries). |
+
+Cross-team sharing is the git-tracked KB itself (or a submodule when shared
+across repos). Tarball export/import was cut as redundant with git.
 
 ## Capability Routing
 
@@ -87,8 +87,6 @@ SERVICE_LAUNCHED=true|false
 KB_REUSED=<n>          # cases pulled from corpus (not regenerated)
 KB_GENERATED=<n>       # cases minted this run
 KB_PROMOTED=<n>        # cases auto-promoted to corpus this run
-KB_DEMOTED=<n>         # cases quarantined this run
-KB_DRIFT=<n>           # baseline drift signals raised
 KB_PROMOTE_STATUS=ok|disabled|error
 ```
 

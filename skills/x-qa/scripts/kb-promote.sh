@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# kb-promote.sh — auto-promote / demote KB entries based on the ledger.
+# kb-promote.sh — auto-promote KB entries based on the ledger.
 # Usage:
-#   kb-promote.sh --auto                  (default; reads ledger, promotes/demotes)
+#   kb-promote.sh --auto                  (default; reads ledger, promotes)
 #   kb-promote.sh --dry-run               (print what would change, no writes)
-#   kb-promote.sh --force <case-id>       (promote even without streak; clears quarantine)
+#   kb-promote.sh --force <case-id>       (promote even without streak)
 #
 # Reads:  kb/.ledger.jsonl, kb/index.json, <run-dir>/plan-cases/*.yaml
 # Writes: kb/cases/*.yaml, kb/flows/*.yaml, kb/index.json
-# Output: KB_PROMOTED=<n> KB_DEMOTED=<n> KB_PROMOTE_STATUS=ok|disabled|error
+# Output: KB_PROMOTED=<n> KB_PROMOTE_STATUS=ok|disabled|error
 #
 # Streak math is done in jq for bash-3.2 portability (no associative arrays).
 set -euo pipefail
@@ -15,6 +15,10 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/kb-common.sh
 . "$SCRIPT_DIR/lib/kb-common.sh"
+
+# Hardcoded — flow promotion requires chain length >= 2 (single-step "flow"
+# is just a case). The original X_QA_KB_FLOW_MIN_LENGTH tunable was cut.
+FLOW_MIN_LENGTH=2
 
 MODE="auto"
 FORCE_ID=""
@@ -31,7 +35,6 @@ done
 
 if [[ -n "$X_QA_KB_DISABLE_AUTO_PROMOTE" && "$MODE" == "auto" ]]; then
   echo "KB_PROMOTED=0"
-  echo "KB_DEMOTED=0"
   echo "KB_PROMOTE_STATUS=disabled"
   exit 0
 fi
@@ -45,24 +48,16 @@ FLOWS_DIR=$(kb_flows_dir)
 kb_assert_schema "$INDEX"
 
 promoted=0
-demoted=0
-
-# ---- helpers ----------------------------------------------------------------
-
-_apply_index() {
-  local filter="$1" tmp
-  tmp=$(mktemp)
-  jq "$filter" "$INDEX" > "$tmp"
-  mv "$tmp" "$INDEX"
-}
 
 update_index() {
   local filter="$1"
   if [[ "$DRY_RUN" == true ]]; then
     echo "[dry-run] would update index with: $filter" >&2
-  else
-    kb_with_lock "$INDEX" _apply_index "$filter"
+    return
   fi
+  local tmp; tmp=$(mktemp)
+  jq "$filter" "$INDEX" > "$tmp"
+  mv "$tmp" "$INDEX"
 }
 
 force_promote() {
@@ -90,8 +85,7 @@ force_promote() {
       green_streak: 0,
       last_run_id: (.cases[\"$case_id\"].last_run_id // \"\"),
       last_verdict: \"pass\",
-      checksum: \"$checksum\",
-      quarantined: false
+      checksum: \"$checksum\"
     }
   "
   promoted=$((promoted + 1))
@@ -103,52 +97,23 @@ if [[ "$MODE" == "force" ]]; then
   [[ -z "$FORCE_ID" ]] && { echo "--force requires <case-id>" >&2; exit 2; }
   force_promote "$FORCE_ID"
   echo "KB_PROMOTED=$promoted"
-  echo "KB_DEMOTED=$demoted"
   echo "KB_PROMOTE_STATUS=ok"
   exit 0
 fi
 
 if [[ ! -s "$LEDGER" ]]; then
   echo "KB_PROMOTED=0"
-  echo "KB_DEMOTED=0"
   echo "KB_PROMOTE_STATUS=ok"
   exit 0
 fi
 
 window=$((X_QA_KB_PROMOTE_AFTER * 2))
-# Slurp the recent ledger window into a single array.
 RECENT=$(tail -n "$window" "$LEDGER" | jq -s '.')
 
-# Streak computation in jq:
-#   For each case id, fold the ledger in chronological order. A `pass` extends
-#   the streak; `flaky-recovered` neither extends nor resets; `fail`/`skipped`
-#   reset to 0. Output a per-id summary with the current streak + endpoint +
-#   category + body_path + last_run_id.
-STREAK_JSON=$(jq -c '
-  [.[].cases[]?] as $rows
-  | ($rows | map(.id) | unique) as $ids
-  | [
-      $ids[] as $id
-      | $rows
-      | map(select(.id == $id))
-      | reduce .[] as $r ({streak:0, ep:"unknown", cat:"unknown", body:null, run:null};
-          .ep  = ($r.endpoint   // .ep)
-          | .cat = ($r.category // .cat)
-          | .body = ($r.body_path // .body)
-          | .run = ($r.run_id    // .run)
-          | .streak = (
-              if   $r.verdict == "pass" then .streak + 1
-              elif $r.verdict == "flaky-recovered" then .streak
-              else 0
-              end
-            )
-        )
-      | . + {id:$id}
-    ]
-' <<<"$RECENT")
-
-# Also tag each row with its run_id so .run survives. The ledger lines already
-# have run_id at the top — re-emit cases enriched with it.
+# Streak computation in jq: fold the ledger chronologically per case id.
+#   pass             → streak + 1
+#   flaky-recovered  → unchanged (neither extends nor resets)
+#   anything else    → reset to 0
 STREAK_JSON=$(jq -c '
   [ .[] as $line
     | $line.cases[]?
@@ -175,7 +140,6 @@ STREAK_JSON=$(jq -c '
     ]
 ' <<<"$RECENT")
 
-# Promote candidates whose streak >= PROMOTE_AFTER and not already in index.
 while IFS= read -r row; do
   cid=$(jq -r '.id'     <<<"$row")
   s=$(jq -r   '.streak' <<<"$row")
@@ -206,56 +170,13 @@ while IFS= read -r row; do
           green_streak: $s,
           last_run_id: \"$run\",
           last_verdict: \"pass\",
-          checksum: \"$checksum\",
-          quarantined: false
+          checksum: \"$checksum\"
         }
       "
     fi
     promoted=$((promoted + 1))
   fi
 done < <(jq -c '.[]' <<<"$STREAK_JSON")
-
-# Demote: trailing consecutive fail per case (chronological).
-DEMOTE_JSON=$(jq -c '
-  [ .[] as $line | $line.cases[]? | . + {run_id: $line.run_id} ] as $rows
-  | ($rows | map(.id) | unique) as $ids
-  | [
-      $ids[] as $id
-      | $rows
-      | map(select(.id == $id))
-      | reduce .[] as $r ({fails:0};
-          .fails = (
-            if   $r.verdict == "fail" then .fails + 1
-            elif $r.verdict == "pass" or $r.verdict == "flaky-recovered" then 0
-            else .fails
-            end
-          )
-        )
-      | . + {id:$id}
-    ]
-' <<<"$RECENT")
-
-while IFS= read -r row; do
-  cid=$(jq -r '.id'    <<<"$row")
-  fs=$(jq -r  '.fails' <<<"$row")
-  in_index=$(jq -r --arg id "$cid" '.cases | has($id)' "$INDEX")
-  [[ "$in_index" == "true" ]] || continue
-  q=$(jq -r --arg id "$cid" '.cases[$id].quarantined // false' "$INDEX")
-  [[ "$q" == "true" ]] && continue
-  if (( fs >= X_QA_KB_DEMOTE_AFTER )); then
-    if [[ "$DRY_RUN" == true ]]; then
-      echo "[dry-run] would demote $cid (fail_streak=$fs)" >&2
-    else
-      now=$(kb_now)
-      update_index "
-        .cases[\"$cid\"].quarantined = true
-        | .cases[\"$cid\"].demoted_at = \"$now\"
-        | .cases[\"$cid\"].demoted_reason = \"$fs consecutive fails\"
-      "
-    fi
-    demoted=$((demoted + 1))
-  fi
-done < <(jq -c '.[]' <<<"$DEMOTE_JSON")
 
 # ---- Flow promotion ---------------------------------------------------------
 while IFS= read -r flow_line; do
@@ -266,13 +187,10 @@ while IFS= read -r flow_line; do
   [[ "$all_pass" == "true" ]] || continue
   (( consec >= X_QA_KB_PROMOTE_AFTER )) || continue
   chain_len=$(jq 'length' <<<"$chain_json")
-  (( chain_len >= X_QA_KB_FLOW_MIN_LENGTH )) || continue
+  (( chain_len >= FLOW_MIN_LENGTH )) || continue
 
   ok=$(jq -nr --slurpfile idx "$INDEX" --argjson chain "$chain_json" '
-    $chain
-    | all(. as $c
-          | ($idx[0].cases[$c] // null) as $e
-          | $e != null and ($e.quarantined != true))
+    $chain | all(. as $c | ($idx[0].cases[$c] // null) != null)
   ')
   [[ "$ok" == "true" ]] || continue
 
@@ -320,8 +238,7 @@ while IFS= read -r flow_line; do
         promoted_from_run: \"auto\",
         green_streak: $consec,
         last_verdict: \"pass\",
-        checksum: \"$checksum\",
-        quarantined: false
+        checksum: \"$checksum\"
       }
     "
   fi
@@ -329,5 +246,4 @@ while IFS= read -r flow_line; do
 done < <(jq -c '.[].flow_observations[]?' <<<"$RECENT")
 
 echo "KB_PROMOTED=$promoted"
-echo "KB_DEMOTED=$demoted"
 echo "KB_PROMOTE_STATUS=ok"

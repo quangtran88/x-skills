@@ -1,23 +1,21 @@
 # KB Curation Rules
 
-How entries enter, age out of, and get rejected from `.x-skills/x-qa/kb/`.
-Curation runs at the END of every `run` (after aggregate, before envelope
-emit) — driven by `scripts/kb-promote.sh`.
+How entries enter and age out of `.x-skills/x-qa/kb/`. Curation runs at the
+END of every `run` (after aggregate, before envelope emit) — driven by
+`scripts/kb-promote.sh`.
 
-## Tunables (env vars, all optional)
+## Tunables (env vars)
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `X_QA_KB_PROMOTE_AFTER`        | `3`  | Consecutive green runs before a generated case auto-promotes. |
-| `X_QA_KB_DEMOTE_AFTER`         | `3`  | Consecutive `fail` (non-flaky) runs before a promoted case demotes. |
-| `X_QA_KB_BASELINE_WINDOW`      | `50` | Rolling window size for latency / flaky-rate / shape stats. |
-| `X_QA_KB_FLOW_MIN_LENGTH`      | `2`  | Minimum chain length for a flow to be promotable. |
-| `X_QA_KB_LEDGER_RETAIN`        | `200`| Max lines kept by `kb-prune.sh --ledger`. |
 | `X_QA_KB_DISABLE_AUTO_PROMOTE` | unset| When set, no auto-promotion runs. Manual only. |
 
-Override per-run with flags: `--kb-promote-after N`,
-`--kb-disable-auto-promote`. Persistent overrides live in
-`profile.json.metadata.x_qa_kb` (free-form per profile-schema.md).
+Other thresholds (window=50 for baseline percentiles, flow-min-length=2)
+are hardcoded. They were originally env tunables but cut as anticipatory
+configuration — adjust the source when a real need surfaces.
+
+Override per-run with flags: `--kb-promote-after N`, `--kb-disable-auto-promote`.
 
 ## Case Promotion
 
@@ -29,31 +27,33 @@ A `generated` case in a run-local plan is a **candidate** when:
 3. `consecutive_pass >= X_QA_KB_PROMOTE_AFTER`.
 
 `consecutive_pass` is derived from `kb/.ledger.jsonl`. The first run a
-case appears in is `consecutive_pass = 1`. A `fail` or `flaky-recovered`
-verdict resets the counter to 0.
+case appears in is `consecutive_pass = 1`. A `fail` verdict resets the
+counter to 0; `flaky-recovered` leaves it unchanged.
 
 Promotion writes:
 - `kb/cases/tc-<slug>.yaml` with provenance fields filled in.
 - `kb/index.json.cases.<id>` with `green_streak`, `promoted_at`,
-  `promoted_from_run`.
-- A line in `kb/.ledger.jsonl` marking the promotion event (separate
-  from the run summary line).
+  `promoted_from_run`, `checksum`.
 
-## Case Demotion
+## Manual Demotion (v1: by hand)
 
-A promoted case demotes when it accumulates `X_QA_KB_DEMOTE_AFTER`
-consecutive `fail` verdicts (flaky-recovered does NOT count).
+A promoted case that goes bad is removed by hand:
 
-Demotion does NOT delete the YAML. It moves the entry into
-`kb/index.json.cases.<id>.demoted_at` and `quarantined: true`. The
-planner skips quarantined cases until the user explicitly runs
-`kb-promote --force tc-<id>` to clear the flag.
+```
+git rm .x-skills/x-qa/kb/cases/tc-foo.yaml
+jq 'del(.cases["tc-foo"])' .x-skills/x-qa/kb/index.json > /tmp/idx \
+  && mv /tmp/idx .x-skills/x-qa/kb/index.json
+```
+
+A `kb-demote.sh` subcommand and quarantine lifecycle were cut as
+speculative — bring them back if/when auto-promotion produces enough
+bad entries to justify a dedicated workflow.
 
 Hand-edited corpus YAMLs are detected separately: `doctor.sh` compares
 the file's sha256 against the index's `checksum` and emits a warning.
-v1 does NOT auto-demote on checksum drift — review and either accept
-the edit (`kb-promote --force <id>` to refresh the recorded checksum)
-or revert it.
+v1 does NOT auto-act on checksum drift — review and either accept the
+edit (`kb-promote --force <id>` to refresh the recorded checksum) or
+revert it.
 
 ## Flow Promotion
 
@@ -66,45 +66,27 @@ A chain promotes to `kb/flows/fl-<slug>.yaml` when:
 1. The same exact case-ID sequence appears in `>=
    X_QA_KB_PROMOTE_AFTER` consecutive runs with `all_pass: true`.
 2. Every case in the chain is itself a promoted KB case.
-3. Chain length `>= X_QA_KB_FLOW_MIN_LENGTH`.
+3. Chain length `>= 2`.
 
 Capture/inject directives are not inferred. The first flow promotion
 emits a flow YAML with empty `capture`/`inject` blocks; subsequent
-manual edits add them. A future v2 pass can infer captures from
-response-to-request data dependencies.
+manual edits add them.
 
 ## Baseline Update Rules
 
-Run after every test case (regardless of verdict):
+Run after every test case (regardless of verdict). Baselines are
+**passive memory** — they record what was seen, not regression signals.
 
 1. **`status_codes`** — increment the count for the observed status.
 2. **`latency_ms`** — push the observed latency into the rolling
-   window. Recompute `p50` / `p95` / `p99` / `max` over the window.
-   Update `ewma` as `ewma = 0.2 * observed + 0.8 * ewma_prev`.
-3. **`response_shape`** — ONLY on `verdict == pass`. Merge the
-   observed shape into the stored JSON Schema via additive union
-   (new keys widen the schema; never narrow on a single sample).
-4. **`flaky_rate`** — recompute `fails / samples` and
-   `flaky_recovered / samples` over the window.
+   window (size 50). Recompute `p50` / `p95` over the window.
+3. **`last_seen_at`** / **`samples`** — bump.
 
-The window evicts oldest sample when `samples > window`.
-
-## Drift Signals
-
-Computed AFTER baseline update, written into the baseline's
-`drift_signals` block, and propagated into `QA_REPORT.md` notes.
-
-| Signal | Trigger |
-|---|---|
-| `new_status_code_seen` | First time a status code appears for this endpoint. |
-| `shape_added_required_field` | A `pass` response contained a new `required` field absent from prior shape. |
-| `latency_p95_regression_pct` | `(p95_current - p95_prev) / p95_prev` if positive, else 0. Surface when `>20%`. |
-| `flaky_rate_spike` | `flaky_rate` doubled vs prior window snapshot. |
-
-Drift signals are informational. They do NOT flip the run verdict.
-Teams who want to gate on drift can set
-`X_QA_KB_FAIL_ON_DRIFT=p95,shape` (comma-separated) to escalate to
-`fail`.
+The original baselines layer also computed p99/max/EWMA, an additive
+response-shape JSON Schema union, flaky-rate, and drift signals. All
+were cut as scope creep — they served a regression-monitoring goal
+that the user did not ask for. The slim version above is the floor
+that still meets "maintain knowledge across runs."
 
 ## Endpoint Rename Handling
 
@@ -115,30 +97,24 @@ review — never auto-deletes (the endpoint may have just been moved).
 
 ## Manual Override Commands
 
-All shell-script entry points; see `scripts/`:
-
 | Command | Effect |
 |---|---|
-| `kb-promote --force <case-id>` | Promote regardless of streak. Clears `quarantined` if set. |
-| `kb-demote <case-id>` | Mark quarantined manually. |
+| `kb-promote --force <case-id>` | Promote regardless of streak. |
 | `kb-promote --dry-run` | Print what would auto-promote, no writes. |
 | `kb-inspect <case-id>` | Pretty-print case + ledger history. |
 | `kb-prune --orphans` | List files with no index entry, or index entries with no file. |
-| `kb-prune --baselines --older-than 90d` | Drop baselines untouched for 90+ days. |
-| `kb-prune --ledger` | Trim ledger to `X_QA_KB_LEDGER_RETAIN` lines. |
-| `kb-export <path>` | Tar+gz the KB for transfer to another repo / share with another team. |
-| `kb-import <tarball>` | Merge a KB tarball into the current KB. Refuses on ID collisions; `--rename-collisions` suffixes them. |
+| `kb-prune --orphans --apply` | Same, but remove. |
 
 ## Auto-Promotion Trigger Point
 
 `run` invokes `kb-promote.sh --auto` AFTER aggregate emits its envelope.
 The auto-promote pass:
 
-1. Reads `kb/.ledger.jsonl` (the last `2 * PROMOTE_AFTER` lines).
+1. Reads the recent tail of `kb/.ledger.jsonl`.
 2. Computes promotion candidates per the rules above.
 3. Writes new YAML + index entries.
 4. Emits a one-line summary the orchestrator appends to the envelope:
-   `KB_PROMOTED=<n>` and `KB_DEMOTED=<n>`.
+   `KB_PROMOTED=<n>` and `KB_PROMOTE_STATUS=ok|disabled|error`.
 
 Failure of auto-promote does NOT fail the run — it logs to stderr and
 sets `KB_PROMOTE_STATUS=error` in the envelope.

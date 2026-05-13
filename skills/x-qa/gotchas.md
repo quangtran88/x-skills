@@ -52,18 +52,17 @@
 
 19. **Stale baseline trap.** `kb/baselines/*.json` are observational, not
     ground-truth. A baseline that hasn't been hit for weeks can encode an
-    old endpoint shape; doctor warns via `last_seen_at`. Prune with
-    `kb-prune.sh --baselines --older-than 90d --apply` when in doubt.
+    old endpoint shape; doctor warns via `last_seen_at`. To prune by hand,
+    `rm` the JSON and `jq 'del(.baselines["<endpoint>"])'` the index.
 20. **Corpus drift on endpoint rename.** When code renames an endpoint
     (`POST /api/v1/x` → `/api/v2/x`), the matching corpus case still
     targets the old path. The planner emits `corpus-stale` and skips the
-    case; doctor does NOT auto-fail. Decision: rename the case + bump
-    `kb/index.json.version`, or `kb-demote <id>` and let the planner mint
-    a fresh one.
-21. **Schema migration.** `schema: 1` is hard-pinned in `kb/index.json`,
-    every `kb/cases/*.yaml`, every `kb/flows/*.yaml`, every
-    `kb/baselines/*.json`. `kb-migrate.sh` is a v2 placeholder; v1 has no
-    predecessor and refuses unknown schema.
+    case; doctor does NOT auto-fail. Resolution: edit the case YAML in
+    place, or `git rm` it and let the planner mint a fresh one on the
+    next run.
+21. **Schema pin.** `schema: 1` is hard-pinned in `kb/index.json`, every
+    `kb/cases/*.yaml`, `kb/flows/*.yaml`, `kb/baselines/*.json`. v1
+    refuses unknown schema; there is no migration tool yet.
 22. **Cross-team merge conflicts.** Two devs auto-promoting the same case
     in parallel branches produces conflicting `kb/index.json` entries +
     duplicate `cases/*.yaml`. Resolution: keep the entry with the higher
@@ -71,9 +70,9 @@
     --orphans` cleans up dangling files post-merge.
 23. **Auto-promotion of flaky cases.** A `pass` from a flaky-recovered
     retry does NOT count toward the streak (only the verdict literally
-    `pass` does). However, a case that consistently passes after a transient
-    fail can still drift in. Mitigation: `X_QA_KB_FAIL_ON_DRIFT=p95,shape`
-    promotes drift signals to verdict-flipping, raising the bar.
+    `pass` does). A case that consistently passes after transient fails
+    can still drift in — review the corpus periodically with `kb-list`
+    and `kb-inspect`.
 24. **Empty body_path in ledger.** If a case JSON is malformed, its
     `body_path` may be absent from the ledger line. Auto-promote skips
     these with `[skip] <id>: streak=N but no body file recorded`. Look

@@ -43,7 +43,6 @@
     "POST /api/users/me/avatar": {
       "file": "baselines/post__api_users_me_avatar.json",
       "samples": 42,
-      "window": 50,
       "last_seen_at": "2026-05-12T09:00:42Z"
     }
   }
