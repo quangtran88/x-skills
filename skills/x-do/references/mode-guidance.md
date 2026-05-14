@@ -2,19 +2,20 @@
 
 Detailed instructions for each detection mode. Referenced from SKILL.md's detection table.
 
+**Reviewer dispatch and synthesis live in x-review.** This file never redefines the 3-reviewer fan-out — every review step below dispatches `Skill: x-skills:x-review` and honors its returned verdict. The reduced-review / mechanical-batch / parent-deference exceptions are passed as hint args.
+
 ## A: Existing Plan
 
 1. Read the plan fully
 2. **Mindfulness Gate (auto-invoke `/x-mindful` on high-risk plans).** Scan the plan content for any of: breaking-change keywords (`breaking change`, `deprecate`, `remove`, `rename`, `migrate`, `migration`, `schema change`, `drop column`, `drop table`, `incompatible`); auth/security keywords (`auth`, `authn`, `authz`, `permission`, `RBAC`, `RLS`, `session`, `token`, `secret`, `CORS`, `CSRF`); cross-boundary keywords (`public API`, `shared library`, `published`, `consumer`, `tenant`, `multi-tenant`, `feature flag rollout`, `dual-write`); cost/capacity keywords (`index`, `full scan`, `backfill`, `N+1`, `fan-out`, `queue`, `cron`, `scheduled job`). If ANY hit AND the plan is not a mechanical batch — invoke `Skill: x-skills:x-mindful` with the plan path / content as input BEFORE proceeding to step 3. Wait for the `<!-- x-mindful-envelope v1 -->` block. Apply the envelope: drop `Rejected` items from the plan, revise the plan to incorporate `Modified` directives, proceed with `Confirmed`. Skip the gate when ALL of: scope is single-file, no shared interface touched, < 3 tasks, no high-risk keywords appear. Skip is also OK for mechanical batches (same change across N files, no architectural decision).
-3. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Skip ONLY for trivial plans (< 3 tasks AND single module) OR **mechanical batches** (same structural change repeated across N files — e.g., remove an import + call site identically in 4 adapters). For everything else, launch all 3 reviewers immediately — do NOT ask the user for permission, just announce: *"N tasks across M files — running quick plan review (~90s) before executing."* Then launch reviewers in ONE message. If the user said "fix all" / "just do it" — that means execute everything, NOT skip the review. Collect all results before proceeding.
-   **Research-produced plan exception:** Plans generated from comprehensive x-research (Type A comparison with 10+ sources read) may use reduced plan review (1 reviewer: `--model gpt` blocker-finder only, replacing the UNAVAILABLE `momus` role agent) instead of full 3-reviewer ceremony. The research itself provides grounding that substitutes for broader review.
+3. **⛔ Plan Review — NON-NEGOTIABLE.** Skip ONLY for trivial plans (< 3 tasks AND single module) OR **mechanical batches** (same structural change repeated across N files — e.g., remove an import + call site identically in 4 adapters). Otherwise: announce *"N tasks across M files — running plan review (~90s) before executing."* then dispatch `Skill: x-skills:x-review <plan-path>`. x-review runs its 3-reviewer fan-out in plan-mode (no passes menu, no Fix Mode) and returns the `<!-- x-review plan-mode envelope v1 -->` block. Honor its verdict: APPROVE → step 4; REQUEST_CHANGES → revise plan and re-dispatch (or proceed under explicit user override).
+   **Research-produced plan exception:** Plans generated from comprehensive x-research (Type A comparison with 10+ sources read) may pass a reduced-review hint: `Skill: x-skills:x-review <plan-path> --reduced` — x-review will run only the `--model gpt` blocker-finder lane. The research itself substitutes for broader review.
 4. Execute: `ralph` for 3+ tasks, direct execution for simpler plans. **"Fix all" with 3+ tasks = ralph, not manual batch edits.** Exception: **mechanical batches** (identical change across files) may use direct execution regardless of file count — ralph overhead exceeds the risk.
    **Surgical edit exception:** Direct execution is also acceptable for 3+ tasks when ALL are: (a) single-location edits or new files, (b) no dependencies between them, (c) each describable in 1 sentence, (d) total < 30 lines changed. This is distinct from mechanical batch (same pattern repeated) — it's about *task simplicity*.
-5. **Post-Implementation Review (cross-model, parallel):** Use the exact post-implementation review tool calls from `cross-model-review.md`. All 3 in one message.
-   Collect all results, synthesize, flag contradictions.
-   **Trivial implementations (< 3 tasks AND single module):** Reduce to 1 reviewer (OMC `code-reviewer` on the diff). Full 3-reviewer ceremony is disproportionate for small changes.
-   **Mechanical batches:** Post-impl review is still required (reduced to 1 reviewer: OMC `code-reviewer` on the diff is sufficient).
-   **Parent workflow deference:** When x-do runs inside x-skill-improve, defer post-impl review to the parent skill's validation step (`/x-skill-review`). Do not run both.
+5. **Post-Implementation Review.** Dispatch `Skill: x-skills:x-review` on the changeset (no args → x-review auto-detects diff target). x-review owns the cross-model fan-out, synthesis, passes menu, and Fix Mode routing. Honor its returned verdict: APPROVE → step 6; REQUEST_CHANGES → fire the `verification-failed` reaction (re-review then re-execute on approval).
+   **Trivial implementations (< 3 tasks AND single module):** Pass `--reduced` hint to x-review (1-reviewer mode, OMC `code-reviewer` on the diff).
+   **Mechanical batches:** Pass `--reduced` hint to x-review (1-reviewer mode is sufficient).
+   **Parent workflow deference:** When x-do runs inside x-skill-improve, skip this review — the parent's `/x-skill-review` validation step covers it. Do not run both.
 6. Verify and finish branch
 
 ## B: New Feature
@@ -22,12 +23,12 @@ Detailed instructions for each detection mode. Referenced from SKILL.md's detect
 1. **If requirements are clear:** brainstorm approaches, then plan
 2. **If requirements are vague or cross 3+ modules:** follow the step files in `../steps/` (read one at a time, start with `step-01-gather.md`)
 3. **Mindfulness Gate (auto-invoke `/x-mindful` on high-risk plans).** Same trigger keywords and skip rules as Mode A step 2 above. Run AFTER plan creation, BEFORE plan review. The envelope feeds the revised plan into step 4.
-4. **⛔ Plan Review (cross-model, parallel) — NON-NEGOTIABLE.** Same rules as Mode A step 3, including mechanical batch and research-produced plan exceptions.
+4. **⛔ Plan Review — NON-NEGOTIABLE.** Same rules as Mode A step 3: dispatch `Skill: x-skills:x-review <plan-path>`. Same trivial / mechanical / research-produced reduced-review exceptions apply.
 5. Execute based on scope:
    - 3+ tasks → `ralph` (persistence, TDD, verification loop) — **never manual batch edits**
    - 1-2 tasks → OMO `--model codex` (GPT-5.3 Codex, replaces UNAVAILABLE `hephaestus`) or direct execution
    - **Mechanical batch** or **surgical edits** → direct execution regardless of count (same exceptions as Mode A step 3)
-6. **Post-Implementation Review (cross-model, parallel):** Same as Mode A step 5, including trivial/mechanical/parent-deference exceptions.
+6. **Post-Implementation Review.** Same as Mode A step 5: dispatch `Skill: x-skills:x-review` on the changeset. Same reduced-review / parent-deference exceptions apply.
 7. Verify and finish branch
 
 ## C: Bug Fix
@@ -37,7 +38,7 @@ Detailed instructions for each detection mode. Referenced from SKILL.md's detect
 Route: hand off the user's bug description to x-bugfix via `Skill("x-bugfix", args="<bug description>")`. It will handle investigation, fix, and verification internally.
 
 After x-bugfix completes:
-1. **Post-Fix Review (cross-model, parallel):** Use the exact post-implementation review tool calls from `cross-model-review.md`. All 3 in one message. Collect all results, synthesize, flag contradictions.
+1. **Post-Fix Review.** Dispatch `Skill: x-skills:x-review` on the changeset. Honor verdict per `verification-failed` reaction.
 2. Verify and finish branch
 
 ## D: Quick Task
@@ -64,6 +65,6 @@ Route: hand off the user's refactoring description to refactor via `Skill("refac
 **Enumerated review-feedback exception:** When the user provides specific, numbered changes on an existing commit (e.g., "I have feedback for commit abc123: 1. use csv lib, 2. extract method, 3. fix error type..."), treat as **Mode A** instead — the feedback list IS the plan. `/refactor`'s discovery phases (intent gate, codemap) add ceremony that duplicates what the user already scoped. Route to Mode A and follow its plan review → execute → post-impl review pipeline.
 
 After refactor completes:
-1. **Post-Refactor Review (cross-model, parallel):** Use the exact post-implementation review tool calls from `cross-model-review.md`. All 3 in one message. Collect all results, synthesize, flag contradictions.
-   **Small-scope refactors (single module, < 3 files):** Reduce to 1 reviewer (OMC `code-reviewer` on the diff).
+1. **Post-Refactor Review.** Dispatch `Skill: x-skills:x-review` on the changeset. Honor verdict per `verification-failed` reaction.
+   **Small-scope refactors (single module, < 3 files):** Pass `--reduced` hint to x-review.
 2. Verify and finish branch

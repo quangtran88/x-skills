@@ -81,6 +81,8 @@ If deepwiki returns an error (repo not indexed), report that clearly so we can f
 
 ## Type F: Pre-Planning Analysis
 
+**Canonical fan-out (Standard Mode):** `oracle ∥ morph codebase_search ∥ OMO explore` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + `gemini-agent` for external context.
+
 For `oracle` (pre-planning consult — replaces UNAVAILABLE `metis`):
 ```
 Analyze this request before planning: {{user's request}}.
@@ -88,7 +90,14 @@ Current codebase context: {{relevant files, stack, constraints}}.
 What hidden requirements, scope risks, and AI-slop patterns should we address?
 ```
 
-For `explore` (parallel):
+For `morph codebase_search` (semantic local-code lane):
+```
+Find {{feature concept}} in the codebase. Return file:line refs with brief
+descriptions. Focus on entry points, shared interfaces, and any existing
+implementations that overlap with the requested scope.
+```
+
+For `OMO explore` (pattern/path lane — grep/glob/ast_grep):
 ```
 [CONTEXT]: Pre-planning for {{feature}}.
 [GOAL]: Find existing patterns.

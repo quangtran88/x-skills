@@ -5,12 +5,12 @@
 ## Rules
 
 - **READ COMPLETELY** before acting
-- **NEVER** proceed to execution until ALL reviewers return results
-- **HALT** on REJECT verdict — address blockers before continuing
+- **NEVER** proceed to execution until x-review returns a verdict
+- **HALT** on REQUEST_CHANGES verdict — address blockers before continuing
 
 ## Goal
 
-Review the plan for blockers before committing to execution.
+Delegate plan review to **x-review** and route on its verdict. x-review owns the cross-model fan-out (Claude opus + GPT blocker-finder + requesting-code-review + optional Gemini-pro) and synthesis — do NOT redefine reviewer dispatch here.
 
 ## When to Use
 
@@ -19,27 +19,37 @@ Review the plan for blockers before committing to execution.
 
 ## When to Skip
 
-- Plan has < 3 tasks AND touches a single module → proceed to step-04-execute.md
-- Mechanical batch (same structural change repeated across N files) → proceed to step-04-execute.md
+- Plan has < 3 tasks AND touches a single module → proceed to `step-04-execute.md`
+- Mechanical batch (same structural change repeated across N files) → proceed to `step-04-execute.md`
 
 ## Execution
 
-Launch all 3 reviewers in **ONE message** (ABS = Agent, Bash, Skill):
+Dispatch via the Skill tool:
 
-1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective
-2. **Bash tool:** `omo-agent --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."`, `run_in_background: true`, `timeout: 600000` — GPT-5.4 blocker-finder (OKAY/REJECT). *Note: this replaces the former `momus` role agent, which is UNAVAILABLE due to the oh-my-opencode plugin compat bug — see `../../x-omo/gotchas.md`.*
-3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow
+```
+Skill: x-skills:x-review
+args: <absolute plan path>
+```
 
-**Reduced review (1 reviewer: `--model gpt` blocker-finder only):** Plans generated from comprehensive x-research (Type A comparison with 10+ sources).
+x-review will detect **Target A: Plan/Spec** from the `.md` path and run its plan-mode pipeline:
+1. Cross-model dispatch (Claude `code-reviewer` opus + `--model gpt` blocker-finder + `superpowers:requesting-code-review`; Gemini-pro added if `gemini_cli` capability is pinned)
+2. Synthesis filtered by scope (false assumptions, missing deps, ambiguous success criteria, verification gaps)
+3. Returns the `<!-- x-review plan-mode envelope v1 -->` block with verdict + findings counts. No passes menu, no Fix Mode.
 
-4. **Collect ALL results** before proceeding.
+**Reduced review (1 reviewer: `--model gpt` blocker-finder only):** Plans generated from comprehensive x-research (Type A comparison with 10+ sources read) may pass a `reduced` hint to x-review in the args (e.g., `args: "<plan-path> --reduced"`).
 
-5. **If OKAY:** proceed to step-04-execute.md
-6. **If REJECT:** address the blocker issues, revise the plan, then re-review or proceed with user approval.
+## Verdict Handling
+
+Parse the `<!-- x-review plan-mode envelope v1 -->` block from x-review's return:
+
+- **`verdict: APPROVE`** → proceed to `step-04-execute.md`.
+- **`verdict: REQUEST_CHANGES`** → address blocker findings, revise the plan, then either:
+  - Re-dispatch `Skill: x-skills:x-review <plan-path>` for a fresh verdict, OR
+  - Proceed with explicit user approval ("ship it anyway" / "I've read the blockers and accept").
 
 ## Output
 
-A reviewed plan with OKAY verdict (or user-approved despite issues).
+A reviewed plan with APPROVE verdict (or explicit user override).
 
 ## Next Step
 

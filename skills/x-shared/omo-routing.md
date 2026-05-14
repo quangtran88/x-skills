@@ -2,6 +2,8 @@
 
 Canonical routing table for all x-skills. For full agent catalog and invocation syntax, see the [OMO skill](../x-omo/SKILL.md).
 
+## Unavailable Agents
+
 > ⚠ **DO NOT DISPATCH to `hephaestus`, `atlas`, `prometheus`, `metis`, `momus`.** These 5 agents are UNAVAILABLE due to a known opencode + oh-my-opencode plugin compat bug and will hard-fail with an explicit error. The **only** OMO role agents safe to call are the four listed below. For the tasks those broken agents used to handle, use direct model routing: `--model codex` (autonomous deep work, formerly hephaestus/atlas), `--model gpt` (plan review / blocker-finder, formerly momus; strategic planning, formerly prometheus/metis), or fall through to `oracle` for strategic advice. See `../x-omo/gotchas.md` for the root cause and upstream-fix watch.
 
 ## Agent Catalog
@@ -48,7 +50,7 @@ These are independent and can run simultaneously (`run_in_background: true`, max
 | Pattern | Agents | When |
 |---|---|---|
 | Research | `explore` + `librarian` | Codebase + external docs needed |
-| Pre-planning | `oracle` + `explore` | Strategic framing + codebase context |
+| Pre-planning | `oracle` + `morph codebase_search` + `explore` | Strategic framing + semantic search + pattern context |
 | Plan review | `--model gpt` + OMC `code-reviewer` | Cross-model review of a complex plan |
 | Visual + context | `multimodal-looker` + `explore` | Image input + related code lookup |
 | Code review | OMC `code-reviewer` + `--model gpt` | Claude + GPT cross-model review |

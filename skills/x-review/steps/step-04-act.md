@@ -8,6 +8,36 @@
 - Step 3 (synthesis + findings table) must be complete before this step
 - **HALT at the passes menu** — do not auto-proceed to verdict routing
 
+## Plan-Target Routing (Target A — runs FIRST, short-circuits the rest of this step)
+
+If step-01 detected **Target A: Plan/Spec**, this step takes a short path:
+
+1. The passes menu (`[S][P][C][X][V][D][A][N]`) targets **code**. Skip it entirely for plans.
+2. The Clarification Gate is for **fix-time** decisions on code patches. For plans, the "fix" is upstream plan revision by the caller — skip the gate.
+3. Fix Mode does not apply — `Edit`/`Write` against a `.md` plan is the **caller's** responsibility (e.g., x-do revises the plan and may re-dispatch review).
+
+**Plan-target completion (replaces all sections below for Target A):**
+
+- **APPROVE** → return the verdict + findings table to the caller. Done. No menu.
+- **REQUEST_CHANGES** → return the verdict + findings table to the caller. The caller decides whether to revise the plan, re-dispatch review, or proceed under user override. Do NOT enter Fix Mode.
+
+**Plan-mode handoff envelope (mandatory — surface at the end of the response):**
+
+```
+<!-- x-review plan-mode envelope v1 -->
+target: plan
+target_path: <absolute plan path>
+verdict: APPROVE | REQUEST_CHANGES
+findings_count: <N>
+critical: <N>
+high: <N>
+medium: <N>
+low: <N>
+needs_direction_count: <N>   # informational only; caller resolves at plan-revision time
+```
+
+Skip everything below this section for Target A. The completion checklist at the bottom still applies (verified findings, synthesis table, verdict, handoff context).
+
 ## Offer Additional Passes (MANDATORY HALT)
 
 **STOP here.** After presenting findings in step 3, you MUST:

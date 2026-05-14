@@ -8,9 +8,9 @@ The pipeline is implemented as step files in `../steps/`. Read one step at a tim
 
 | Step | File | Goal | Skip When |
 |------|------|------|-----------|
-| 1 | `steps/step-01-gather.md` | Parallel `oracle` + `explore` (replaces UNAVAILABLE `metis`) | Requirements already clear |
+| 1 | `steps/step-01-gather.md` | Delegate to `x-research` Pre-planning lane (`oracle ∥ morph ∥ OMO explore`) | Requirements already clear OR x-research handoff exists |
 | 2 | `steps/step-02-plan.md` | Create structured plan | — |
-| 3 | `steps/step-03-review.md` | Cross-model plan review (ABS) | Plan has < 3 tasks AND single module |
+| 3 | `steps/step-03-review.md` | Delegate plan review to `x-review` (returns plan-mode envelope) | Plan has < 3 tasks AND single module |
 | 4 | `steps/step-04-execute.md` | Ralph or direct execution | — |
 
 ## When to Skip the Pipeline Entirely

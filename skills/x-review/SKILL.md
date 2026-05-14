@@ -61,7 +61,7 @@ Smart review that detects what to review and how deep to go.
 **MANDATORY first step — do this BEFORE anything else:**
 0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch.
 1. Read `config.json` in this skill directory to get the `omo_agent` path (used at dispatch time).
-2. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model gpt` (plan review / blocker-finder) or `--model codex` (autonomous implementation) instead. See `../x-omo/gotchas.md`.**
+2. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **For the unavailable-agent list and replacement model-routing (`--model gpt`, `--model codex`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 3. Read `../x-gemini/SKILL.md` if `gemini_cli` capability is pinned. Gemini-3-pro is the third cross-model reviewer (alongside Claude opus + GPT oracle), strong on Google-Search-grounded fact checks, large diff handling (1M context), and visual/UI screenshot diffs.
 
 ## Invocation

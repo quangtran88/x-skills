@@ -27,19 +27,19 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 
 ## Post-Impl Review ≠ TypeScript Verification
 
-**Symptom:** `tsc --noEmit` passes → session claims done without running post-implementation review.
+**Symptom:** `tsc --noEmit` passes → session claims done without dispatching post-implementation review.
 
-**Root cause:** Confusing TypeScript verification (mandatory compilation/lint gate) with post-implementation review (cross-model quality assessment). They are separate gates with different purposes.
+**Root cause:** Confusing TypeScript verification (mandatory compilation/lint gate) with post-implementation review (cross-model quality assessment via x-review). They are separate gates with different purposes.
 
-**Fix:** Both are mandatory. tsc/eslint verifies the code compiles and passes lint. Post-impl review (3 reviewers: Agent + Bash + Skill) checks design quality, missed edge cases, dead code, and contract correctness. Run tsc/eslint first, THEN launch post-impl review.
+**Fix:** Both are mandatory. tsc/eslint verifies the code compiles and passes lint. Post-impl review is delegated to `Skill: x-skills:x-review` — x-review owns the cross-model reviewer fan-out, synthesis, and verdict. Run tsc/eslint first, THEN dispatch x-review on the changeset.
 
-## 3rd Reviewer (Skill Tool) Consistently Dropped
+## Reimplementing x-review or x-research Dispatch Inline
 
-**Symptom:** Plan or post-impl review launches only 2 reviewers (Agent + Bash OMO) instead of 3.
+**Symptom:** Step 1 (gather) or step 3 (review) writes its own oracle/explore/code-reviewer fan-out instead of delegating. Mode-guidance.md regrows "launch 3 reviewers in ONE message" recipes. A `cross-model-review.md` file reappears under `references/`.
 
-**Root cause:** The Skill tool call for `superpowers:requesting-code-review` is the easiest to forget because it's a different invocation pattern from Agent and Bash.
+**Root cause:** A previous version of x-do owned both reviewer dispatch and pre-planning research. Logic drifted between the inline copies and the canonical owners (x-review, x-research). The 2026-05 refactor centralized reviewer dispatch in x-review and pre-planning fan-out in x-research; x-do is a pure router for those axes.
 
-**Fix:** Cross-model review = exactly 3 calls in ONE message: **A**gent, **B**ash, **S**kill. Mnemonic: ABS. If you only see 2 tool calls, you're missing one.
+**Fix:** When you reach for a multi-agent fan-out in x-do, STOP. Plan review and post-impl review → `Skill: x-skills:x-review`. Pre-planning context gathering → `Skill: x-skills:x-research` (Pre-planning lane). x-do reads their returned envelopes and routes on the verdict. If you find yourself writing `Agent + Bash omo-agent + Skill` triple-dispatch inside x-do, that is the drift signal — delete it and delegate instead.
 
 ## Granular Commits from executor / ralph
 

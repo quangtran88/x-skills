@@ -12,7 +12,7 @@ x-research is a router. It classifies the question by **information-source signa
 Before dispatching anything, load:
 
 0. `../x-shared/capability-loading.md` — pin the active capability set for this session. Skills MUST NOT re-verify per dispatch; trust the bootstrap-pinned set.
-1. `../x-omo/SKILL.md` — OMO agent catalog + Bash invocation patterns. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — UNAVAILABLE due to plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (planning) instead.**
+1. `../x-omo/SKILL.md` — OMO agent catalog + Bash invocation patterns. **For the unavailable-agent list and replacement model-routing (`--model codex`, `--model gpt`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 2. `../x-gemini/SKILL.md` — direct Gemini CLI bridge (Google Search grounding, gemini-3.x, `--file`, `--resume`). **Load only if `gemini_cli` capability is pinned**; if not pinned, drop gemini-agent rows from the routing table and pick the escalation column instead.
 3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph).
 4. `gotchas.md` — known failure patterns.
@@ -57,7 +57,7 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 | Visual cross-file vision reasoning (screenshots, mockups, multi-image) | `gemini-agent --file` (multimodal pro) | OMO `multimodal-looker` |
 | X vs Y tradeoff (web-grounded) | `perplexity_reason` | OMO `oracle` for arch depth |
 | Architecture decision (no web needed) | OMO `oracle` (GPT-5) | + `perplexity_reason` |
-| Pre-planning (requirements + risks + code) | OMO `oracle` ∥ `morph` ∥ `perplexity_ask` | — |
+| Pre-planning (requirements + risks + code) | OMO `oracle` ∥ `morph` ∥ OMO `explore` | + `perplexity_ask` (web-grounded escalation; Max Mode adds `perplexity_research` + `gemini-agent`) |
 | Visual single file (image/PDF/screenshot) | Claude `Read` (small) OR `gemini-agent --file` | OMO `multimodal-looker` |
 | Exhaustive audit (security / architecture review) | `perplexity_research` | + OMO `oracle` |
 | Dense code examples from web | `exa` → `get_code_context_exa` | OMO `librarian` |

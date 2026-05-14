@@ -99,7 +99,7 @@ Smart entry point that detects what to do and routes through the optimal workflo
 **MANDATORY first step — do this BEFORE anything else:**
 
 0. Pin capabilities for the session per `../x-shared/capability-loading.md` (look for the `[x-skills/capabilities]` snapshot injected by SessionStart; otherwise read `~/.config/x-skills/capabilities.json` once). Filter routing tables against the pinned set; do NOT re-check per dispatch.
-1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (plan review / planning) instead. See `../x-omo/gotchas.md`.**
+1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **For the unavailable-agent list and replacement model-routing (`--model codex`, `--model gpt`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 
 ## Invocation
 
@@ -111,16 +111,16 @@ For x-do-specific routing, see `references/omo-routing.md`.
 
 Before classifying mode, check: **does this task need research first?**
 
-| Signal | Action |
-|--------|--------|
-| Unfamiliar library/API/framework | → `/x-research` (Type B or D) first, then return here |
-| Vague requirements spanning 3+ modules | → `/x-research` (Type F) first, then return here |
-| "How does X work in our codebase?" before fixing/building | → `/x-research` (Type A) first, then return here |
-| Clear requirements, known codebase area | → Skip, proceed to Detection below |
+Trigger rule: if ANY of the following hold, dispatch `Skill: x-skills:x-research` first and return on its envelope, then re-enter this skill skipping `step-01-gather.md`:
 
-When x-research completes, it will offer to hand off to x-do. Use its handoff context to skip step-01-gather (requirements already collected).
+- Unfamiliar library, framework, API, or external system involved
+- Requirements vague AND scope crosses 3+ modules
+- "How does X work in our codebase?" must be answered before fixing/building
+- User explicitly asks for research / investigation / understanding
 
-**Return path:** If x-research just completed in the same session and provided findings/context, skip this gate entirely — research is already done. Proceed directly to Detection. This includes cases where x-research's quick-action exception applied the fix inline.
+x-research owns the signal taxonomy and tool selection — do NOT re-classify here. When it completes, it will offer to hand off to x-do; use its envelope to skip `step-01-gather.md` (requirements already collected).
+
+**Return path:** If x-research just completed in the same session and provided findings/context, skip this gate entirely. Proceed directly to Detection. This includes cases where x-research's quick-action exception applied a small fix inline.
 
 ## Detection
 
@@ -190,9 +190,7 @@ See `references/delegation-and-scaling.md` for signal→agent routing table and 
 
 ## Cross-Model Review
 
-See `references/cross-model-review.md` for exact tool calls (plan review + post-implementation review).
-
-**Key rules:** OMO agents run via Bash, not Agent tool. Launch all 3 reviewers in ONE message. Wait for ALL results before synthesizing.
+Cross-model review (plan or post-implementation) is delegated to **x-review**. Dispatch `Skill: x-skills:x-review <target>` and honor the returned verdict envelope. x-review owns reviewer fan-out, synthesis, severity tiering, passes menu, and Fix Mode. Do not redefine reviewer dispatch here.
 
 ## Mode Guidance
 
@@ -248,7 +246,7 @@ This skill references shared infrastructure in `../x-shared/`:
 - `workflow-chains.md` — cross-skill chaining
 - `context-envelope.md` — handoff context format
 
-External skills used: `x-omo` (agent catalog), `x-bugfix` (Mode C), `refactor` (Mode F), `superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion`, `superpowers:finishing-a-development-branch`, `superpowers:requesting-code-review`, `oh-my-claudecode:ralph`.
+External skills used: `x-research` (Mode B vague-requirements path + step-01-gather delegation), `x-review` (Modes A/B/C/F plan review + post-impl review delegation), `x-omo` (agent catalog), `x-bugfix` (Mode C), `refactor` (Mode F), `superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion`, `superpowers:finishing-a-development-branch`, `superpowers:requesting-code-review`, `oh-my-claudecode:ralph`.
 
 ## Gotchas
 
