@@ -24,6 +24,12 @@ parse_github_url() {
   return 1
 }
 
+# Owner segment must be a single safe component — no path traversal, no
+# embedded slashes. Allows GitHub-style usernames/orgs and Gitea/GitLab too.
+valid_owner_segment() {
+  [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]] && [[ "$1" != "." ]] && [[ "$1" != ".." ]]
+}
+
 resolve_latest_stable() {
   # echoes a tag name to stdout, or returns 1 if none found
   local url="$1" owner="$2" repo="$3" tag=""
@@ -75,22 +81,30 @@ submodule_url_for_path() {
 
 resolve_path_from_arg() {
   # accepts <repo>, <owner>/<repo>, or research/<owner>/<repo>
-  local arg="$1" match
+  # exits 2 (writes "ambiguous: <matches>") when a bare <repo> matches more
+  # than one owner — caller must disambiguate with <owner>/<repo>.
+  local arg="$1" matches
   if [[ -d "$arg" ]] && [[ "$arg" == research/* ]]; then
     printf '%s\n' "${arg%/}"
     return 0
   fi
-  match=$(list_research_paths | awk -v a="$arg" '
+  matches=$(list_research_paths | awk -v a="$arg" '
     {
-      if ($0 == "research/" a) { print; exit }
+      if ($0 == "research/" a)       { print; next }
       n = split($0, p, "/")
-      if (p[n] == a) { print; exit }
+      if (p[n] == a)                 { print; next }
     }')
-  if [[ -n "$match" ]]; then
-    printf '%s\n' "$match"
+  local count
+  count=$(printf '%s\n' "$matches" | sed '/^$/d' | wc -l | tr -d ' ')
+  if [[ "$count" == "0" ]]; then
+    return 1
+  elif [[ "$count" == "1" ]]; then
+    printf '%s\n' "$matches"
     return 0
+  else
+    printf 'ambiguous:\n%s\n' "$matches" >&2
+    return 2
   fi
-  return 1
 }
 
 # ---------- commands ----------
@@ -102,6 +116,12 @@ cmd_add() {
   local upstream_owner upstream_repo
   if ! read -r upstream_owner upstream_repo < <(parse_github_url "$url"); then
     die "cannot parse GitHub URL: $url"
+  fi
+
+  # Reject any owner override that isn't a single safe path segment —
+  # otherwise `target="research/$owner/$repo"` escapes the research/ prefix.
+  if [[ -n "$owner_override" ]] && ! valid_owner_segment "$owner_override"; then
+    die "invalid owner override: '$owner_override' (must be a single segment, no slashes or .. traversal)"
   fi
 
   # Release lookup ALWAYS queries the upstream repo. owner_override only
@@ -126,7 +146,15 @@ cmd_add() {
     warn "checkout of $tag failed; rolling back submodule registration"
     git submodule deinit -f -- "$target" 2>/dev/null || true
     git rm -f --cached -- "$target" 2>/dev/null || true
-    rm -rf "$target" ".git/modules/$target" 2>/dev/null || true
+    # Drop the freshly-added [submodule "<target>"] section so a follow-up
+    # `add` doesn't fail with "already exists in .gitmodules".
+    git config -f .gitmodules --remove-section "submodule.$target" 2>/dev/null || true
+    # Cleanup the cached submodule gitdir. Use `git rev-parse --git-path`
+    # so this resolves correctly inside linked worktrees (where .git is
+    # a file pointing at the main checkout's modules/ dir).
+    local modules_dir
+    modules_dir=$(git rev-parse --git-path "modules/$target" 2>/dev/null || echo ".git/modules/$target")
+    rm -rf "$target" "$modules_dir" 2>/dev/null || true
     die "could not check out $tag in $target — rollback complete; investigate and retry"
   fi
   git add .gitmodules "$target"
@@ -146,9 +174,13 @@ update_one() {
     return
   fi
 
+  # parse_github_url failure is fine — pass empty owner/repo so the
+  # `git ls-remote` semver fallback inside resolve_latest_stable runs.
+  # `gh` lookup is skipped automatically when owner=="" (gh api gets an
+  # empty path and returns an empty tag).
   local owner repo
   if ! read -r owner repo < <(parse_github_url "$url"); then
-    warn "$path: non-GitHub URL, skipping stable detection"; return
+    owner=""; repo=""
   fi
 
   git -C "$path" fetch --tags --quiet
@@ -206,14 +238,18 @@ cmd_remove() {
   [[ -z "$target" ]] && die "usage: x-upstream remove <repo>"
   local path
   if ! path=$(resolve_path_from_arg "$target"); then
-    die "no research submodule matching '$target'"
+    die "no research submodule matching '$target' (or ambiguous — disambiguate with <owner>/<repo>)"
   fi
   # Hardening: rm -rf takes an absolute target only when the path is
   # under research/<owner>/<repo>. Refuse any other shape defensively.
   [[ "$path" == research/*/* ]] || die "refusing to remove non-research submodule path: $path"
   git submodule deinit -f -- "$path"
   git rm -f -- "$path"
-  rm -rf ".git/modules/${path}"
+  # Resolve the modules/ dir via git so the cleanup works in linked worktrees
+  # too (where .git is a file pointing at the main checkout's gitdir).
+  local modules_dir
+  modules_dir=$(git rev-parse --git-path "modules/$path" 2>/dev/null || echo ".git/modules/$path")
+  rm -rf "$modules_dir"
   log "✓ removed $path"
   log "  next: git commit -m \"chore: drop $path\""
 }
