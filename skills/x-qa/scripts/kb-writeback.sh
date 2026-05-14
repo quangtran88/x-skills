@@ -57,18 +57,29 @@ while IFS= read -r tc; do
   cat=$(jq -r '.category'  <<<"$tc")
   result_file="$RUN_DIR/cases/$cid.json"
 
+  # Track whether this case produced a real measurement. Missing or invalid
+  # result files must NEVER push a fake `0ms` sample into the baseline
+  # percentile window (would silently report p50/p95 = 0 for endpoints that
+  # never responded). Verdict still lands in the ledger as a fail.
+  has_measurement=0
   if [[ ! -f "$result_file" ]] || ! jq -e . "$result_file" >/dev/null 2>&1; then
     verdict="fail"; status=""; latency_ms=0
   else
     verdict=$(jq -r '.verdict // "fail"'                  "$result_file")
     status=$(jq  -r '.evidence.response.status // empty'  "$result_file")
     latency_ms=$(jq -r '.evidence.latency_ms // .duration_ms // 0' "$result_file")
+    has_measurement=1
   fi
 
   LEDGER_CASES=$(jq --arg id "$cid" --arg v "$verdict" --arg ep "$ep" --arg c "$cat" \
                     --arg body "$(jq -r '.body_path' <<<"$tc")" \
     '. + [{id:$id, verdict:$v, endpoint:$ep, category:$c, body_path:$body}]' \
     <<<"$LEDGER_CASES")
+
+  # Skip baseline writes when there's no real sample — verdict-only.
+  if [[ "$has_measurement" -eq 0 ]]; then
+    continue
+  fi
 
   slug=$(kb_endpoint_slug "$ep")
   bfile="$BASELINES_DIR/$slug.json"
@@ -180,4 +191,25 @@ jq -c -n \
   { run_id: $run, started_at: $ts, verdict: $v,
     total: $total, passed: $passed, failed: $failed, flaky: $flaky,
     cases: $cases, flow_observations: $flows }
-' >> "$LEDGER"
+' > "$ENRICHED.line"
+
+# Atomic append under flock — multi-KB ledger lines exceed POSIX PIPE_BUF
+# (~4 KiB) so concurrent `>>` appends from parallel x-team runs can interleave
+# and corrupt JSON lines. Once corrupted, kb-promote's strict `jq -s '.'`
+# aborts on the bad line and auto-promotion stalls silently.
+#
+# `flock` is available on Linux by default; on macOS it ships with util-linux
+# via Homebrew. Fall back to a python fcntl.lockf wrapper if neither is found.
+if command -v flock >/dev/null 2>&1; then
+  ( flock -x 9; cat "$ENRICHED.line" >>"$LEDGER" ) 9>"$LEDGER.lock"
+else
+  python3 - "$LEDGER" "$LEDGER.lock" "$ENRICHED.line" <<'PY'
+import fcntl, sys
+ledger, lockf, src = sys.argv[1:]
+with open(lockf, "a") as l:
+    fcntl.lockf(l, fcntl.LOCK_EX)
+    with open(src) as s, open(ledger, "a") as out:
+        out.write(s.read())
+PY
+fi
+rm -f "$ENRICHED.line"

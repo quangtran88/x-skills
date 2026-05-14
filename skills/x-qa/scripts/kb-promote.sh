@@ -64,7 +64,7 @@ force_promote() {
   local case_id="$1"
   local repo; repo=$(git rev-parse --show-toplevel)
   local body
-  body=$(find "$repo/.x-skills/x-qa/runs" -type f \
+  body=$(find "$repo/.x-skills/x-qa/runs" -type f -path "*/plan-cases/*" \
            \( -name "$case_id.yaml" -o -name "$case_id.yml" \) \
            -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1 || true)
   if [[ -z "$body" || ! -f "$body" ]]; then
@@ -114,6 +114,10 @@ RECENT=$(tail -n "$window" "$LEDGER" | jq -s '.')
 #   pass             → streak + 1
 #   flaky-recovered  → unchanged (neither extends nor resets)
 #   anything else    → reset to 0
+#
+# Schema (references/kb-schema.md §118) requires distinct run IDs across the
+# streak window — collapse multiple rows from the same run_id to the LAST one
+# so re-aggregating a run can't inflate the streak counter.
 STREAK_JSON=$(jq -c '
   [ .[] as $line
     | $line.cases[]?
@@ -124,6 +128,8 @@ STREAK_JSON=$(jq -c '
       $ids[] as $id
       | $rows
       | map(select(.id == $id))
+      | (reduce .[] as $r ({}; .[$r.run_id] = $r) | [.[]]) as $deduped
+      | $deduped
       | reduce .[] as $r ({streak:0, ep:"unknown", cat:"unknown", body:null, run:null};
           .ep  = ($r.endpoint   // .ep)
           | .cat = ($r.category // .cat)

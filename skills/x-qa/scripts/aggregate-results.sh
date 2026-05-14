@@ -143,6 +143,19 @@ cases_yaml=$(jq -r '.[] |
     echo "## ✓ PASS ($passed/$total passed)"
   fi
   echo
+  # Notes from scout phase — SKILL.md §15 promises open_questions surface in
+  # the report; emit them verbatim so a fail isn't silently missing context.
+  if [[ -f "$RUN_DIR/scope.json" ]]; then
+    open_questions=$(jq -r '.open_questions // [] | .[]' "$RUN_DIR/scope.json" 2>/dev/null || true)
+    if [[ -n "$open_questions" ]]; then
+      echo "## Notes — Scout Open Questions"
+      echo
+      while IFS= read -r q; do
+        [[ -n "$q" ]] && echo "- $q"
+      done <<<"$open_questions"
+      echo
+    fi
+  fi
   echo "## Failed Cases"
   echo
   jq -r '.[] | select(.verdict == "fail") | "### \(.id)\n\nError: \(.error)\n\n"' <<<"$results"
@@ -154,12 +167,14 @@ kb_status="disabled"
 kb_reused=0
 kb_generated=0
 if [[ "$KB_ENABLED" == true ]]; then
-  # Read planner counters if it dropped a sidecar.
+  # Read planner counters via safe KEY=value parse — NEVER source(.) the file.
+  # A planner that interpolates an unsafe value (e.g. KB_REUSED=$(cmd)) must
+  # not execute as shell here.
   if [[ -f "$RUN_DIR/kb-counters.env" ]]; then
-    # shellcheck disable=SC1090
-    . "$RUN_DIR/kb-counters.env"
-    kb_reused="${KB_REUSED:-0}"
-    kb_generated="${KB_GENERATED:-0}"
+    kb_reused=$(awk -F= '/^KB_REUSED=/{gsub(/[^0-9]/,"",$2); print $2; exit}' "$RUN_DIR/kb-counters.env")
+    kb_generated=$(awk -F= '/^KB_GENERATED=/{gsub(/[^0-9]/,"",$2); print $2; exit}' "$RUN_DIR/kb-counters.env")
+    : "${kb_reused:=0}"
+    : "${kb_generated:=0}"
   fi
   if ! writeback_out=$("$SCRIPT_DIR/kb-writeback.sh" --run-dir "$RUN_DIR" --plan "$PLAN" 2>&1); then
     echo "$writeback_out" >&2

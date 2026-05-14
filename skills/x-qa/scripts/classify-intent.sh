@@ -9,6 +9,7 @@ PROFILE="$REPO_ROOT/.x-skills/x-qa/profile.json"
 
 intent=""; confidence="high"
 pr_number=""; branch=""; service=""; spec=""; artifact=""; prose=""
+_abs=""
 
 # strip leading/trailing whitespace via parameter expansion (no subshell)
 trim="${RAW#"${RAW%%[![:space:]]*}"}"; trim="${trim%"${trim##*[![:space:]]}"}"
