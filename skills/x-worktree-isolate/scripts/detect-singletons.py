@@ -9,7 +9,7 @@ Output:
 """
 
 from __future__ import annotations
-import argparse, json, sys
+import argparse, json, os, sys
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -25,22 +25,55 @@ sys.modules["parse_compose"] = pc
 spec2.loader.exec_module(pc)
 
 
+def _walk_pruned(repo: Path, guard: dict | None):
+    """Walk repo with exclude_dirs pruned from descent in-place.
+
+    `Path.rglob` lazily descends into every directory regardless of filename
+    filters — on a populated `.git` (10^5+ objects) or `node_modules`, that
+    means minutes of stat() before any singleton check runs. Switch to
+    os.walk + topdown=True so we can prune `dirnames[:]` and skip subtree
+    traversal entirely.
+    """
+    g = guard or {}
+    exclude = [tuple(Path(e).parts) for e in (g.get("exclude_dirs") or [])]
+    repo_str = str(repo)
+    for dirpath, dirnames, filenames in os.walk(repo_str, topdown=True, followlinks=False):
+        rel_parts = Path(dirpath).relative_to(repo).parts
+        # Prune in-place: drop any child dir whose path-from-repo starts with
+        # an excluded prefix.
+        kept: list[str] = []
+        for d in dirnames:
+            child_parts = rel_parts + (d,)
+            blocked = False
+            for ex_parts in exclude:
+                # exclude entry can be single-segment ("node_modules") or
+                # multi-segment ("tests/fixtures") — match as path prefix.
+                if len(child_parts) >= len(ex_parts) and \
+                   child_parts[:len(ex_parts)] == ex_parts:
+                    blocked = True
+                    break
+            if not blocked:
+                kept.append(d)
+        dirnames[:] = kept
+        for name in filenames:
+            yield Path(dirpath) / name
+
+
 def find_compose_files(repo: Path, guard: dict | None = None) -> list[Path]:
     names = ("docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml")
     found: list[Path] = []
     g = guard or {}
-    for entry in sorted(repo.rglob("*")):
+    for entry in _walk_pruned(repo, g):
         if not (entry.is_file() and entry.name in names and "override" not in entry.name):
             continue
         depth = len(entry.relative_to(repo).parts) - 1
         if depth > 2:
             continue
-        # Honor exclude_dirs so vendored copies under node_modules/vendor/etc.
-        # don't pollute compose-tier singleton detection.
+        # Defense-in-depth: _path_excluded also catches exclude_globs.
         if g and _path_excluded(entry, repo, g):
             continue
         found.append(entry)
-    return found
+    return sorted(found)
 
 
 def detect_compose(repo: Path, guard: dict | None = None) -> list[dict]:
@@ -121,7 +154,7 @@ def _path_excluded(p: Path, repo: Path, guard: dict) -> bool:
 def _eligible_files(repo: Path, guard: dict):
     max_depth = int(guard.get("scan_max_depth", 4))
     max_bytes = int(guard.get("scan_max_file_bytes", 1048576))
-    for p in repo.rglob("*"):
+    for p in _walk_pruned(repo, guard):
         if not p.is_file():
             continue
         rel = p.relative_to(repo)
@@ -184,7 +217,7 @@ def detect_host(repo: Path, guard: dict) -> list[dict]:
     out: list[dict] = []
     seen_ids: set[str] = set()
     max_depth = int(guard.get("scan_max_depth", 4))
-    for p in repo.rglob("*"):
+    for p in _walk_pruned(repo, guard):
         if not p.is_file():
             continue
         rel = p.relative_to(repo)

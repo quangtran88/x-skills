@@ -45,6 +45,24 @@ def main() -> None:
     host_blockers: list[dict] = []
     warnings: list[str] = []
 
+    # First pass: collect env_vars that ANY enabled env-flag singleton owns.
+    # Multiple singleton ids can share a `suggested_env_var` (e.g. both
+    # `node-cron` and `agenda` use RUN_SCHEDULER). If a user enables one of
+    # them, we must not emit `RUN_SCHEDULER=false` from another still-disabled
+    # id that shares the variable — that would silently re-disable the feature
+    # the user just toggled on.
+    enabled_env_vars: set[str] = set()
+    for s in profile.get("singletons", []) or []:
+        if s.get("kind") != "env-flag":
+            continue
+        sid = s.get("id")
+        default = s.get("default_in_worktree", "disabled")
+        state = overrides.get(sid, default)
+        if state == "enabled":
+            var = s.get("env_var")
+            if var:
+                enabled_env_vars.add(var)
+
     for s in profile.get("singletons", []) or []:
         sid = s.get("id")
         default = s.get("default_in_worktree", "disabled")
@@ -95,7 +113,7 @@ def main() -> None:
         elif kind == "env-flag":
             var = s.get("env_var")
             val = s.get("env_disabled_value", "false")
-            if var:
+            if var and var not in enabled_env_vars:
                 env_lines.append(f"{var}={val}")
 
     print(json.dumps({

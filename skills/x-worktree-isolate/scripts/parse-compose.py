@@ -32,15 +32,22 @@ except ImportError:
     )
 
 
+# Per Docker Compose spec, a single integer ("80") is the TARGET (container)
+# port with an ephemeral host port — NOT a literal host port. The host
+# alternation is only valid when followed by `:<container>` (otherwise the
+# integer is the container port and the host group must stay empty).
 PORT_RE = re.compile(
     r"""^
     (?:(?P<host_ip>\d{1,3}(?:\.\d{1,3}){3}):)?
     (?:
+      (?:
         (?P<host_var>\$\{[A-Za-z_][A-Za-z0-9_]*\})
         |
         (?P<host_lit>\d+)
+      )
+      :
     )?
-    (?::(?P<container>\d+))?
+    (?P<container>\d+)?
     (?:/(?P<proto>tcp|udp))?
     $""",
     re.VERBOSE,

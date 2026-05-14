@@ -432,10 +432,21 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 # --- Write files ---
-printf '%s\n' "$OVERRIDE_CONTENT" > "$OVERRIDE_PATH"
-printf '%s\n' "$ENV_CONTENT" > "$ENV_PATH"
+# Atomic write: render to mktemp on the same filesystem, then rename. A SIGINT
+# or disk-full mid-write leaves the target file untouched rather than a partial
+# YAML/env that `docker compose up` would fail on.
+write_atomic() {
+  local target="$1" content="$2" dir tmp
+  dir=$(dirname "$target")
+  mkdir -p "$dir"
+  tmp=$(mktemp "$dir/.xwi.$(basename "$target").XXXXXX")
+  printf '%s\n' "$content" > "$tmp"
+  mv "$tmp" "$target"
+}
+write_atomic "$OVERRIDE_PATH" "$OVERRIDE_CONTENT"
+write_atomic "$ENV_PATH"      "$ENV_CONTENT"
 mkdir -p "$STATE_DIR"
-printf '%s\n' "$STATE_CONTENT" > "$STATE_PATH"
+write_atomic "$STATE_PATH"    "$STATE_CONTENT"
 
 # --- Patch .gitignore (idempotent) ---
 GITIGNORE="$REPO_ROOT/.gitignore"
