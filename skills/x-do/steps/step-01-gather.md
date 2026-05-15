@@ -24,13 +24,13 @@ Gather requirements analysis and codebase context before planning. **x-research 
 - **x-research handoff already exists in this session** → requirements already collected, go to `step-02-plan.md`
 - Requirements are already clear and scoped → go to `step-02-plan.md`
 - User already brainstormed in a prior session → go to `step-02-plan.md`
-- Single-task work → skip the pipeline entirely, use `--model codex` (replaces UNAVAILABLE `hephaestus`) or direct execution
+- Single-task work → skip the pipeline entirely, use `--model codex` or direct execution
 
 ## Execution
 
 ### 1. Delegate to x-research (Pre-planning lane)
 
-Dispatch via the Skill tool — x-research runs the canonical Pre-planning fan-out (`oracle ∥ morph codebase_search ∥ OMO explore`) per `../x-research/SKILL.md` § "Pre-planning" and synthesizes the three lanes into a single envelope:
+Dispatch via the Skill tool — x-research runs the canonical Pre-planning fan-out (`OMO oracle ∥ morph codebase_search ∥ OMO explore`) per `../x-research/references/prompt-templates.md` § Type F (also indexed in `../x-research/SKILL.md` Detection table row `Pre-planning`) and synthesizes the three lanes into a single envelope:
 
 ```
 Skill: x-skills:x-research
@@ -41,7 +41,7 @@ args: Pre-planning consult for: {{user's request}}.
 ```
 
 x-research will:
-1. Run `oracle` (strategic consult, replaces UNAVAILABLE `metis`) — surfaces hidden requirements, scope risks, AI-slop patterns
+1. Run `oracle` (strategic consult) — surfaces hidden requirements, scope risks, AI-slop patterns
 2. Run `morph codebase_search` — semantic local code search for related implementations
 3. Run `OMO explore` — pattern/path discovery via grep/glob/ast_grep for conventions and prior implementations
 4. Synthesize into a single context envelope (per `../x-research/references/synthesis-rules.md`)

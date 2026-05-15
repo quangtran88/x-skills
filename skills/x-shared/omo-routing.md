@@ -50,10 +50,10 @@ These are independent and can run simultaneously (`run_in_background: true`, max
 | Pattern | Agents | When |
 |---|---|---|
 | Research | `explore` + `librarian` | Codebase + external docs needed |
-| Pre-planning | `oracle` + `morph codebase_search` + `explore` | Strategic framing + semantic search + pattern context |
-| Plan review | `--model gpt` + OMC `code-reviewer` | Cross-model review of a complex plan |
+| Pre-planning | `OMO oracle` ∥ `morph codebase_search` ∥ `OMO explore` | Strategic framing + semantic search + pattern context (canonical Type F — see `../x-research/references/prompt-templates.md`) |
+| Plan review | `--model gpt` blocker-finder + OMC `code-reviewer` (+ `requesting-code-review` Skill) | Cross-model review of a complex plan — see `../x-review/steps/step-02-review.md` § "Plan Review" |
 | Visual + context | `multimodal-looker` + `explore` | Image input + related code lookup |
-| Code review | OMC `code-reviewer` + `--model gpt` | Claude + GPT cross-model review |
+| Code review (diff) | OMC `code-reviewer` + `OMO oracle` (+ `gemini-agent --model pro` when `gemini_cli` pinned, + `requesting-code-review` Skill) | Claude + GPT (+ Gemini) cross-model review on code/diff per `../x-review/steps/step-02-review.md` § "Code / Git Diff Review". **`--model gpt` is plan-only; using it for code/diff is a known target-routing mistake.** |
 
 ## Sequential Dependencies (Never Parallelize)
 

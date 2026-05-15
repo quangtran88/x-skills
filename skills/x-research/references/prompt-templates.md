@@ -81,7 +81,7 @@ If deepwiki returns an error (repo not indexed), report that clearly so we can f
 
 ## Type F: Pre-Planning Analysis
 
-**Canonical fan-out (Standard Mode):** `oracle ∥ morph codebase_search ∥ OMO explore` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + `gemini-agent` for external context.
+**Canonical fan-out (Standard Mode):** `OMO oracle ∥ morph codebase_search ∥ OMO explore` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + `gemini-agent` for external context.
 
 For `oracle` (pre-planning consult — replaces UNAVAILABLE `metis`):
 ```

@@ -68,3 +68,5 @@ After refactor completes:
 1. **Post-Refactor Review.** Dispatch `Skill: x-skills:x-review` on the changeset. Honor verdict per `verification-failed` reaction.
    **Small-scope refactors (single module, < 3 files):** Pass `--reduced` hint to x-review.
 2. Verify and finish branch
+
+> **Verdict-envelope vs Fix Mode contract:** x-review returns a structured `plan-mode envelope` (with `verdict: APPROVE | REQUEST_CHANGES`) only for **Target A (plan/spec)**. For code/diff targets (B/C/D), x-review applies fixes inline via its own Fix Mode (`superpowers:receiving-code-review` + `verification-before-completion`) and returns after fixes are on disk. x-do should treat code-target review as "x-review owns the fix loop" — re-run tsc/eslint/tests on the resulting tree rather than routing on a verdict token. The `verification-failed` reaction below applies to **plan-review** REQUEST_CHANGES and to code-target reviews where the user explicitly picked Review-Only Mode (no inline fixes).

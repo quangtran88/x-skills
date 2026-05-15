@@ -57,14 +57,14 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 | Visual cross-file vision reasoning (screenshots, mockups, multi-image) | `gemini-agent --file` (multimodal pro) | OMO `multimodal-looker` |
 | X vs Y tradeoff (web-grounded) | `perplexity_reason` | OMO `oracle` for arch depth |
 | Architecture decision (no web needed) | OMO `oracle` (GPT-5) | + `perplexity_reason` |
-| Pre-planning (requirements + risks + code) | OMO `oracle` ∥ `morph` ∥ OMO `explore` | + `perplexity_ask` (web-grounded escalation; Max Mode adds `perplexity_research` + `gemini-agent`) |
+| Pre-planning (requirements + risks + code) | `OMO oracle` ∥ `morph codebase_search` ∥ `OMO explore` | + `perplexity_ask` (web-grounded escalation; Max Mode adds `perplexity_research` + `gemini-agent`) |
 | Visual single file (image/PDF/screenshot) | Claude `Read` (small) OR `gemini-agent --file` | OMO `multimodal-looker` |
 | Exhaustive audit (security / architecture review) | `perplexity_research` | + OMO `oracle` |
 | Dense code examples from web | `exa` → `get_code_context_exa` | OMO `librarian` |
 
 **Cheapest-viable-first.** Free/instant tools (morph, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
 
-**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate. **Max Mode is exempt** — its whole purpose is parallel multi-lane fan-out where the user has accepted the cost.
+**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate. **Max Mode is exempt** — its whole purpose is parallel multi-lane fan-out where the user has accepted the cost. **Pre-planning Type F is also exempt** — the three lanes (`oracle` for strategic framing, `morph codebase_search` for semantic search, `OMO explore` for pattern context) cover orthogonal axes, so parallel dispatch is intentional and not "just in case". See `references/prompt-templates.md` § Type F for the canonical fan-out.
 
 **Parallel only when axes differ:** morph (local code) ∥ perplexity (web) is fine. morph ∥ OMO `explore` "just in case" is waste.
 

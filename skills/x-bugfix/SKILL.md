@@ -12,7 +12,7 @@ Smart entry point for bugs and investigations. Detects severity, routes through 
 **MANDATORY first step — do this BEFORE anything else:**
 
 0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch.
-1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **Do NOT dispatch to `hephaestus`, `atlas`, `prometheus`, `metis`, or `momus` — they are UNAVAILABLE due to a plugin compat bug. Use `--model codex` (autonomous deep work) or `--model gpt` (strategic / review) instead. See `../x-omo/gotchas.md`.**
+1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. For the canonical list of UNAVAILABLE role agents and their replacements, see [`../x-shared/omo-routing.md § Unavailable Agents`](../x-shared/omo-routing.md#unavailable-agents).
 2. Read `../x-gemini/SKILL.md` if `gemini_cli` capability is pinned. Gemini's 1M context, native Google Search grounding, and multimodal `--file` flag handle three bug scenarios that OMO/MCP cannot: large-log analysis, screenshot/mockup-driven bugs, and fresh CVE/regression web facts.
 
 ## Invocation
@@ -142,7 +142,7 @@ Skip: hypothesis testing, pattern catalog, OMO delegation, debug report. Still r
 | 3+ failed hypotheses (after instrumentation) | `oracle` | Fresh perspective from a different model |
 | Codebase search needed (simple) | `morph-mcp codebase_search` | Semantic search, no agent overhead |
 | Codebase search needed (complex, multi-tool) | `explore` | Parallel multi-tool search |
-| Stalled >3 iterations (per iteration-patterns.md §2 definitions) | `--model codex` | Deep autonomous worker (replaces UNAVAILABLE `hephaestus`) |
+| Stalled >3 iterations (per iteration-patterns.md §2 definitions) | `--model codex` | Deep autonomous worker |
 | Unfamiliar library in stack | `librarian` OR `gemini-agent --model pro` | External docs specialist; gemini for fresh web grounding |
 | Log/trace >50k tokens | `gemini-agent --file <log>` | 1M context single-shot beats paging |
 | Visual bug (screenshot/mockup) | `gemini-agent --file <image>` | Multimodal pro |

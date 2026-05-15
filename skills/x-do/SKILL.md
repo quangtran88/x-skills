@@ -196,8 +196,8 @@ Cross-model review (plan or post-implementation) is delegated to **x-review**. D
 
 See `references/mode-guidance.md` for detailed per-mode instructions. Key rules:
 
-- **A/B: Plan Review is NON-NEGOTIABLE** for 3+ tasks or multi-module plans. Launch all 3 reviewers (ABS) in ONE message.
-- **A/B: Post-Implementation Review** is also mandatory (all 3 reviewers). Separate from tsc/eslint verification.
+- **A/B: Plan Review is NON-NEGOTIABLE** for 3+ tasks or multi-module plans. Dispatch `Skill: x-skills:x-review <plan-path>` — x-review owns the multi-reviewer fan-out.
+- **A/B: Post-Implementation Review** is also mandatory (dispatch `Skill: x-skills:x-review` on the diff; x-review runs the full code-review fan-out). Separate from tsc/eslint verification.
 - **A/B: ralph for 3+ tasks** unless mechanical batch or surgical edit exception applies.
 - **C: Delegate to `/x-bugfix`**, then post-fix review.
 - **D: Direct execution**, still verify.

@@ -1,12 +1,14 @@
 # x-do Gotchas
 
+> Replacement mapping for UNAVAILABLE role agents (`metis`, `prometheus`, `momus`, `hephaestus`) lives in **[../x-shared/omo-routing.md § Unavailable Agents](../x-shared/omo-routing.md#unavailable-agents)**. Do not re-inline that mapping in entries below; refer to role agents by their replacement (e.g., `--model codex`, `--model gpt`, `oracle`) directly.
+
 Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shared/common-gotchas.md`.
 
 - **Ralph sometimes re-executes completed stories on resume.** Always check `ralph-state.json` for story status before resuming.
-- **`--model codex` works best with a structured prompt** (context, goal, constraints, existing code, expected output, verification steps, output format). Underspecified prompts lead to hallucinated requirements. *(Replaces former `hephaestus` role agent, which is UNAVAILABLE.)*
+- **`--model codex` works best with a structured prompt** (context, goal, constraints, existing code, expected output, verification steps, output format). Underspecified prompts lead to hallucinated requirements.
 - **Brainstorming on trivial tasks wastes time.** If the implementation path is obvious, skip straight to execution.
-- **`--model gpt` blocker-finder sometimes flags non-issues as blockers.** Cross-reference with your own judgment — if a "blocker" is actually a known constraint, proceed. *(Replaces former `momus` role agent, which is UNAVAILABLE.)*
-- **Don't force the planning pipeline on small tasks.** A single rename or config change doesn't need `oracle` pre-plan → `--model gpt` plan → `--model gpt` blocker-finder (formerly `metis → prometheus → momus`, all now UNAVAILABLE). Use Mode D.
+- **`--model gpt` blocker-finder sometimes flags non-issues as blockers.** Cross-reference with your own judgment — if a "blocker" is actually a known constraint, proceed.
+- **Don't force the planning pipeline on small tasks.** A single rename or config change doesn't need `oracle` pre-plan → `--model gpt` plan → `--model gpt` blocker-finder. Use Mode D.
 - **Mechanical batch detection:** A task qualifies as a "mechanical batch" when ALL changes follow the same structural pattern (e.g., delete import + remove call site in N files). Test: if you could describe the change as a template applied N times, it's mechanical. If any file requires unique logic or decisions, it's NOT mechanical — use full ceremony.
 
 ## Review Feedback Misclassified as Mode F
@@ -57,7 +59,7 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 
 **Root cause:** Claude is trying to solve a problem that would benefit from a different model's perspective or a specialized agent's tool access.
 
-**Fix:** After 2 failed attempts at the same issue, proactively delegate to `oracle` (for debugging/architecture advice) or `--model codex` (for implementation; replaces UNAVAILABLE `hephaestus`). State the delegation reason to the user. See "Proactive OMO Delegation" in SKILL.md.
+**Fix:** After 2 failed attempts at the same issue, proactively delegate to `oracle` (for debugging/architecture advice) or `--model codex` (for implementation). State the delegation reason to the user. See "Proactive OMO Delegation" in SKILL.md.
 
 ## Implementing Against an Unfamiliar Lib Without a Scratch-Test First
 

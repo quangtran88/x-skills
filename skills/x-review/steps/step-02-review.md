@@ -16,6 +16,17 @@ Read `references/scope-guard.md` and paste the SCOPE block VERBATIM at the top o
 
 In the prompt examples below, `<SCOPE_GUARD>` is shorthand for the full block from `references/scope-guard.md`. When you actually invoke the tool, replace it with the entire pasted block (~10 lines).
 
+## Reduced Mode (`--reduced` hint)
+
+If the invocation args contain `--reduced` (e.g., `Skill: x-skills:x-review <path> --reduced`), run a SINGLE-reviewer fan-out instead of the full 3/4-lane dispatch:
+
+- **Target A (plan) + `--reduced`** → run only `<omo_agent> --model gpt` blocker-finder (lane 2 of Plan Review below). Skip Agent `code-reviewer`, skip `requesting-code-review`.
+- **Targets B/C/D (code/diff) + `--reduced`** → run only Agent `oh-my-claudecode:code-reviewer` (lane 1 of Code Review below). Skip oracle, skip gemini, skip `requesting-code-review`.
+
+Reduced mode still pastes the Scope Guard VERBATIM. It still emits the completion checklist with the unused-lane boxes marked `N/A — reduced mode`. It still routes through step-03 synthesis and step-04 verdict.
+
+The caller (typically `x-do` for research-produced plans, trivial impls, or mechanical batches) is responsible for asserting that reduced coverage is sufficient — see `../../x-do/references/mode-guidance.md` for the trigger criteria.
+
 ## Plan Review (Target A)
 
 Launch these 3 in ONE message. **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.

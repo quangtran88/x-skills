@@ -36,7 +36,7 @@ low: <N>
 needs_direction_count: <N>   # informational only; caller resolves at plan-revision time
 ```
 
-Skip everything below this section for Target A. The completion checklist at the bottom still applies (verified findings, synthesis table, verdict, handoff context).
+Skip everything below this section for Target A. The completion checklist at the bottom still applies (verified findings, synthesis table, verdict, envelope, handoff context) — except the `NEEDS_DIRECTION` row, which is N/A for plan-mode because the Clarification Gate is skipped (`needs_direction_count` surfaces in the envelope only; the caller resolves at plan-revision time).
 
 ## Offer Additional Passes (MANDATORY HALT)
 
@@ -186,7 +186,7 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 
 - [ ] Every CRITICAL/HIGH finding verified against actual code
 - [ ] Synthesis table includes Source, Verified, and NEEDS_DIRECTION columns
-- [ ] Every NEEDS_DIRECTION row has a recorded user decision (chosen option or skip)
+- [ ] Every NEEDS_DIRECTION row has a recorded user decision (chosen option or skip) — N/A for Target A plan-mode (Clarification Gate skipped; `needs_direction_count` surfaces in envelope)
 - [ ] Verdict stated: APPROVE or REQUEST_CHANGES
 - [ ] Handoff context block included (see `../../x-shared/context-envelope.md`)
 

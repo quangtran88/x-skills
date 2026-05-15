@@ -32,7 +32,7 @@ All lanes dispatch with `run_in_background: true`. Wait for ALL terminal states 
 | **Web research / fresh facts** | `perplexity_research` ∥ `exa web_search_exa` ∥ `gemini-agent` (Google Search) ∥ OMO `librarian` (TYPE B) |
 | **Library API** | `context7 query-docs` ∥ `exa get_code_context_exa` ∥ `gemini-agent` ∥ OMO `librarian` |
 | **Architecture / X vs Y** | OMO `oracle` ∥ `perplexity_reason` ∥ `gemini-agent --model pro` ∥ OMC Explore w/ `exa get_code_context_exa` |
-| **Pre-planning** | OMO `oracle` ∥ `morph codebase_search` ∥ OMO `explore` ∥ `perplexity_research` ∥ `gemini-agent` |
+| **Pre-planning** | `OMO oracle` ∥ `morph codebase_search` ∥ `OMO explore` ∥ `perplexity_research` ∥ `gemini-agent` |
 | **Visual** | `gemini-agent --file` ∥ OMO `multimodal-looker` ∥ Claude `Read` direct |
 
 Lane invocation lives in the linked skills (`x-omo/SKILL.md`, `x-gemini/SKILL.md`, `x-shared/mcp-toolbox.md`). Do NOT redefine here.
