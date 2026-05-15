@@ -247,7 +247,6 @@ x-skills is **stateless** by design:
 - No state files between invocations
 - No session memory beyond what Claude Code's conversation provides
 - Handoff context blocks carry state between skills
-- Optional: `claude-mem` plugin for cross-session memory (not required)
 
 The only persistent artifacts are:
 - `~/.config/x-skills/capabilities.json` — capability manifest (rewritten by setup)

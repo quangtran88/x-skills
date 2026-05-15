@@ -82,7 +82,6 @@ Everything is optional. Setup detects what's available and skills adapt.
 | [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) | Role agents (oracle, explore, librarian) | `opencode plugin oh-my-openagent` |
 | [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) | OMC agents (executor, code-reviewer, debugger) | `/plugin marketplace add Yeachan-Heo/oh-my-claudecode` |
 | [superpowers](https://github.com/obra/superpowers) | Workflow skills (brainstorming, TDD, writing-plans) | `/plugin marketplace add obra/superpowers-marketplace` |
-| [claude-mem](https://github.com/thedotmack/claude-mem) | Cross-session memory + search | `/plugin marketplace add thedotmack/claude-mem` |
 | MCP servers | perplexity, deepwiki, exa, context7, morph | Configure in `.mcp.json` |
 | Security tools | schemathesis, nuclei, sqlmap, spectral | `pip install schemathesis sqlmap` / `brew install nuclei` |
 
@@ -102,7 +101,7 @@ Everything is optional. Setup detects what's available and skills adapt.
 $ /x-skills:setup
 
   Working: omo-agent, opencode (166 models), perplexity MCP
-  Missing: oh-my-claudecode, superpowers, claude-mem
+  Missing: oh-my-claudecode, superpowers
 
   Would you like me to install the missing plugins? [1,2,3 / all / skip]
 ```

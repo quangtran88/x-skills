@@ -32,8 +32,7 @@ Location: `~/.config/x-skills/capabilities.json`
     },
     "plugins": {
       "oh_my_claudecode": true,
-      "superpowers": true,
-      "claude_mem": true
+      "superpowers": true
     },
     "companion_skills": {
       "ui_ux_pro_max": true,
@@ -76,7 +75,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
 The `inject-capabilities.sh` hook reads the manifest and injects a one-line snapshot into the conversation context:
 
 ```
-[x-skills/capabilities] opencode, omo_plugin, gemini_cli, mcp_perplexity, mcp_deepwiki, mcp_exa, mcp_context7, mcp_morph, plugin_oh_my_claudecode, plugin_superpowers, plugin_claude_mem
+[x-skills/capabilities] opencode, omo_plugin, gemini_cli, mcp_perplexity, mcp_deepwiki, mcp_exa, mcp_context7, mcp_morph, plugin_oh_my_claudecode, plugin_superpowers
 ```
 
 Skills parse this line at bootstrap. If absent, they fall back to reading `~/.config/x-skills/capabilities.json` directly with `jq`.
@@ -167,7 +166,6 @@ Detection method: grep `settings.json`, `.mcp.json`, and plugin cache `.mcp.json
 Checks `installed_plugins.json` for:
 - `oh-my-claudecode` — multi-agent orchestration
 - `superpowers` — workflow skills
-- `claude-mem` — cross-session memory
 
 ### 6. Companion Skills
 Checks `~/.omc/skills/` and `~/.claude/skills/` for:

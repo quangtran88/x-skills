@@ -9,7 +9,7 @@ Evaluates how well an x-skill was followed during a real session, then improves 
 
 ## Bootstrap
 
-0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `plugin.omc` snapshot token (manifest key `plugins.oh_my_claudecode`) gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable. `plugin.claude_mem` is optional and used only for memory-backed enhancements.
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `plugin.omc` snapshot token (manifest key `plugins.oh_my_claudecode`) gates the `session_search` MCP tool used in step 1; degrade to JSONL-direct fallback if unavailable.
 
 ## Invocation
 
@@ -124,7 +124,7 @@ When the user chooses to apply:
 - **COMPLIANCE GAP findings:** No skill change. Optionally add to gotchas.md as a reminder.
 - After applying, show a summary of what changed and offer validation:
   > Updates applied. Validate with `/x-skill-review`? **[Y]** Run review **[N]** Done
-- **For x-skills plugin edits:** Remind user to bump version and release after fixes (`/claude-mem:version-bump`).
+- **For x-skills plugin edits:** Remind user to bump version and release after fixes.
 
 ## Dependencies
 

@@ -49,7 +49,6 @@ def truthy: . == true or . == "partial" or . == "full";
   (.capabilities.mcp.morph            | select(truthy) | "mcp.morph"),
   (.capabilities.plugins.oh_my_claudecode | select(truthy) | "plugin.omc"),
   (.capabilities.plugins.superpowers  | select(truthy) | "plugin.superpowers"),
-  (.capabilities.plugins.claude_mem   | select(truthy) | "plugin.claude_mem"),
   (.capabilities.companion_skills.ui_ux_pro_max  | select(truthy) | "skill.ui_ux_pro_max"),
   (.capabilities.companion_skills.x_skill_review | select(truthy) | "skill.x_skill_review"),
   (.capabilities.security_tools.schemathesis | select(truthy) | "tool.schemathesis"),

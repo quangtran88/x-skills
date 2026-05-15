@@ -52,7 +52,6 @@ Detection method: grep `settings.json`, `.mcp.json`, and plugin cache `.mcp.json
 #### 5. Peer Plugins
 - `oh-my-claudecode` — multi-agent orchestration
 - `superpowers` — workflow skills
-- `claude-mem` — cross-session memory
 
 #### 6. Companion Skills
 - `ui-ux-pro-max` — design-system MASTER.md generator
@@ -160,7 +159,6 @@ This bounds trust on the plugin-cache symlink target.
 | oh-my-openagent | Role agents (oracle, explore, librarian) | `opencode plugin oh-my-openagent` |
 | oh-my-claudecode | OMC agents (executor, code-reviewer, debugger) | `/plugin marketplace add Yeachan-Heo/oh-my-claudecode` |
 | superpowers | Workflow skills | `/plugin marketplace add obra/superpowers-marketplace` |
-| claude-mem | Cross-session memory | `/plugin marketplace add thedotmack/claude-mem` |
 | MCP servers | perplexity, deepwiki, exa, context7, morph | Configure in `.mcp.json` |
 | Gemini CLI | Direct Gemini access | `npm install -g @google/gemini-cli` |
 | Security tools | schemathesis, nuclei, sqlmap, spectral | `pip install schemathesis sqlmap` / `brew install nuclei` |

@@ -39,8 +39,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
     },
     "plugins": {
       "oh_my_claudecode": true,
-      "superpowers": true,
-      "claude_mem": true
+      "superpowers": true
     },
     "companion_skills": {
       "ui_ux_pro_max": true,

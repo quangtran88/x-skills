@@ -20,9 +20,9 @@
 | **x-worktree** | plugin | Provision an isolated git worktree on a new branch — used by `x-do` / `x-bugfix` `--wt` flag, also invokable directly | git (≥ 2.5); optional: worktrunk `wt` CLI |
 | **x-worktree-isolate** | plugin | Per-worktree docker-compose isolation: scan once → emit profile.json → on each new worktree write `compose.override.yml` (with `!reset null`) and `.env.worktree`. Hard-blocks on cross-worktree footguns. | Requires: docker compose ≥ v2.24, python3 + pyyaml; optional: worktrunk wt |
 | **x-upstream** | plugin | Pin upstream repos as `research/<owner>/<repo>` submodules at latest stable release. Commands: add / update (one or all) / list / remove. Stable detection: `gh release` non-prerelease → semver tag fallback. | git ≥ 2.13; optional: gh + jq (without them, semver-tag fallback only) |
-| **x-skill-improve** | plugin | Improve skills from session data | Optional: claude-mem |
+| **x-skill-improve** | plugin | Improve skills from session data | Standalone |
 | **x-shared** | plugin | Shared references (not invokable) | None |
-| **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/`; optional: claude-mem |
+| **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/` |
 
 ## Feature Gates
 

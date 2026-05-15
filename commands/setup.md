@@ -13,7 +13,7 @@ Idempotent setup — safe to run any number of times. Each run detects current s
 - opencode CLI + `oh-my-openagent` plugin registration
 - **Role agents in `~/.config/opencode/oh-my-openagent.json` have `"mode": "all"`** — `oracle`, `explore`, `librarian`, `multimodal-looker` default to `mode: "subagent"` in the plugin, so `opencode run --agent <name>` silently fails unless the user config bumps them to `"all"`. The audit seeds the file if it's missing, adds missing entries, and patches wrong-mode entries — writes a timestamped `.bak` before touching an existing file.
 - MCP servers (perplexity, deepwiki, exa, context7, morph)
-- Peer plugins (oh-my-claudecode, superpowers, claude-mem)
+- Peer plugins (oh-my-claudecode, superpowers)
 - Optional security tools (schemathesis, nuclei, sqlmap, …)
 
 ## Step 1: Find and run setup
@@ -96,7 +96,6 @@ fi
 |--------|-----------|------------|---------|
 | oh-my-claudecode | `oh-my-claudecode` | `Yeachan-Heo/oh-my-claudecode` | `oh-my-claudecode@omc` |
 | superpowers | `superpowers` | `obra/superpowers-marketplace` | `superpowers@superpowers-marketplace` |
-| claude-mem | `claude-mem` | `thedotmack/claude-mem` | `claude-mem@thedotmack` |
 
 **For MCP servers**, provide config guidance (cannot auto-install):
 - **perplexity**: Requires API key from perplexity.ai, configure in `.mcp.json`
@@ -116,7 +115,6 @@ After installing anything:
 | Plugin | Post-install command | When to mention |
 |--------|---------------------|-----------------|
 | oh-my-claudecode | `/oh-my-claudecode:omc-setup` | Only if OMC was installed in THIS run |
-| claude-mem | Check claude-mem docs for MCP setup | Only if claude-mem was installed in THIS run |
 | superpowers | None needed | Never |
 
 3. **Re-run `bin/setup`** to update capabilities manifest with newly installed deps:

@@ -445,7 +445,7 @@ What it does:
   2. Creates a symlink at ~/.local/bin/omo-agent (or updates existing)
   3. Verifies opencode CLI is installed and reachable
   4. Detects available MCP servers (perplexity, deepwiki, exa, context7, morph-mcp)
-  5. Detects peer plugins (oh-my-claudecode, superpowers, claude-mem)
+  5. Detects peer plugins (oh-my-claudecode, superpowers)
   6. Detects companion skills (ui-ux-pro-max, x-skill-review) under ~/.omc/skills/ and ~/.claude/skills/
   7. Writes a capability manifest to ~/.config/x-skills/capabilities.json
   8. Reports which skills are fully operational vs degraded
@@ -786,8 +786,6 @@ check_plugin "oh-my-claudecode" "multi-agent orchestration (executor, code-revie
   "/plugin marketplace add Yeachan-Heo/oh-my-claudecode && /plugin install oh-my-claudecode@omc" || true
 check_plugin "superpowers" "workflow skills (brainstorming, TDD, writing-plans)" \
   "/plugin marketplace add obra/superpowers-marketplace && /plugin install superpowers@superpowers-marketplace" || true
-check_plugin "claude-mem" "cross-session memory + search" \
-  "/plugin marketplace add thedotmack/claude-mem && /plugin install claude-mem@thedotmack" || true
 
 # --- 4b. Companion Skills (user-level, not Claude Code plugins) ---
 header "4b. Companion Skills (user-level)"
@@ -899,7 +897,6 @@ manifest = {
         "plugins": {
             "oh_my_claudecode": cap("$(cap_get plugin_oh-my-claudecode)"),
             "superpowers":      cap("$(cap_get plugin_superpowers)"),
-            "claude_mem":       cap("$(cap_get plugin_claude-mem)"),
         },
         "companion_skills": {
             "ui_ux_pro_max":  cap("$(cap_get skill_ui-ux-pro-max)"),
@@ -953,7 +950,6 @@ report_skill() {
       gemini_cli)     [[ "$(cap_get gemini_cli)" == "true" ]] && met=true ;;
       omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
       superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
-      claude-mem)     [[ "$(cap_get plugin_claude-mem)" == "true" ]] && met=true ;;
       morph)          [[ "$(cap_get mcp_morph)" == "true" ]] && met=true ;;
       research-mcps)  for m in perplexity deepwiki exa context7; do
                         [[ "$(cap_get "mcp_$m")" == "true" ]] && met=true
@@ -983,7 +979,7 @@ report_skill "x-design"
 report_skill "x-api-pentest"  security-tools
 report_skill "x-omo"          opencode omo_plugin
 report_skill "x-gemini"       gemini_cli
-report_skill "x-skill-review" omc claude-mem
+report_skill "x-skill-review" omc
 report_skill "x-skill-improve" omc
 report_skill "x-guide"         gemini_cli research-mcps
 report_skill "x-worktree"

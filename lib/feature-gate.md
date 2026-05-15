@@ -76,13 +76,6 @@ Each MCP is independently optional. Skills should check before dispatching:
 | context7 | x-research | Skip library docs lookup |
 | morph | x-do, x-research, x-bugfix, x-review | Fall back to native `Grep` + `Edit` |
 
-### claude-mem (cross-session memory)
-
-**Check:** Read `capabilities.json → plugins.claude_mem`
-
-**If available:** Use `mcp__plugin_claude-mem_*` tools for session search
-**If unavailable:** Skip session search, note limitation to user
-
 ## Fallback Priority
 
 When a dependency is missing, skills degrade in this order:
