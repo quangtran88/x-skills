@@ -620,6 +620,24 @@ else
   cap_set x_upstream true
 fi
 
+# --- 1g. GitNexus CLI (optional, used by mcp.gitnexus integration) ---
+header "1g. GitNexus CLI (optional)"
+if command -v gitnexus &>/dev/null; then
+  gitnexus_ver=$(gitnexus --version 2>/dev/null | head -1)
+  ok "gitnexus CLI on PATH (${gitnexus_ver:-version unknown})"
+  cap_set cli_gitnexus true
+elif command -v npx &>/dev/null; then
+  info "gitnexus not installed globally — npx fallback available (slower cold-start)"
+  cap_set cli_gitnexus false
+  missing_add "cli" "gitnexus" "Code knowledge graph (impact / context / rename)" \
+    "npm install -g gitnexus"
+else
+  warn "gitnexus CLI not on PATH and npx unavailable — gitnexus integration disabled"
+  cap_set cli_gitnexus false
+  missing_add "cli" "gitnexus" "Code knowledge graph (impact / context / rename)" \
+    "npm install -g gitnexus"
+fi
+
 # --- 2. OpenCode CLI ---
 header "2. OpenCode CLI"
 
@@ -762,6 +780,8 @@ check_mcp "context7"    "library API docs" \
   "claude mcp add --transport http context7 https://mcp.context7.com/mcp" || true
 check_mcp "morph"       "semantic codebase search + editing" \
   "claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_KEY -- npx -y @morph-llm/morph-fast-apply" || true
+check_mcp "gitnexus"    "code knowledge graph (impact / context / rename / route_map)" \
+  "npm install -g gitnexus" || true
 
 # --- 4. Peer Plugins ---
 header "4. Peer Plugins"
@@ -893,6 +913,10 @@ manifest = {
             "exa":        cap("$(cap_get mcp_exa)"),
             "context7":   cap("$(cap_get mcp_context7)"),
             "morph":      cap("$(cap_get mcp_morph)"),
+            "gitnexus":   cap("$(cap_get mcp_gitnexus)"),
+        },
+        "cli": {
+            "gitnexus": cap("$(cap_get cli_gitnexus)"),
         },
         "plugins": {
             "oh_my_claudecode": cap("$(cap_get plugin_oh-my-claudecode)"),
