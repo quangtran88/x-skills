@@ -26,6 +26,12 @@ Lazy-load only when the phase needs it:
 - `references/item-schema.md` — when emitting / consuming items.
 - `../x-omo/SKILL.md` — only if Phase 2 routes to OMO agents (`oracle`, `--model codex`).
 
+## Impact Tool Preference
+
+When `mcp.gitnexus` is pinned in the bootstrap-active set, prefer the GitNexus `impact` MCP tool over heuristic ranking for BREAK and ARCH items. The graph-derived blast radius (depth 1 = WILL BREAK, depth 2 = LIKELY AFFECTED) replaces the qualitative severity guesses for those categories. SEC and PERF items continue to use the categorical extraction prompts — `gitnexus impact` does not understand authn/authz semantics or runtime cost.
+
+When the capability is NOT pinned, fall back to the existing extraction + scoring pipeline. Either way, surface the chosen path inline (e.g., `Impact source: gitnexus.impact` or `Impact source: heuristic ranking`) so the user can audit the routing decision.
+
 ## Anti-Triggers
 
 Route elsewhere and stop if the request is closer to:

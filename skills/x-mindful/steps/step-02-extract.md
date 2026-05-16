@@ -11,6 +11,10 @@ Goal: scan the plan and produce a list of items in four categories — ARCH, BRE
 | SEC | Security / auth | Auth flow changes, permission model shifts, new endpoints (especially unauthenticated), secret-handling shifts, new attack surface (file upload, deserialization, eval), CORS / CSRF / cookie changes, RLS or row-level access |
 | PERF | Performance / cost | New hot paths, new I/O per request, missing index for a new query pattern, fan-out, full scans, backfills, scheduled jobs, queue depth shifts, cache invalidation, infra cost steps |
 
+## GitNexus capability gate (optional)
+
+If `mcp.gitnexus` is in the active capability set AND the plan touches existing symbols (rename / move / signature change), call `gitnexus impact({target: <symbol>, direction: "upstream"})` for each named symbol BEFORE extracting BREAK items via prompt. The graph result becomes the BREAK item directly (callers at depth 1 are the affected list). Skip this preflight when the plan only adds new code with no upstream dependents. This gate only applies to BREAK and ARCH extraction; SEC and PERF continue to use the category prompts in `references/extraction-prompts.md`.
+
 ## Routing by Size Class (from Step 01)
 
 Use the pinned capability set; if a primary route is unavailable, fall back to the next row.
