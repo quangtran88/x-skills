@@ -35,7 +35,11 @@ Project overrides are **subtractive only**: a project file can disable a capabil
       "deepwiki": true,
       "exa": true,
       "context7": true,
-      "morph": true
+      "morph": true,
+      "gitnexus": true
+    },
+    "cli": {
+      "gitnexus": true
     },
     "plugins": {
       "oh_my_claudecode": true,

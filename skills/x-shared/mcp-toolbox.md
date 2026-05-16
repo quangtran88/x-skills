@@ -28,3 +28,24 @@ Availability is gated by the user's MCP setup; skills should fall back gracefull
 ## Availability
 
 Skills load the active capability set ONCE at bootstrap per the contract in `capability-loading.md`. Routing tables are filtered against the pinned set on entry — never re-check per dispatch. Each row below has a primary tool and a documented fallback that auto-applies when the primary is unavailable.
+
+## GitNexus (optional, when `mcp.gitnexus` pinned)
+
+Code-intelligence MCP server (`npm install -g gitnexus`). Provides precomputed call-graph and impact analysis. License: PolyForm Noncommercial — commercial users need a separate license from akonlabs.com.
+
+| Need | Primary (when `mcp.gitnexus` pinned) | Fallback (when not pinned) |
+|---|---|---|
+| Blast radius before edits | `gitnexus` → `impact` (with `direction: upstream`, `minConfidence`) | OMO `oracle` qualitative scan; otherwise treat as warn-only |
+| 360° symbol context (callers + callees + processes) | `gitnexus` → `context` | Two `morph-mcp codebase_search` calls (callers, then callees) |
+| Pre-commit / pre-PR scope check | `gitnexus` → `detect_changes` | `git diff` + manual analysis |
+| Multi-file rename | `gitnexus` → `rename` (always `dry_run: true` first) | `morph-mcp edit_file` per file |
+| Execution-flow-grouped search | `gitnexus` → `query` | `morph-mcp codebase_search` (loses process grouping) |
+| API route → handler → consumer mapping | `gitnexus` → `route_map` / `api_impact` / `shape_check` | Manual OpenAPI spec parse |
+
+**Index freshness:** GitNexus tools may report a stale index. When they do, surface the warning and suggest `npx gitnexus analyze` — do NOT auto-run it (it rewrites `AGENTS.md` / `CLAUDE.md` and can take minutes on large repos).
+
+**When NOT to use GitNexus rows even if pinned:**
+- Repo not yet indexed by GitNexus → tools error; fall back row applies.
+- Quick literal-string lookup → native `Grep` is still cheaper.
+
+**Capability gate:** Every Primary row above is treated as the Fallback row when `mcp.gitnexus` is not in the active capability set. The fallback substitution is automatic — skills should not branch on `mcp.gitnexus` ad-hoc, only consult this table.
