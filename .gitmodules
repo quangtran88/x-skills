@@ -1,3 +1,12 @@
 [submodule "research/abhigyanpatwari/GitNexus"]
 	path = research/abhigyanpatwari/GitNexus
 	url = https://github.com/abhigyanpatwari/GitNexus
+[submodule "research/affaan-m/everything-claude-code"]
+	path = research/affaan-m/everything-claude-code
+	url = https://github.com/affaan-m/everything-claude-code
+[submodule "research/obra/superpowers"]
+	path = research/obra/superpowers
+	url = https://github.com/obra/superpowers
+[submodule "research/yeachan-heo/oh-my-claudecode"]
+	path = research/yeachan-heo/oh-my-claudecode
+	url = https://github.com/yeachan-heo/oh-my-claudecode
