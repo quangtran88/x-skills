@@ -199,6 +199,9 @@ run_install() {
       mkdir -p "$HOME/.omc/skills"
       git clone https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$HOME/.omc/skills/ui-ux-pro-max"
       ;;
+    gitnexus)
+      npm install -g gitnexus
+      ;;
     *)
       fail "no install handler for: $name"
       return 1
@@ -627,7 +630,7 @@ if command -v gitnexus &>/dev/null; then
   ok "gitnexus CLI on PATH (${gitnexus_ver:-version unknown})"
   cap_set cli_gitnexus true
 elif command -v npx &>/dev/null; then
-  info "gitnexus not installed globally — npx fallback available (slower cold-start)"
+  info "gitnexus not installed globally — install with 'npm install -g gitnexus' to enable (npx not currently wired into routing)"
   cap_set cli_gitnexus false
   missing_add "cli" "gitnexus" "Code knowledge graph (impact / context / rename)" \
     "npm install -g gitnexus"
