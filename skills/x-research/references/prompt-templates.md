@@ -110,3 +110,27 @@ For `OMO explore` (pattern/path lane — grep/glob/ast_grep):
 {{specific extraction/analysis prompt}}
 ```
 Always use `--file /path/to/file` flag with `multimodal-looker`.
+
+## Type H: Local Structural (GitNexus, advisory)
+
+Only when `mcp.gitnexus` is pinned AND the target repo is in the shared probe's indexed-path set (Bootstrap step 0a / `../../x-shared/capability-loading.md`). Not pinned OR not indexed → use the Type A codebase template against `morph-mcp codebase_search` instead (zero behavior change).
+
+**"How does our X work" (process-grouped) — `gitnexus query`:**
+```
+mcp__gitnexus__query({ query: "{{structural concept / how does our X work}}" })
+```
+Returns process-grouped, RRF-ranked results. Synthesize the process groups; do NOT surface raw graph dumps.
+
+**Symbol 360° (callers + callees + flows) — `gitnexus context`:**
+```
+mcp__gitnexus__context({ name: "{{symbolName}}" })
+```
+Returns callers, callees, and the execution flows the symbol participates in. Use for "what calls X / what does X call / which flows touch X".
+
+**Staleness note (mandatory when the indexed repo is stale — C3 advisory class).** If the shared probe reports `staleness.commitsBehind > 0` for the target repo, `query`/`context` are advisory-class so they still run, but append this exact line to the synthesis:
+
+```
+(index N commits stale — results may lag HEAD)
+```
+
+Substitute `N` with the probe's `staleness.commitsBehind` for that repo. This note IS the instrumentation — it must appear verbatim in the synthesis whenever a stale indexed repo was queried.

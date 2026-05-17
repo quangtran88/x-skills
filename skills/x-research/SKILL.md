@@ -12,6 +12,7 @@ x-research is a router. It classifies the question by **information-source signa
 Before dispatching anything, load:
 
 0. `../x-shared/capability-loading.md` — pin the active capability set for this session. Skills MUST NOT re-verify per dispatch; trust the bootstrap-pinned set.
+0a. If `mcp.gitnexus` is pinned, consume the shared gitnexus indexed+fresh probe per `../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe" (session-pinned, derived once — do NOT run a per-skill `gitnexus list`).
 1. `../x-omo/SKILL.md` — OMO agent catalog + Bash invocation patterns. **For the unavailable-agent list and replacement model-routing (`--model codex`, `--model gpt`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 2. `../x-gemini/SKILL.md` — direct Gemini CLI bridge (Google Search grounding, gemini-3.x, `--file`, `--resume`). **Load only if `gemini_cli` capability is pinned**; if not pinned, drop gemini-agent rows from the routing table and pick the escalation column instead.
 3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph).
@@ -46,6 +47,8 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 
 | Signal | Primary | Escalation |
 |---|---|---|
+| Local code: "how does our X work" (target repo indexed) | `gitnexus` → `query` (process-grouped) | `morph-mcp` → `codebase_search` → OMO `explore` |
+| Symbol callers+callees+flows (target repo indexed) | `gitnexus` → `context` | 2× `morph-mcp codebase_search` (callers, then callees) |
 | Local code: "how does our X work" | `morph-mcp` → `codebase_search` | OMO `explore` |
 | Local cross-repo (3+ modules tangled) | `morph` + OMO `explore` parallel | — |
 | Public repo internals: "how does repo X do Y" | `deepwiki` → `ask_question` | `morph` → `github_codebase_search` → OMO `librarian` |
@@ -61,6 +64,8 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 | Visual single file (image/PDF/screenshot) | Claude `Read` (small) OR `gemini-agent --file` | OMO `multimodal-looker` |
 | Exhaustive audit (security / architecture review) | `perplexity_research` | + OMO `oracle` |
 | Dense code examples from web | `exa` → `get_code_context_exa` | OMO `librarian` |
+
+**GitNexus rows — graceful degradation (C3, advisory class).** The two `gitnexus` Detection rows apply ONLY when `mcp.gitnexus` is pinned AND the target repo is in the shared probe's indexed-path set (step 0a). **Not pinned OR not indexed → the row collapses to the existing `morph-mcp codebase_search` behavior — zero behavior change for unindexed repos.** Indexed but stale (`staleness.commitsBehind > 0`) → still use `gitnexus` (`query`/`context` are advisory-class per `../x-shared/mcp-toolbox.md` use-class index) and append `(index N commits stale — results may lag HEAD)` to the synthesis. The morph rows below them are the fallback path — never delete them.
 
 **Cheapest-viable-first.** Free/instant tools (morph, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
 
