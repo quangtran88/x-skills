@@ -141,6 +141,16 @@ The goal is **fewest atomic commits where each commit is one logical concern** (
    - **Group count match** (when `auto: false`): actual commit count must equal the previewed plan's count. Mismatch → abort + `git reset --hard ORIG_HEAD` and report which group was dropped/merged.
 5. **Surface the result** to the user as a before/after diff of `git log` output. Do NOT force-push. Branch finish (`superpowers:finishing-a-development-branch`) handles push/PR.
 
+### Post-recomposition scope check (advisory)
+
+After recomposition completes (the soft-reset → `Skill commit` → tree-equivalence verify above), run an OPTIONAL gitnexus scope sanity check. Gate: `mcp.gitnexus` pinned **AND** the repo indexed **AND** the index **fresh**, read from the shared session-pinned probe (`../../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe"). `detect_changes` is **correctness-sensitive** per the use-class index in `../../x-shared/mcp-toolbox.md` — **stale or unindexed → skip silently** (`git diff` already covers file scope; no fallback call).
+
+When gated-in, call `gitnexus detect_changes` with **`scope: "compare"`, `base_ref: <BASE_SHA>`** — the `BASE_SHA` captured pre-dispatch in Execution step 2. The default `scope: "unstaged"` returns the empty-state stub on a clean post-recomposition tree (`if (fileDiffs.length === 0)` returns `changed_count: 0` / empty `changed_symbols` / empty `affected_processes` — `research/abhigyanpatwari/GitNexus/gitnexus/src/mcp/local/local-backend.ts:2163-2173`), so `compare` against `BASE_SHA` is mandatory here, not the default scope.
+
+Report the result as an advisory line: `recomposition touched flows: <affected-process names>` (changed symbols + affected processes). State the explicit delta over `git diff`: **flow membership** — `git diff` shows files/hunks; `detect_changes` maps those hunks to indexed symbols and the execution flows they participate in, which `git diff` cannot produce.
+
+This is **advisory only — it NEVER blocks the commit**. Recomposition has already produced a verified zero-net-diff tree; this line is a scope-sanity readout for the user, not a gate. A surprising flow in the readout is a prompt for the user to eyeball, not a recomposition failure.
+
 ### Failure recovery
 
 If `Skill commit` fails, errors, or produces an empty tree:

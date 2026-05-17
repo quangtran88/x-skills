@@ -31,3 +31,28 @@ Scale ceremony to match the task:
 | Cross-module | — | Full pipeline + OMO plan review |
 | Mechanical batch (same pattern repeated across N files) | Direct execution, plan review optional, post-impl review still required | — |
 | Security-sensitive | — | Add `security-reviewer` pass |
+
+## Depth Calibration — gitnexus grounding gate (counts → ceremony)
+
+The Depth Calibration heuristic table in `../SKILL.md` § "Depth Calibration" is the default. An OPTIONAL grounding step bumps the heuristic ceremony level using **raw gitnexus impact counts** (never the `risk` label — C1). This table is the canonical counts→ceremony mapping referenced from that section.
+
+**Gate (ALL must hold, else heuristic path unchanged):**
+
+| Condition | Requirement |
+|---|---|
+| Mode | ∈ {A, B, F} — never D, never C (no `impact` call ever fires on D or C) |
+| Named-symbol set | non-empty via ONE pinned mechanism: Mode A = plan-file symbols; Mode F = refactor-prompt symbols; Mode B = handoff-envelope symbols OR backtick identifiers resolving to existing graph nodes (Mode B greenfield with no resolvable existing symbol ⇒ gate OUT) |
+| Task 1 gate | "pinned + indexed + fresh" read from the shared session-pinned probe (`../../x-shared/capability-loading.md`); `impact` is correctness-sensitive per `../../x-shared/mcp-toolbox.md` use-class index → stale hard-degrades OUT |
+| C5 dedup | symbols already covered by a `<!-- x-mindful-envelope v1 -->` item are NOT re-grounded (surface `[covered]`, do not call `impact`) |
+
+**Counts → ceremony bump** (depth-1 caller count + affected-process count ONLY, taken from `gitnexus impact` on the gated-in symbols — never the `risk` field):
+
+| Depth-1 callers | Affected processes | Effect on heuristic ceremony level |
+|---|---|---|
+| 0 | 0 | No bump — heuristic level stands |
+| ≥1 and <20 | ≥1 and <3 | Bump one level: Light → Standard, Standard → Heavy |
+| ≥20 | ≥3 | Bump to Heavy (clamp — never exceeds Heavy) |
+
+A bump is applied at most once (the higher of the caller-driven and process-driven row wins; Heavy is the ceiling). The heuristic majority-column score still computes first; this only raises it, never lowers it.
+
+**Surfaced line** (see `../SKILL.md` § "Depth Calibration" for the exact byte format): `Depth grounding: gitnexus.impact (N callers, M processes) [direct] symbols=[…]` when self-grounded; `Depth grounding: x-mindful envelope [covered] symbols=[…]` when the symbol set was already analyzed by x-mindful; `Depth grounding: heuristic` (no `symbols=` field) when gated out.

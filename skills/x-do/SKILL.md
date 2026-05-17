@@ -98,7 +98,7 @@ Smart entry point that detects what to do and routes through the optimal workflo
 
 **MANDATORY first step — do this BEFORE anything else:**
 
-0. Pin capabilities for the session per `../x-shared/capability-loading.md` (look for the `[x-skills/capabilities]` snapshot injected by SessionStart; otherwise read `~/.config/x-skills/capabilities.json` once). Filter routing tables against the pinned set; do NOT re-check per dispatch.
+0. Pin capabilities for the session per `../x-shared/capability-loading.md` (look for the `[x-skills/capabilities]` snapshot injected by SessionStart; otherwise read `~/.config/x-skills/capabilities.json` once). Filter routing tables against the pinned set; do NOT re-check per dispatch. **If `mcp.gitnexus` is pinned, also consume the shared session-pinned indexed+fresh probe per `../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe" — do NOT run an independent `gitnexus list`; read the single pinned record.** (F3)
 1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **For the unavailable-agent list and replacement model-routing (`--model codex`, `--model gpt`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 
 ## Invocation
@@ -180,6 +180,34 @@ Before entering mode guidance, assess the task along these dimensions to decide 
 
 This overrides file-count heuristics. A 3-file auth change (Heavy risk) needs more ceremony than a 6-file rename (Light scope, Light risk).
 
+### Optional gitnexus grounding (gated — counts only, C1)
+
+The heuristic table above is the default. **This grounding step is OPTIONAL and only runs when ALL of the following hold** — otherwise the heuristic Depth Calibration is used unchanged (the gated-out path is byte-identical to pre-change behavior):
+
+- **Mode ∈ {A, B, F}** — never Mode D, never Mode C (C delegates to x-bugfix). No `impact` call ever fires on Mode D or Mode C.
+- **The named-symbol set is non-empty**, resolved by ONE pinned mechanism (no guessing):
+  - **Mode A** — symbols referenced in the plan file.
+  - **Mode F** — symbols named in the refactor prompt.
+  - **Mode B** — symbols carried in the inbound x-research / x-mindful handoff envelope, OR backtick-quoted identifiers in the user prompt that resolve to existing graph nodes. **Mode B with no resolvable existing symbol ⇒ gate OUT (heuristic path); do NOT speculate `impact` on a greenfield feature.**
+- **Task 1 gate satisfied** = "pinned + indexed + **fresh**", READ FROM the shared session-pinned probe (`../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe") — NOT a per-skill `gitnexus list` call. `impact` is **correctness-sensitive** per the use-class index in `../x-shared/mcp-toolbox.md`, so a stale index hard-degrades this step OUT (heuristic path).
+
+**Consume x-mindful, do not re-run (C5).** Before grounding, if a `<!-- x-mindful-envelope v1 -->` block is present in the handoff context (Mode A path — x-do Mode A triggers x-mindful), extract the **already-analyzed symbol set**:
+
+- Backtick-quoted identifiers in each `[<id>] <title>` line across **all** sections (Confirmed / Modified / Rejected / Skipped / Pending).
+- **Additionally**, for **Modified** items only, backtick-quoted identifiers in the `**Original plan:**` and `**User direction:**` text (these fields exist on Modified items only per the canonical emitter `../x-mindful/steps/step-05-handoff.md:9-39`; Confirmed/Skipped/Pending carry only the `[<id>] <title>` line, Rejected adds a `Reason:` line — do NOT mine prose that the schema does not emit).
+
+x-mindful already routed BREAK/ARCH items in that set through `gitnexus impact` during its own run. x-do **MUST NOT re-invoke `impact` on any symbol in the envelope set** — C5 is a no-re-run dedup keyed on symbol membership (the envelope carries no blast-radius payload to reuse). Depth grounding applies **only to named symbols NOT in the envelope set**.
+
+**When gated-in:** call `gitnexus impact` on the named symbols (those NOT covered by the envelope). Take the **depth-1 caller count + affected-process count ONLY**. Map to the Light / Standard / Heavy ladder via the explicit counts→ceremony table in `references/delegation-and-scaling.md`. **NEVER read or branch on gitnexus's `risk` field** — it is a hardcoded threshold bucket (C1); consume raw counts only.
+
+**Surface one `Depth grounding:` line per grounding class that applies** (the Task 6.4 grep signal — the `[covered]`/`[direct]` tag PLUS the explicit `symbols=` list together make the C5 no-double-run check measurable). A single task may emit BOTH a `[covered]` line and a `[direct]` line when it has envelope-covered symbols AND additionally self-grounded symbols — emit both so the C5 grep sees each set; do NOT collapse them into one line. When fully gated out, emit the single bare `heuristic` line only:
+
+- Self-grounded symbols (x-do called `impact`): `Depth grounding: gitnexus.impact (N callers, M processes) [direct] symbols=[<comma-separated names>]`
+- Envelope-covered symbols (x-mindful already analyzed — NOT re-run): `Depth grounding: x-mindful envelope [covered] symbols=[<comma-separated names>]`
+- Gated-out (not pinned / not indexed / stale / empty symbol set / Mode D or C): `Depth grounding: heuristic` — **no `symbols=` field** (nothing was graph-grounded; the heuristic line is intentionally unmeasurable for Task 6.4 and is skipped by its grep).
+
+The `symbols=[…]` field is **mandatory on every non-heuristic** `Depth grounding:` line. A symbol appearing in a `[direct]` line's `symbols=` list while also present in an envelope item is the C5 violation Task 6.4 detects.
+
 ## Available Tools
 
 See `references/available-tools.md` for the full tool table (MCP tools, skills, agents). Key rule: **morph-mcp tools are the DEFAULT** for search and edits — use them before spawning agents.
@@ -197,6 +225,7 @@ Cross-model review (plan or post-implementation) is delegated to **x-review**. D
 See `references/mode-guidance.md` for detailed per-mode instructions. Key rules:
 
 - **A/B: Plan Review is NON-NEGOTIABLE** for 3+ tasks or multi-module plans. Dispatch `Skill: x-skills:x-review <plan-path>` — x-review owns the multi-reviewer fan-out.
+- **A: Consume x-mindful envelope.** When the Mode A handoff carries a `<!-- x-mindful-envelope v1 -->` block, follow the consume-don't-re-run contract in § Depth Calibration → "Optional gitnexus grounding" (C5): symbols named in envelope items are already-analyzed; x-do MUST NOT re-invoke `impact` on them.
 - **A/B: Post-Implementation Review** is also mandatory (dispatch `Skill: x-skills:x-review` on the diff; x-review runs the full code-review fan-out). Separate from tsc/eslint verification.
 - **A/B: ralph for 3+ tasks** unless mechanical batch or surgical edit exception applies.
 - **C: Delegate to `/x-bugfix`**, then post-fix review.
