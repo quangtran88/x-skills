@@ -72,6 +72,52 @@ When a skill needs to dispatch external tools:
 4. Filter the skill's routing/fan-out tables against the active set. Drop unavailable lanes silently. Pick fallback row when primary unavailable.
 5. **Do not re-check the manifest per dispatch.** Trust the pinned set for the session.
 
+## Shared GitNexus Indexed+Fresh Probe (session-pinned, derived state — F3)
+
+This is the single canonical definition of the indexed+fresh signal that **x-research, x-do, and x-review all consume identically** from their Bootstrap. It is NOT a `bin/setup` capability — it is a runtime-derived session pin. The later Bootstrap-consumption edits in those three skills (US-003/004/005) reference this section; they do not redefine the derivation.
+
+### Capability key vs. derived probe (do not conflate)
+
+Two distinct things, deliberately separate:
+
+- `mcp.gitnexus` — a **boolean capability key**. Lives in `~/.config/x-skills/capabilities.json`, written by `bin/setup`, pinned in the bootstrap-active set. Answers "is the gitnexus MCP server available?"
+- The **indexed+fresh probe result** — a **runtime-derived session state**. Built from a live `gitnexus list` call. Answers "which repos are indexed, and is each one's index fresh?" It is **NOT** a `bin/setup` capability key and **does NOT appear in `~/.config/x-skills/capabilities.json`** under any name.
+
+The probe is *gated by* `mcp.gitnexus` being pinned, but is itself a separate derived artifact with its own session pin.
+
+### Derivation (run once, then session-pinned)
+
+At the first Bootstrap (across x-research / x-do / x-review) that needs the signal in a session:
+
+1. **Gate:** `mcp.gitnexus` must be in the bootstrap-active set. If it is not, **skip entirely** — see the no-op note below.
+2. Make one read-only `gitnexus list` call (the `list_repos` MCP response — `mcp__gitnexus__list_repos` in Claude Code). Never call `gitnexus analyze`/index from this probe; it is read-only.
+3. Parse the returned array of repo objects into a derived, session-pinned record:
+   - **(a) indexed-path set** — the set of indexed repo paths reported by the response.
+   - **(b) per-repo freshness** — for each indexed repo, its `staleness.commitsBehind`.
+4. Pin this record for the rest of the session. **It runs exactly once.** x-research, x-do (Depth Calibration grounding), and x-review (step-01 enrichment) all read this single pinned record — **none re-probes per dispatch, and none runs its own independent `gitnexus list`.**
+
+This mirrors the established parse idiom in `skills/x-api-pentest/steps/step-01-recon.md:104` ("`gitnexus list` reports `SOURCE_REPO` as indexed" — gated on `mcp.gitnexus` in the bootstrap-active set, membership read from the `gitnexus list` response). This section is the shared/session-pinned generalization of that per-step check.
+
+### Observed `gitnexus list` shape (live-captured this session, cite — do not guess)
+
+The `list_repos` response is an array of repo objects. Confirmed live via `mcp__gitnexus__list_repos` and matching the source citation `gitnexus/src/mcp/local/local-backend.ts:536, 578-579` (`StalenessInfo { isStale, commitsBehind, hint? }`):
+
+- A **stale** repo object includes `"staleness": { "commitsBehind": <number>, "hint": "<string>" }`. Observed: the `x-skills` entry carried `staleness.commitsBehind = 23`.
+- A **fresh** repo object has **no `staleness` key at all**. Observed: the `openclaw` entry had no `staleness` key.
+
+### Freshness semantics (C3)
+
+Per inviolable constraint **C3**:
+
+- `staleness` key **ABSENT** OR `commitsBehind === 0` ⇒ **fresh**.
+- `staleness` key **present** with `commitsBehind > 0` ⇒ **stale** (`commitsBehind` is the staleness magnitude).
+
+The probe yields BOTH indexed-set membership AND freshness from this one response — consumers do not hunt per-response keys. Use-class asymmetry (correctness-sensitive consumers **hard-degrade to fallback** on stale; advisory consumers **proceed with a one-line staleness note**) is defined once in C3 and the `mcp-toolbox.md` GitNexus use-class index — this section does not redefine it; consumers resolve a tool's class there.
+
+### Unpinned no-op (regression guard)
+
+**With `mcp.gitnexus` NOT pinned in the bootstrap-active set, this probe is a no-op** — it is never run, nothing is derived or pinned, and consumers fall straight to their fallback rows. Non-gitnexus sessions have **zero behavior change**; the probe adds no calls and no branching on those paths.
+
 ## Drift Handling
 
 A tool errors at runtime despite being marked available = setup drift (CLI uninstalled, MCP server stopped, etc). Skill MUST:
