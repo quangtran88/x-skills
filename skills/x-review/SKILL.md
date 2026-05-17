@@ -34,6 +34,12 @@ x-review evaluates whether the target **does what it claims to do, safely**. Not
 
 This contract narrows what reviewers report. The user can request broader passes explicitly via the [P]/[C]/[D] menu in step 4 — those passes are opt-in scope-expanders, never default.
 
+**gitnexus-derived material (fence — applies to the optional blast-radius enrichment from `steps/step-01-prepare.md`):**
+The existing in-scope / out-of-scope lists above are UNCHANGED. This fence is an ADDITIONAL constraint on any finding that draws on gitnexus enrichment (depth-1 caller summaries, `route_map`/`api_impact` consumer lists):
+- ✅ **In scope:** gitnexus structurally contradicts a stated claim → a real false-assumption / spec-deviation finding. Canonical example: the PR/plan says a handler is internal-only, but `route_map` shows N external consumers. This is the in-scope false-assumption finding — and it comes from `route_map` consumers, NOT from `impact` depth-1 callers.
+- ❌ **Out of scope:** "high coupling / consider restructuring", "this symbol has many callers, consider decoupling", or any refactor/architecture observation. gitnexus MUST NEVER generate the refactor/restructuring findings the out-of-scope list above already drops — high caller counts are context for a correctness finding, never a finding on their own.
+- **Mandatory C2 disclaimer:** EVERY gitnexus-derived reviewer-facing line MUST carry verbatim: *static call graph — may miss dynamic dispatch; a 0-caller result is NOT a safety proof.* A 0-caller / 0-consumer result is never phrased as "safe to change."
+
 **x-review MUST NOT:**
 - Call `Edit` or `Write` during the review phase (steps 1-3 up to verdict) — reviewers evaluate, they don't fix
 - Propose "while I'm here, let me just fix this" inline fixes — that's role leakage
@@ -59,7 +65,7 @@ Smart review that detects what to review and how deep to go.
 ## Bootstrap
 
 **MANDATORY first step — do this BEFORE anything else:**
-0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch.
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch. **If `mcp.gitnexus` is pinned, also consume the shared session-pinned indexed+fresh probe per `../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe" — do NOT run an independent `gitnexus list`; read the single pinned record.** (F3)
 1. Read `config.json` in this skill directory to get the `omo_agent` path (used at dispatch time).
 2. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **For the unavailable-agent list and replacement model-routing (`--model gpt`, `--model codex`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 3. Read `../x-gemini/SKILL.md` if `gemini_cli` capability is pinned. Gemini-3-pro is the third cross-model reviewer (alongside Claude opus + GPT oracle), strong on Google-Search-grounded fact checks, large diff handling (1M context), and visual/UI screenshot diffs.
