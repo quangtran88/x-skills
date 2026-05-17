@@ -6,9 +6,9 @@
 
 | Skill | Source | Purpose | Requires |
 |-------|--------|---------|----------|
-| **x-do** | plugin | Build, implement, fix, execute | Best with: opencode, OMC, superpowers |
-| **x-research** | plugin | Research, investigate, understand | Best with: opencode, MCP servers |
-| **x-review** | plugin | Code review, plan review, PR review | Best with: opencode, OMC, superpowers |
+| **x-do** | plugin | Build, implement, fix, execute (gitnexus-aware, optional) | Best with: opencode, OMC, superpowers |
+| **x-research** | plugin | Research, investigate, understand (gitnexus-aware, optional) | Best with: opencode, MCP servers |
+| **x-review** | plugin | Code review, plan review, PR review (gitnexus-aware, optional) | Best with: opencode, OMC, superpowers |
 | **x-verify** | plugin | Run the completion cascade ("am I done?") | Standalone |
 | **x-bugfix** | plugin | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
 | **x-mindful** | plugin | Pre-implementation impact gate — extracts ARCH/BREAK/SEC/PERF items from a plan, ranks by severity × blast-radius × reversibility, walks the user one item at a time with confirm/modify/reject/skip menu. Auto-invoked by x-do Mode A on high-risk plans. | Standalone; better with: opencode, x-gemini |
