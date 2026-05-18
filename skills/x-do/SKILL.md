@@ -262,10 +262,7 @@ OMC `executor` and `ralph` commit per micro-step, producing noisy history. After
 
 ## After This Skill
 
-Work done? → `/x-review` the changes. See `../x-shared/workflow-chains.md` for common sequences. Include a [handoff context](../x-shared/context-envelope.md) block.
-
-**Learner hook:** If the completed workflow was complex (3+ steps, multi-agent, novel pattern) AND the OMC plugin is available (per the capability set pinned in Bootstrap step 0), offer skill extraction. Skip silently when OMC is unavailable — do not surface a slash command the user can't run.
-> This workflow succeeded. Save as a reusable skill? **[Y]** `/oh-my-claudecode:learner` **[N]** Skip
+Use `../x-shared/done-format.md` DONE shape. Next-step options typically: `[A] commit · [B] x-review`. Append `· [L] save as skill` when OMC plugin is available and the workflow was complex (3+ steps, multi-agent, novel pattern) — skip [L] silently otherwise. Handoff context block suppressed by default per done-format.md; include only when the next skill explicitly requires it. See `../x-shared/workflow-chains.md` for chaining sequences.
 
 ## Dependencies
 
