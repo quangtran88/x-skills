@@ -129,7 +129,7 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 ## Act on Verdict
 
 ### APPROVE
-Offer: **[F]** Finish branch (`superpowers:finishing-a-development-branch`) | **[D]** Done
+Use `../../x-shared/done-format.md` DONE shape: `✓ APPROVE — [N bugs] · [N filtered (reason)]` then the passes line. After user picks [N]: `Next → [F] finish branch · [N] done`
 
 ### REQUEST CHANGES
 
@@ -170,7 +170,4 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 
 ## After This Skill
 
-Review passed? Offer: **[F]** Finish branch (`superpowers:finishing-a-development-branch`) | **[D]** Done.
-Issues found? Invoke `superpowers:receiving-code-review` for structured fixes, then re-review.
-
-Include a [handoff context](../../x-shared/context-envelope.md) block.
+Use `../../x-shared/done-format.md` for completion output. Handoff context block suppressed by default; include only when next skill explicitly requires it. Review passed → Fix Mode complete → `Next → [F] finish branch · [N] done`. Issues found → invoke `superpowers:receiving-code-review`, then re-review.
