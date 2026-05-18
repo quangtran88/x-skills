@@ -100,7 +100,7 @@ TL;DR: inviolable principles > user in-prompt > project `CLAUDE.md` > **this fil
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **x-skills** (2527 symbols, 2608 relationships, 6 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **x-skills** (87923 symbols, 119194 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
