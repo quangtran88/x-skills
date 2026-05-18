@@ -42,7 +42,7 @@ Skip everything below this section for Target A. The completion checklist at the
 
 **STOP here.** After presenting findings in step 3, you MUST:
 
-1. Show the full additional passes menu from `references/review-passes.md` — do not inline a subset
+1. Show the passes line (compact format from `../../x-shared/done-format.md § Passes Line`) — emit on one line after the verdict summary
 2. **WAIT for user input** — do NOT auto-proceed to "Act on Verdict"
 3. Only after the user selects passes (or says Done/N) should you continue
 
@@ -50,33 +50,15 @@ S, P, X are read-only and can run in parallel. D modifies files — run it last,
 
 **NEVER skip this gate.** Even if the verdict is REQUEST_CHANGES with obvious fixes, the user may want additional passes first. Auto-invoking `receiving-code-review` without offering this menu is a known compliance gap.
 
-**Do NOT replace this menu with a custom one.** Wrong patterns seen in the wild:
-- "1) Apply all fixes  2) HIGH-only  3) Stop" — invented fix-flow menu, skips the passes gate entirely
-- Inlining only S/P/X — partial menu robs the user of [C]/[V]/[D]/[A]/[N] options
-- Jumping straight to "Want me to fix?" — skips the menu altogether
-- "[D] Fix Mode  [F] Finish  [N] Done" — letter-redefinition: `[D]` is Deslop, NOT Fix Mode. `[F]` belongs to APPROVE branch (finishing-a-development-branch), not the passes menu. Evidence: session 9ba4f817.
-
 **Letter assignments are fixed. Do not redefine them.** `[S]=Security`, `[P]=Performance`, `[C]=Complexity`, `[X]=Cross-model`, `[V]=Visual`, `[D]=Deslop`, `[A]=All of S/P/C/D`, `[N]=Done`. Any other meaning for these letters is a deviation.
 
-**Paste-verbatim rule.** Copy the menu block from `references/review-passes.md` exactly as written. Do not summarize, reorder, or substitute. If you are tempted to "tailor" the menu to the findings (e.g., "they only need [D]"), STOP — the user picks; the skill presents.
-
-**Canonical menu (copy this block verbatim — do NOT re-derive):**
+**Passes line (required — use exactly):**
 
 ```
-Additional passes available:
-[S] Security — deeper threat modeling (STRIDE/OWASP)
-[P] Performance — perf path tracing  [scope-expander: non-bug optimization suggestions]
-[C] Complexity — structural analysis  [scope-expander: refactor candidates]
-[X] Cross-model — adversarial (skip if oracle already ran in primary pass)
-[V] Visual — compare screenshots to specs
-[D] Deslop — code archaeology  [scope-expander: refactor / dead-code edits]
-[A] All of S, P, C, D  [warning: P/C/D are scope-expanders]
-[N] Done
+Passes: [S]ec [P]erf [C]omplex [X]cross [V]isual [D]eslop · [N] done
 ```
 
-**Scope-expander rule:** `[P]`, `[C]`, `[D]` widen the review past the bug/security/false-assumption contract. Never auto-run them. Never recommend "[A] All" — let the user pick. If the user picks `[A]`, confirm once: "All passes includes refactor + perf suggestions beyond bugs/security — proceed?" before launching.
-
-The exact menu from `references/review-passes.md` is the only valid form. If you find yourself drafting a numbered fix menu, STOP — show the lettered passes menu first and wait for user input.
+**Scope-expander rule:** `[P]`, `[C]`, `[D]` widen the review past the bug/security/false-assumption contract. Never auto-run them. If the user picks `[A]`, confirm once: "All passes includes refactor + perf suggestions beyond bugs/security — proceed?" before launching.
 
 ## Clarification Gate (MANDATORY HALT — runs after passes menu, before Act on Verdict)
 
