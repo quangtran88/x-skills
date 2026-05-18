@@ -225,7 +225,7 @@ Pick A / B / C / D / E, or describe a different direction.
 - Effort tag forbidden when axis = security or compliance.
 - "Ship dead gate" / "leave bind open" / "lying config" options are forbidden, not "hard no".
 - Keep each block short — long blocks won't get read.
-- Stash the drafted blocks below the findings table so step 4 can present them verbatim.
+- Stash the drafted blocks internally for step 4 to surface one-at-a-time using `../../x-shared/done-format.md § Shape 3 — DECIDE`. Do NOT display them in step 3 output — the findings table is the only user-facing output from this step (per the rule below).
 
 ### Meta-finding: plan-scope mismatch (MANDATORY check)
 

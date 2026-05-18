@@ -55,7 +55,7 @@ S, P, X are read-only and can run in parallel. D modifies files — run it last,
 **Passes line (required — use exactly):**
 
 ```
-Passes: [S]ec [P]erf [C]omplex [X]cross [V]isual [D]eslop · [N] done
+Passes: [S]ec [P]erf [C]omplex [X]cross [V]isual [D]eslop · [A]ll · [N] done
 ```
 
 **Scope-expander rule:** `[P]`, `[C]`, `[D]` widen the review past the bug/security/false-assumption contract. Never auto-run them. If the user picks `[A]`, confirm once: "All passes includes refactor + perf suggestions beyond bugs/security — proceed?" before launching.
@@ -69,29 +69,29 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 **Procedure:**
 
 1. **Display the Big Picture header** drafted in step 3 — verbatim, before any clarification block. If missing, halt and demand step 3 produce it before proceeding.
-2. **Surface each DECIDE block** using the compact format from `../../x-shared/done-format.md § Shape 3 — DECIDE`, **one at a time** — surface the first, wait for user reply, then surface the next. Do NOT display all blocks at once. Safety rules from step-03 carry through into every DECIDE block: axis-aware Decider footer, security/compliance deferral restriction (option C must say "Fix in immediate follow-up PR" not "keep as-is"), effort label omitted for security/compliance axis. Verify each DECIDE block has a numbered heading and Bottom line before surfacing — if missing, re-draft from step 3's "Draft Clarification Block" template.
+2. **Surface each DECIDE block** using the compact format from `../../x-shared/done-format.md § Shape 3 — DECIDE`, **one at a time** — surface the first, wait for user reply, then surface the next. Do NOT display all blocks at once. Safety rules from step-03 carry through into every DECIDE block: axis-aware Decider footer (see `../../x-shared/done-format.md § Shape 3 — DECIDE` for the per-axis footer map), security/compliance deferral restriction (option C must say "Fix in immediate follow-up PR" not "keep as-is"), effort label omitted for security/compliance axis, `[E] Split` row included only when 2+ unresolved findings exist. Verify each DECIDE block has a numbered heading and Bottom line before surfacing — if missing, re-draft from step 3's "Draft Clarification Block" template.
 3. **Display the meta-finding** if step 3 emitted one (`META: Plan scope mismatch`). Pause for user reaction before listing per-finding choices.
-4. **Display the Follow-up options menu** (paste-verbatim block below) AFTER the last clarification block and BEFORE the per-decision prompt. The menu gives the user a top-level route choice; the per-decision prompt only applies if they pick `[P]`.
+4. **Display the Follow-up options line** AFTER the last clarification block and BEFORE the per-decision prompt. The line gives the user a top-level route choice; the per-decision prompt only applies if they pick `[M]`.
 
    **Follow-up options line (from `../../x-shared/done-format.md § Follow-up Options Line` — emit on one line):**
 
    ```
-   → [Y] all recommended · [P] per-decision · [R] review-only · [S] skip flagged · [X] re-dispatch · [N] done
+   → [Y] all recommended · [M] manual · [R] review-only · [K] skip flagged · [Z] re-dispatch · [N] done
    ```
 
    **Branching:**
    - `[Y]` Yolo — Before launching: build a one-line summary `"Yolo will apply Recommended for #2:A, #4:A, #7:B and enter Fix Mode — confirm?"` and **WAIT for explicit confirm** (single round-trip). On confirm, lock the recommended option per finding and skip step 5's per-decision prompt. Yolo guardrails:
-     - If any Recommended is a deferral (`C` / `skip` / `v2`) on a `security` or `compliance` axis → REJECT yolo, force `[P]`, restate why deferral is forbidden for that axis.
-     - If any clarification block lacks an explicit `Recommended:` line → REJECT yolo, force `[P]` for that finding.
-     - If meta-finding `META: Plan scope mismatch` is present → REJECT yolo, force `[P]` (plan scope cannot be auto-resolved).
+     - If any Recommended is a deferral (`C` / `skip` / `v2`) on a `security` or `compliance` axis → REJECT yolo, force `[M]`, restate why deferral is forbidden for that axis.
+     - If any clarification block lacks an explicit `Recommended:` line → REJECT yolo, force `[M]` for that finding.
+     - If meta-finding `META: Plan scope mismatch` is present → REJECT yolo, force `[M]` (plan scope cannot be auto-resolved).
      - Yolo still routes through `superpowers:receiving-code-review` + `superpowers:verification-before-completion` — it skips the prompt, NOT the fix workflow.
-   - `[P]` Pick per-decision — fall through to step 5 (the existing per-decision prompt below).
-   - `[R]` Review-only — skip Fix Mode entirely. Use the Review-Only Mode checklist under "Act on Verdict / REQUEST CHANGES". Mark every NEEDS_DIRECTION row as `Awaiting author direction` in the handoff context.
-   - `[S]` Skip NEEDS_DIRECTION — record every flagged row as `Deferred — awaiting direction` (require `Follow-up tracker:`, `Owner:`, `Deadline:` from user before continuing; same enforcement as option `C` deferral). Fix only unambiguous CRITICAL/HIGH rows. Same axis-aware tracker enforcement applies — `security`/`compliance` rows with dead-gate / open-surface outcome cannot be skipped.
-   - `[X]` Re-dispatch — Halt here. Tell the user: "Push or paste the patched diff, then I'll re-run reviewers (step 2) on the new state." Do NOT enter Fix Mode.
-   - `[N]` Done — stop. Emit final handoff context block. No fixes, no PR post.
+   - `[M]` Manual per-decision — fall through to step 5 (the existing per-decision prompt below).
+   - `[R]` Review-only — skip Fix Mode entirely. Use the Review-Only Mode checklist under "Act on Verdict / REQUEST CHANGES". Mark every NEEDS_DIRECTION row as `Awaiting author direction` in the handoff context (this branch REQUIRES handoff context emission — overrides the default-suppress rule).
+   - `[K]` Skip NEEDS_DIRECTION — record every flagged row as `Deferred — awaiting direction` (require `Follow-up tracker:`, `Owner:`, `Deadline:` from user before continuing; same enforcement as option `C` deferral). Fix only unambiguous CRITICAL/HIGH rows. Same axis-aware tracker enforcement applies — `security`/`compliance` rows with dead-gate / open-surface outcome cannot be skipped.
+   - `[Z]` Re-dispatch — Halt here. Tell the user: "Push or paste the patched diff, then I'll re-run reviewers (step 2) on the new state." Do NOT enter Fix Mode.
+   - `[N]` Done — stop. Emit final handoff context block (this branch REQUIRES handoff context emission — overrides the default-suppress rule). No fixes, no PR post.
 
-5. **Prompt the user (per-decision)** — only reached if user picked `[P]` above. Use this exact line after the last clarification block:
+5. **Prompt the user (per-decision)** — only reached if user picked `[M]` above. Use this exact line after the last clarification block:
 
    ```
    Resolve the decisions above. Reply with the decision number + your pick:
@@ -108,7 +108,7 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
    ```
 
 6. **WAIT for user input.** Do NOT proceed. Do NOT propose answers on the user's behalf. Do NOT auto-pick the recommended option (except via explicit `[Y]` Yolo confirmation in step 4).
-7. **Lock direction.** When the user replies, record the chosen option per finding. `skip` removes that finding from Fix Mode scope (note it in the handoff context as deferred). For Yolo: log every locked option as `recommended (yolo)` in the handoff context so the audit trail shows the user accepted recommendations en bloc rather than per-decision.
+7. **Lock direction.** When the user replies, record the chosen option per finding. `skip` removes that finding from Fix Mode scope (note it in the handoff context as deferred — this branch REQUIRES handoff context emission for the skipped finding). For Yolo: log every locked option as `recommended (yolo)` in the handoff context so the audit trail shows the user accepted recommendations en bloc rather than per-decision.
 8. **Tracker enforcement (axis-aware).** If the chosen option is a deferral (C / skip / "v2" / explicit follow-up):
    - For axis = `security` or `compliance` with a dead-gate / open-surface outcome → REJECT the choice, restate why deferral is forbidden for this axis, re-prompt.
    - For axis = `impl` or `product` → require the user provide `Follow-up tracker:`, `Owner:`, `Deadline:` before continuing. If absent, re-prompt with the three fields explicitly listed.
@@ -122,7 +122,7 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 - If the user picks a custom direction not in A/B/C/D/E, restate the chosen direction in plain language and confirm before fixing.
 - If the user says "you decide" or "pick the best" on a `product` or `compliance` axis finding: refuse softly. Reply: "This axis needs the [decider] to pick — not me. I can recommend, but you should loop them in." Surface the recommendation again, do not auto-act.
 - If the user says "you decide" on `impl` axis: still surface recommendation + tradeoff once more, get explicit ack ("yes go with recommended"). Do not silently take initiative.
-- Skipped findings still appear in the final handoff context block as `Deferred — awaiting direction` with axis and tracker fields recorded.
+- Skipped findings still appear in the final handoff context block as `Deferred — awaiting direction` with axis and tracker fields recorded (handoff context REQUIRED in this case — overrides default-suppress).
 
 **Skip this gate ONLY if** the synthesis table has zero `NEEDS_DIRECTION = ✓` rows. Verify the column before skipping.
 
@@ -170,4 +170,4 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 
 ## After This Skill
 
-Use `../../x-shared/done-format.md` for completion output. Handoff context block suppressed by default; include only when next skill explicitly requires it. Review passed → Fix Mode complete → `Next → [F] finish branch · [N] done`. Issues found → invoke `superpowers:receiving-code-review`, then re-review.
+Use `../../x-shared/done-format.md` for completion output. **Handoff context default:** suppressed in the final After-This-Skill output. **Override (handoff context REQUIRED):** any of (a) next skill explicitly requires it, (b) Clarification Gate branched through `[R]` Review-only / `[K]` Skip-flagged / `[N]` Done, (c) a finding was locked as `skip` / `Deferred — awaiting direction`, (d) Lock-direction recorded a deferral. Review passed → Fix Mode complete → `Next → [F] finish branch · [N] done`. Issues found → invoke `superpowers:receiving-code-review`, then re-review.
