@@ -91,6 +91,24 @@ Run `bin/setup` after installation to configure the omo-agent binding and detect
 
 Or invoke the setup skill: `/x-skills:setup`
 
+## Release Workflow
+
+When releasing a new version (after feature/fix commits are on `main`):
+
+1. **Commit the fixes** — standard `fix()`/`feat()` commits.
+2. **Bump the three version manifests** — all must be updated together:
+   - `.claude-plugin/plugin.json` → `"version"`
+   - `.claude-plugin/marketplace.json` → `"version"` (inside the `skills` array entry)
+   - `package.json` → `"version"`
+3. **Commit the manifest bump** as `chore(release): vX.Y.Z — <one-line summary>`.
+4. **Create + push the git tag**: `git tag vX.Y.Z && git push origin vX.Y.Z`
+5. **Publish the GitHub release**: `gh release create vX.Y.Z --title vX.Y.Z --notes "..."` (use the `/release` skill to automate steps 4–5).
+6. **Push main**: `git push origin main`
+
+**Semver rules:** BREAKING → MAJOR (or MINOR if major=0), FEATURE → MINOR, FIX/CHORE → PATCH.
+
+> If you skip step 2, the plugin cache will report the old version and `/plugin` will not upgrade consumers.
+
 ## Instruction Precedence
 
 The skills in this repo resolve conflicting instructions via the precedence ladder in `skills/x-shared/invocation-guide.md` § "Prompt Assembly — Precedence Ladder".
