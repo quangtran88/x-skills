@@ -211,6 +211,26 @@ if [[ "${X_GEMINI_NO_LOG:-0}" != "1" ]]; then
 fi
 [[ -z "$DEBUG_LOG" ]] && DEBUG_LOG="(disabled)"
 
+# --- Persist stderr (RC3) -------------------------------------------------
+# Previously $ERR_TMPFILE was rm'd on EXIT and never kept, so every failed
+# session left only a 0-byte stdout log with no diagnosis. Persist it next to
+# the stdout log, same user-private dir, mode 0600 (NEVER /tmp — prompts may
+# carry secrets). Sibling name: <log>.stderr.log
+STDERR_LOG=""
+if [[ "$DEBUG_LOG" != "(disabled)" && -s "$ERR_TMPFILE" ]]; then
+  STDERR_LOG="${DEBUG_LOG%.log}.stderr.log"
+  if [[ ! -L "$STDERR_LOG" ]]; then
+    install -m 0600 /dev/null "$STDERR_LOG" 2>/dev/null && cp "$ERR_TMPFILE" "$STDERR_LOG" 2>/dev/null
+  else
+    STDERR_LOG=""
+  fi
+fi
+[[ -z "$STDERR_LOG" ]] && STDERR_LOG="(none)"
+
+# Stderr tail for inline surfacing on failures (cap to avoid flooding context).
+STDERR_TAIL=""
+[[ -s "$ERR_TMPFILE" ]] && STDERR_TAIL=$(tail -5 "$ERR_TMPFILE" 2>/dev/null | tr -d '\r')
+
 # --- Format duration ---
 if [[ "$DURATION" -ge 60 ]]; then
   DURATION_FMT="$((DURATION / 60))m $((DURATION % 60))s"
@@ -230,7 +250,8 @@ STATUS="success"
 
 if [[ "$RAW" -eq 1 || "$STREAM" -eq 1 ]]; then
   cat "$TMPFILE"
-  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+  [[ $EXIT_CODE -ne 0 && -n "$STDERR_TAIL" ]] && echo "[gemini-agent] stderr tail (RC3): ${STDERR_TAIL}" >&2
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG} | stderr=${STDERR_LOG}" >&2
   exit $EXIT_CODE
 fi
 
@@ -238,16 +259,23 @@ fi
 if ! command -v jq &>/dev/null; then
   echo "[gemini-agent] WARNING: jq not installed, dumping raw JSON" >&2
   cat "$TMPFILE"
-  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+  [[ $EXIT_CODE -ne 0 && -n "$STDERR_TAIL" ]] && echo "[gemini-agent] stderr tail (RC3): ${STDERR_TAIL}" >&2
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG} | stderr=${STDERR_LOG}" >&2
   exit $EXIT_CODE
 fi
 
 # Validate JSON
 if ! jq -e . "$TMPFILE" >/dev/null 2>&1; then
-  echo "[gemini-agent] WARNING: invalid JSON output (likely error before JSON emitted)" >&2
+  echo "[gemini-agent] WARNING: invalid JSON output (likely error/kill before JSON emitted)" >&2
   echo "[gemini-agent] Raw output tail:" >&2
   tail -20 "$TMPFILE" >&2
-  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG}" >&2
+  if [[ -n "$STDERR_TAIL" ]]; then
+    echo "[gemini-agent] stderr tail (was previously discarded — RC3):" >&2
+    echo "$STDERR_TAIL" >&2
+  else
+    echo "[gemini-agent] stderr was EMPTY too → process killed mid-flight (timeout/SIGTERM) before any output. See gotchas.md 'thinking starvation'." >&2
+  fi
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | raw=${DEBUG_LOG} | stderr=${STDERR_LOG}" >&2
   exit ${EXIT_CODE:-1}
 fi
 
@@ -260,11 +288,34 @@ TOTAL_TOOLS=$(jq -r '.stats.tools.totalCalls // 0' "$TMPFILE")
 MODEL_USED=$(jq -r '.stats.models | keys | .[]' "$TMPFILE" 2>/dev/null | grep -v 'flash-lite' | head -1)
 [[ -z "$MODEL_USED" ]] && MODEL_USED="unknown"
 
+# Thinking-starvation detector (gemini-3-pro burns the output budget on
+# internal `thoughts` and ends the turn with empty/tiny text → "session stops
+# in the middle, returns to prompt"). Confirmed root cause; mitigation lives in
+# ~/.gemini/settings.json modelConfigs override (thinkingLevel, NOT
+# thinkingBudget — Gemini 3 ignores the latter).
+THOUGHTS_TOK=$(jq -r '[.. | objects | select(.thoughts? != null)][0].thoughts // 0' "$TMPFILE" 2>/dev/null)
+ANSWER_TOK=$(jq -r '[.. | objects | select(.thoughts? != null and .candidates? != null)][0].candidates // 0' "$TMPFILE" 2>/dev/null)
+[[ "$THOUGHTS_TOK" =~ ^[0-9]+$ ]] || THOUGHTS_TOK=0
+[[ "$ANSWER_TOK" =~ ^[0-9]+$ ]] || ANSWER_TOK=0
+STARVE=0
+if [[ -z "$RESPONSE" && "$THOUGHTS_TOK" -gt 1500 ]]; then
+  STARVE=2   # empty answer, thinking consumed the turn
+elif [[ "$THOUGHTS_TOK" -ge 6000 && "$ANSWER_TOK" -gt 0 && $((ANSWER_TOK * 6)) -lt "$THOUGHTS_TOK" ]]; then
+  STARVE=1   # degraded: answer << thinking
+fi
+STARVE_HINT="thinking starvation: thoughts=${THOUGHTS_TOK} answer=${ANSWER_TOK} tok. Cap it in ~/.gemini/settings.json -> modelConfigs.overrides match {model: gemini-3.1-pro-preview} generateContentConfig.thinkingConfig.thinkingLevel=\"low\". (Gemini 3 ignores thinkingBudget.) Or route bulk reads to --model flash."
+
 if [[ -z "$RESPONSE" ]]; then
   echo "[gemini-agent] WARNING: empty .response field" >&2
+  if [[ "$STARVE" -ge 1 ]]; then
+    echo "[gemini-agent] DIAGNOSIS: ${STARVE_HINT}" >&2
+  fi
+  if [[ -n "$STDERR_TAIL" ]]; then
+    echo "[gemini-agent] stderr tail (RC3): ${STDERR_TAIL}" >&2
+  fi
   echo "[gemini-agent] Full JSON:" >&2
   cat "$TMPFILE" >&2
-  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | session=${SESSION_ID} | raw=${DEBUG_LOG}" >&2
+  echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | session=${SESSION_ID} | thoughts=${THOUGHTS_TOK} | answer=${ANSWER_TOK} | raw=${DEBUG_LOG} | stderr=${STDERR_LOG}" >&2
   exit ${EXIT_CODE:-1}
 fi
 
@@ -277,6 +328,9 @@ if [[ "$RESPONSE_LEN" -gt "$MAX_CHARS" ]]; then
 fi
 
 echo "$RESPONSE"
-echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | model=${MODEL_USED} | tools=${TOTAL_TOOLS} | session=${SESSION_ID} | raw=${DEBUG_LOG}" >&2
+if [[ "$STARVE" -eq 1 ]]; then
+  echo "[gemini-agent] WARN: ${STARVE_HINT}" >&2
+fi
+echo "[gemini-agent] $LABEL | duration=${DURATION_FMT} | status=${STATUS} | model=${MODEL_USED} | tools=${TOTAL_TOOLS} | thoughts=${THOUGHTS_TOK} | answer=${ANSWER_TOK} | session=${SESSION_ID} | raw=${DEBUG_LOG} | stderr=${STDERR_LOG}" >&2
 
 exit $EXIT_CODE

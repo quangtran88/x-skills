@@ -90,3 +90,21 @@ Raw JSON logs default to `~/.cache/x-skills/gemini/` (mode 0600, user-private). 
 ## Auth: Google login, not API key
 
 `gemini` uses OAuth against your Google account (Ultra subscription recommended). There is **no `GEMINI_API_KEY` env var** for the CLI in this configuration. If you see "auth" / "sign in" errors, run `gemini` interactively once to complete the OAuth flow.
+
+## Thinking-budget starvation on `gemini-3.x-pro` (CONFIRMED ROOT CAUSE)
+
+**Symptom:** A `--model pro` session "stops in the middle" — runs a few tool calls (e.g. `ReadFile`), then returns to the prompt (interactive) or emits a 0-byte stdout / empty `.response` (headless) with **no error**. Most common on the large prompts x-review / x-research / x-bugfix / x-qa dispatch (big SCOPE block + multiple files pulled in → 150k–340k token context).
+
+**Cause:** `gemini-3.1-pro-preview` is a thinking model with no thinking cap by default. On large/tool-heavy turns it spends the entire output budget on internal `thoughts` and ends the turn with an empty/tiny final text part. gemini-cli treats the empty model turn as end-of-turn. Signature in the raw JSON: `thoughts` ≫ `candidates` (observed 18030 thoughts / 684 answer tokens just before total starvation). This is the documented gemini-cli #23081 class issue.
+
+**This is NOT a timeout bug** — gemini exits cleanly on SIGTERM (verified). Equal inner/outer timeouts (wrapper `GEMINI_TIMEOUT=600` vs callers' `timeout: 600000`) are a separate latent issue, not this symptom.
+
+**Mitigation (applied):** `~/.gemini/settings.json` → `modelConfigs.overrides` matching `{model: gemini-3.1-pro-preview}` and `{model: pro}` with:
+
+```json
+"modelConfig": { "generateContentConfig": { "thinkingConfig": { "thinkingLevel": "low" } } }
+```
+
+Use **`thinkingLevel`** (`"minimal"|"low"|"medium"|"high"`), NOT `thinkingBudget` — Gemini 3 replaced the numeric budget and silently ignores it. Thinking cannot be fully disabled on Gemini 3 Pro; `"low"` is the practical floor. Don't add `maxOutputTokens` as the primary fix — too-low a value on a thinking model re-triggers the same empty-response (budget eaten by thoughts before any answer). For pure bulk file reads, route to `--model flash` instead.
+
+**Diagnosis:** the wrapper now persists stderr to `<log>.stderr.log` (mode 0600) and prints a `DIAGNOSIS: thinking starvation: thoughts=… answer=…` line plus `thoughts=`/`answer=` fields on the `[gemini-agent]` summary. A 0-byte stdout log with an empty stderr log = process killed mid-flight (timeout/SIGTERM) before output; a 0-byte stdout with non-empty stderr = the captured failure reason (auth/quota/deadline).
