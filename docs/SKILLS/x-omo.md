@@ -8,7 +8,7 @@
 
 | Agent | Role | Model | Cost | Best For |
 |-------|------|-------|------|----------|
-| `oracle` | Read-only strategic advisor | GPT-5.4 max | EXPENSIVE | Architecture/debugging advice |
+| `oracle` | Read-only strategic advisor | configurable | EXPENSIVE | Architecture/debugging advice |
 | `explore` | Contextual codebase search | Configured in `oh-my-openagent.json` | FREE | Find code in codebase |
 | `librarian` | External docs & OSS research | Configured in `oh-my-openagent.json` | CHEAP | Look up library docs |
 | `multimodal-looker` | Visual & document analysis | Gemini 3.1 Pro | CHEAP | Analyze images/PDFs/diagrams |
@@ -26,7 +26,7 @@ omo-agent --model <alias> "<prompt>"
 | `gemini-pro` | Gemini 3.1 Pro | Visual/UI work, multimodal, creative |
 | `gemini-flash` | Gemini 3 Flash | Fast search, lightweight tasks |
 | `codex` | GPT-5.3 Codex | Deep implementation, autonomous coding |
-| `gpt` | GPT-5.4 | Architecture, reasoning, review |
+| `gpt` | GPT-5.5 | Architecture, reasoning, review |
 
 ---
 
@@ -46,7 +46,7 @@ omo-agent --model <alias> "<prompt>"
 |---------|--------|------|
 | Research | `explore` + `librarian` | Need both codebase + external docs |
 | Visual + context | `multimodal-looker` + `explore` | Image/PDF input + related code |
-| Code review | OMC code-reviewer + `--model gpt` | Claude + GPT-5.4 cross-model review |
+| Code review | OMC code-reviewer + `--model gpt` | Claude + GPT-5.5 cross-model review |
 
 ---
 

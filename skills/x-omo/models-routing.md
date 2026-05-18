@@ -30,7 +30,7 @@
 | `gemini-pro`   | gemini-3.1-pro | ARC-AGI-2 #1, GPQA #1 (94.3%), MCP Atlas #1, 1M ctx, $2/1M | GDPval expert tasks (Claude leads)     |
 | `gemini-flash` | gemini-3-flash | SWE-bench 78%, 218 TPS, $0.50/1M cheapest                   | Deep reasoning, premium quality        |
 | `codex`        | gpt-5.3-codex  | Terminal-Bench 77.3%, SWE-bench ~80%, agentic-native, 400K ctx | Simple tasks (overkill)             |
-| `gpt`          | gpt-5.4        | GDPval #1 (83.0%), OSWorld #1 (>human), GPQA ~92%, 1M ctx   | Budget work (expensive)                |
+| `gpt`          | gpt-5.5        | Frontier reasoning, strong agentic + GDPval, 1M ctx (5.5 published benchmarks TBD) | Budget work (expensive)                |
 
 
 ## When NOT to Route via OMO

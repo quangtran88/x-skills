@@ -42,7 +42,7 @@ If `{{ARGUMENTS}}` starts with an agent name or `--model`, invoke it immediately
 
 | Agent | Role | Model | Cost | Reference |
 |---|---|---|---|---|
-| `oracle` | Read-only strategic advisor | GPT-5.4 max | EXPENSIVE | [agents/oracle.md](agents/oracle.md) |
+| `oracle` | Read-only strategic advisor | configurable | EXPENSIVE | [agents/oracle.md](agents/oracle.md) |
 | `explore` | Contextual codebase search | Configured in `oh-my-openagent.json` | FREE | [agents/explore.md](agents/explore.md) |
 | `librarian` | External docs & OSS research | Configured in `oh-my-openagent.json` | CHEAP | [agents/librarian.md](agents/librarian.md) |
 | `multimodal-looker` | Visual & document analysis | Gemini 3.1 Pro | CHEAP | [agents/multimodal-looker.md](agents/multimodal-looker.md) |
@@ -67,7 +67,7 @@ If `{{ARGUMENTS}}` starts with an agent name or `--model`, invoke it immediately
 | "ask gemini about [library/framework]" | `librarian` | External docs specialist |
 | "ask gemini to build/implement ..." | `--model gemini-pro` | Direct model for implementation |
 | "ask codex to build/implement ..." | `--model codex` | Direct model for autonomous coding |
-| "ask gpt about architecture/design" | `oracle` | Strategic advisor on GPT-5.4 max |
+| "ask gpt about architecture/design" | `oracle` | Strategic advisor (configured model) |
 | "use [model] for this" | `--model <alias>` | Direct model access |
 
 ---
@@ -85,9 +85,9 @@ omo-agent --model <alias> "<prompt>"
 | `gemini-pro` | Gemini 3.1 Pro | Visual/UI work, multimodal, creative |
 | `gemini-flash` | Gemini 3 Flash | Fast search, lightweight tasks |
 | `codex` | GPT-5.3 Codex | Deep implementation, autonomous coding |
-| `gpt` | GPT-5.4 | Architecture, reasoning, review |
-| Any partial ID | Fuzzy-matched via `opencode models` | e.g., `gpt-5.4-mini`, `big-pickle` |
-| Full `provider/model` | Passthrough | e.g., `openai/gpt-5.4` |
+| `gpt` | GPT-5.5 | Architecture, reasoning, review |
+| Any partial ID | Fuzzy-matched via `opencode models` | e.g., `gpt-5.5-pro`, `big-pickle` |
+| Full `provider/model` | Passthrough | e.g., `openai/gpt-5.5` |
 
 See `models-routing.md` for detailed task-to-model mapping.
 
@@ -125,7 +125,7 @@ Fire multiple Bash tool calls simultaneously with `run_in_background: true`. Alw
 |---|---|---|
 | Research | `explore` + `librarian` | Need both codebase + external docs |
 | Visual + context | `multimodal-looker` + `explore` | Image/PDF input + related code |
-| Code review | OMC code-reviewer + `--model gpt` | Claude + GPT-5.4 cross-model review |
+| Code review | OMC code-reviewer + `--model gpt` | Claude + GPT-5.5 cross-model review |
 
 ```bash
 # Example: parallel research

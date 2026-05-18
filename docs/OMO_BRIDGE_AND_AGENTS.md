@@ -1,6 +1,6 @@
 # OMO Bridge and Agents
 
-The OMO (OpenCode Multi-Model Orchestration) bridge enables x-skills to dispatch work to non-Claude models (GPT-5.4, Gemini, Codex) via the OpenCode CLI. This is the primary mechanism for cross-model review, specialized reasoning, and autonomous deep work.
+The OMO (OpenCode Multi-Model Orchestration) bridge enables x-skills to dispatch work to non-Claude models (GPT-5.5, Gemini, Codex) via the OpenCode CLI. This is the primary mechanism for cross-model review, specialized reasoning, and autonomous deep work.
 
 ## Architecture
 
@@ -9,7 +9,7 @@ Claude Code skill
     │
     ├─── Skill tool ──→ Other skills
     ├─── Agent tool ──→ OMC agents (code-reviewer, executor)
-    └─── Bash tool ──→ omo-agent ──→ OpenCode CLI ──→ GPT-5.4 / Gemini / Codex
+    └─── Bash tool ──→ omo-agent ──→ OpenCode CLI ──→ GPT-5.5 / Gemini / Codex
 ```
 
 **Critical rule**: OMO agents are invoked via `Bash` tool, not `Agent` tool. Using `Agent` tool for OMO silently downgrades to Claude instead of using the target model.
@@ -20,7 +20,7 @@ Only these 4 role agents are safe to dispatch. Five other agents are **UNAVAILAB
 
 | Agent | Role | Model | Cost | Best For |
 |-------|------|-------|------|----------|
-| `oracle` | Read-only strategic advisor | GPT-5.4 max | EXPENSIVE | Architecture trade-offs, debugging advice, plan review |
+| `oracle` | Read-only strategic advisor | configurable | EXPENSIVE | Architecture trade-offs, debugging advice, plan review |
 | `explore` | Contextual codebase search | Configured in `oh-my-openagent.json` | FREE | Find code patterns, conventions, file paths |
 | `librarian` | External docs & OSS research | Configured in `oh-my-openagent.json` | CHEAP | Library docs, API patterns, OSS internals |
 | `multimodal-looker` | Visual & document analysis | Gemini 3.1 Pro | CHEAP | Image, PDF, screenshot, diagram input |
@@ -65,9 +65,9 @@ omo-agent --file img.png --model gpt "<prompt>"
 | `gemini-pro` | Gemini 3.1 Pro | Visual/UI work, multimodal, creative |
 | `gemini-flash` | Gemini 3 Flash | Fast search, lightweight tasks |
 | `codex` | GPT-5.3 Codex | Deep implementation, autonomous coding |
-| `gpt` | GPT-5.4 | Architecture, reasoning, review |
-| Any partial ID | Fuzzy-matched via `opencode models` | e.g., `gpt-5.4-mini` |
-| Full `provider/model` | Passthrough | e.g., `openai/gpt-5.4` |
+| `gpt` | GPT-5.5 | Architecture, reasoning, review |
+| Any partial ID | Fuzzy-matched via `opencode models` | e.g., `gpt-5.5-pro` |
+| Full `provider/model` | Passthrough | e.g., `openai/gpt-5.5` |
 
 ### Quick Dispatch in x-omo
 
@@ -100,7 +100,7 @@ Max 3 concurrent OMO agents. Standard patterns:
 |---------|--------|------|
 | Research | `explore` + `librarian` | Need both codebase + external docs |
 | Visual + context | `multimodal-looker` + `explore` | Image/PDF input + related code |
-| Code review | OMC `code-reviewer` + `--model gpt` | Claude + GPT-5.4 cross-model review |
+| Code review | OMC `code-reviewer` + `--model gpt` | Claude + GPT-5.5 cross-model review |
 | Pre-planning | `oracle` + `explore` | Strategic framing + codebase context |
 
 **Never parallelize sequential deps**:

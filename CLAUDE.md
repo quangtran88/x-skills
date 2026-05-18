@@ -61,7 +61,7 @@ When opencode is unavailable, skills substitute:
 
 | OMO Agent | Claude-Only Replacement |
 |-----------|------------------------|
-| `oracle` (GPT-5.4) | `Agent` tool with `model=opus` |
+| `oracle` | `Agent` tool with `model=opus` |
 | `explore` (Gemini Flash) | `Agent` tool with `subagent_type=Explore` |
 | `librarian` (Gemini Flash) | `Agent` tool with web search |
 | `multimodal-looker` (Gemini Pro) | `Read` tool (Claude is multimodal) |

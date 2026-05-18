@@ -220,13 +220,13 @@ By default, x-review runs cross-model review (Claude + GPT perspectives):
 
 **Target A (Plan/Spec review):**
 1. **OMC `code-reviewer`** (Claude perspective) via `Agent` tool
-2. **`--model gpt`** (GPT-5.4 blocker-finder perspective) via `omo-agent` Bash — OKAY/REJECT verdict. Replaces UNAVAILABLE `momus` role agent.
+2. **`--model gpt`** (GPT-5.5 blocker-finder perspective) via `omo-agent` Bash — OKAY/REJECT verdict. Replaces UNAVAILABLE `momus` role agent.
 3. **`superpowers:requesting-code-review`** (third perspective) via `Skill` tool
 (Optional 4th: OMO `oracle` for architecture-sensitive plans)
 
 **Targets B/C/D (Code/Files/Diff review):**
 1. **OMC `code-reviewer`** (Claude perspective) via `Agent` tool
-2. **OMO `oracle`** (GPT-5.4 perspective) via `omo-agent` Bash
+2. **OMO `oracle`** (oracle perspective) via `omo-agent` Bash
 3. **`superpowers:requesting-code-review`** (third perspective) via `Skill` tool
 
 All three are launched in **ONE message** (`assign` primitive). Wait for ALL results before synthesizing.
@@ -234,7 +234,7 @@ All three are launched in **ONE message** (`assign` primitive). Wait for ALL res
 By default, x-review runs cross-model review (Claude + GPT perspectives):
 
 1. **OMC `code-reviewer`** (Claude perspective) via `Agent` tool
-2. **`--model gpt`** (GPT-5.4 perspective) via `omo-agent` Bash
+2. **`--model gpt`** (GPT-5.5 perspective) via `omo-agent` Bash
 3. **`superpowers:requesting-code-review`** (third perspective) via `Skill` tool
 
 All three are launched in **ONE message** (`assign` primitive). Wait for ALL results before synthesizing.

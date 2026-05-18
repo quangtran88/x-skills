@@ -10,7 +10,7 @@ Named after the Oracle of Delphi. A read-only consultation agent for high-diffic
 |---|---|
 | Short name | `oracle` |
 | OpenCode display name | `oracle` |
-| Default model | `openai/gpt-5.4` |
+| Default model | per `oh-my-openagent.json` config |
 | Variant | `max` (extended reasoning) |
 | Mode | Read-only (no write/edit/apply_patch/task) |
 | Temperature | 0.1 |

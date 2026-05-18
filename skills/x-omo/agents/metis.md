@@ -4,7 +4,7 @@
 
 ## Replacement
 
-Use **`omo-agent oracle "<pre-planning consult prompt>"`** for pre-planning intent classification and scope-risk analysis. `oracle` runs on GPT-5.4 max and gives you read-only strategic advice — effectively the same role as metis with a broader charter. If you want raw GPT without oracle's framing, use `omo-agent --model gpt "<prompt>"`.
+Use **`omo-agent oracle "<pre-planning consult prompt>"`** for pre-planning intent classification and scope-risk analysis. `oracle` runs on its configured model and gives you read-only strategic advice — effectively the same role as metis with a broader charter. If you want raw GPT without oracle's framing, use `omo-agent --model gpt "<prompt>"`.
 
 ```bash
 omo-agent oracle "Analyze this request before planning: '<user request>'. Current context: <codebase/stack/constraints>. What hidden requirements, scope risks, and AI-slop patterns should we address before planning?"

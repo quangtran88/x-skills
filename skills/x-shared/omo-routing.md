@@ -22,8 +22,8 @@ When you would have reached for a broken role agent, use direct model routing in
 | Former role agent | Replacement | Why |
 |---|---|---|
 | `metis` (pre-planning / intent) | `oracle` or `--model gpt` | Strategic pre-plan consult |
-| `prometheus` (structured planner) | `--model gpt` or `oracle` | GPT-5.4 for plan authoring |
-| `momus` (plan reviewer / blocker-finder) | `--model gpt` | GPT-5.4 raw with blocker-finder prompt |
+| `prometheus` (structured planner) | `--model gpt` or `oracle` | GPT-5.5 for plan authoring |
+| `momus` (plan reviewer / blocker-finder) | `--model gpt` | GPT-5.5 raw with blocker-finder prompt |
 | `hephaestus` (autonomous deep worker) | `--model codex` | GPT-5.3 Codex for deep implementation |
 | `atlas` (plan executor) | `--model codex` | GPT-5.3 Codex for multi-task execution |
 

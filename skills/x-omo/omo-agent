@@ -10,7 +10,7 @@
 # Model aliases resolved via `opencode models` (always accurate):
 #   - Short aliases (gemini-pro, codex, gpt) → fuzzy match available models
 #   - Partial IDs (gpt-5.3-codex, gemini-3.1-pro) → grep match
-#   - Full IDs (openai/gpt-5.4) → passthrough
+#   - Full IDs (openai/gpt-5.5) → passthrough
 
 set -uo pipefail
 
@@ -70,9 +70,9 @@ Model Aliases (resolved via `opencode models`):
   gemini-pro        Gemini 3.1 Pro
   gemini-flash      Gemini 3 Flash
   codex             GPT-5.3 Codex
-  gpt               GPT-5.4
+  gpt               GPT-5.5
   o3, o4-mini       Reasoning models
-  Or any partial/full model ID (e.g., gpt-5.3-codex, openai/gpt-5.4)
+  Or any partial/full model ID (e.g., gpt-5.3-codex, openai/gpt-5.5)
 EOF
   exit 1
 fi
@@ -101,7 +101,7 @@ resolve_model() {
     gemini-pro)     pattern="gemini-3\.1.*pro" ;;
     gemini-flash)   pattern="gemini.*flash" ;;
     codex)          pattern="gpt-5\.3-codex$" ;;
-    gpt|gpt-5-4)    pattern="/gpt-5\.4$" ;;
+    gpt|gpt-5-5)    pattern="/gpt-5\.5$" ;;
     o3)             pattern="/o3$" ;;
     o3-pro)         pattern="/o3-pro$" ;;
     o4-mini)        pattern="/o4-mini$" ;;

@@ -4,7 +4,7 @@
 
 ## Replacement
 
-Use **`omo-agent --model gpt "<plan-author prompt>"`** for structured plan authoring. You're routing directly to GPT-5.4 — supply the plan-author framing (context, requirements, constraints, output structure with tasks + dependencies) in the prompt.
+Use **`omo-agent --model gpt "<plan-author prompt>"`** for structured plan authoring. You're routing directly to GPT-5.5 — supply the plan-author framing (context, requirements, constraints, output structure with tasks + dependencies) in the prompt.
 
 ```bash
 omo-agent --model gpt "Create an implementation plan for: <feature description>. Context: <codebase context, existing patterns, constraints>. Requirements: <specific requirements>. Output a task DAG with: task IDs, descriptions, dependencies, and verification steps for each task."

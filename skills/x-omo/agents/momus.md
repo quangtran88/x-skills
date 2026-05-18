@@ -4,7 +4,7 @@
 
 ## Replacement
 
-Use **`omo-agent --model gpt "<blocker-finder prompt>"`** for plan review / blocker-finding. You're routing directly to GPT-5.4 — you supply the blocker-finder framing in the prompt.
+Use **`omo-agent --model gpt "<blocker-finder prompt>"`** for plan review / blocker-finding. You're routing directly to GPT-5.5 — you supply the blocker-finder framing in the prompt.
 
 ```bash
 omo-agent --model gpt "You are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: missing dependencies, ambiguous success criteria, hidden scope, and verification gaps."

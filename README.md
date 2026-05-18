@@ -43,7 +43,7 @@ The plugin's SessionStart hook detects stale capabilities and reminds you, but y
 | **x-team** | `/x-skills:x-team` | Multi-feature team orchestrator — decomposes work into N parallel features, provisions a worktree per feature, gates merges on x-qa passing |
 | **x-worktree** | `/x-skills:x-worktree` | Isolated git worktree provisioner — used by `x-do`/`x-bugfix` `--wt` flag and directly; auto-applies docker-compose isolation when a profile is present |
 | **x-worktree-isolate** | `/x-skills:x-worktree-isolate` | Per-worktree docker-compose isolation — scan once, emit `profile.json`, write `compose.override.yml` + `.env.worktree` per new worktree |
-| **x-omo** | `/x-skills:x-omo` | OpenCode multi-model bridge — dispatch to GPT-5.4, Gemini, Codex models via role agents or direct model routing |
+| **x-omo** | `/x-skills:x-omo` | OpenCode multi-model bridge — dispatch to GPT-5.5, Gemini, Codex models via role agents or direct model routing |
 | **x-gemini** | `/x-skills:x-gemini` | Direct Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, gemini-3.x access without OpenCode layer |
 | **x-guide** | `/x-skills:x-guide` | Progressive comprehension-gated tutor — turns docs/PRDs/specs/code/features into a resumable walkthrough with per-project state in `.x-guide/<slug>/` |
 | **x-skill-improve** | `/x-skills:x-skill-improve` | Session-based skill alignment analyzer — evaluates how well a skill was followed during real sessions and proposes targeted edits |
@@ -65,7 +65,7 @@ User: "add auth to the API"
          │
     ┌────┴────────────────────┐
     │ opencode available?     │
-    ├─── yes ─→ OMO oracle    │  (GPT-5.4 review)
+    ├─── yes ─→ OMO oracle    │  (oracle review)
     │          + OMC executor  │  (Claude implementation)
     ├─── no ──→ Agent(opus)   │  (Claude-only fallback)
     └─────────────────────────┘

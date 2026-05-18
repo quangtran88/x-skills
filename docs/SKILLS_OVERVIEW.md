@@ -24,7 +24,7 @@ Every skill in x-skills follows the **router principle**: it classifies, it rout
 | **x-api-pentest** | *(not declared)* | API security testing — OWASP API Top 10 testing with schemathesis, nuclei, sqlmap, spectral |
 | **x-qa** | *(not declared)* | Profile-driven E2E QA — scans the project once, persists a launch/test profile, fans tests out across cheap/strong models against an isolated stack |
 | **x-team** | *(not declared)* | Multi-feature team orchestrator — decomposes work into N parallel features, provisions a worktree per feature, gates merges on x-qa passing |
-| **x-omo** | *(not declared)* | OpenCode multi-model bridge — dispatch to GPT-5.4, Gemini, Codex models via role agents or direct model routing |
+| **x-omo** | *(not declared)* | OpenCode multi-model bridge — dispatch to GPT-5.5, Gemini, Codex models via role agents or direct model routing |
 | **x-gemini** | *(not declared)* | Direct Gemini CLI bridge — uses Google Ultra subscription, native Google Search grounding, gemini-3.x access |
 | **x-skill-improve** | *(not declared)* | Session-based skill alignment analyzer — evaluates how well a skill was followed during a real session |
 | **x-verify** | `verifier` | Completion cascade dispatcher — answers "am I done?" for long-running skills |

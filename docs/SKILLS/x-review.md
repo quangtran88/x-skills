@@ -33,7 +33,7 @@ Step 1: Prepare (step-01-prepare.md)
 Step 2: Review (step-02-review.md)
   ├─ **Target A (Plan/Spec):** Launch 3 reviewers in ONE MESSAGE:
   │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
-  │   2. Bash tool: omo-agent --model gpt "<plan blocker-finder prompt>" — GPT-5.4 blocker-finder (OKAY/REJECT verdict). Replaces UNAVAILABLE `momus` role agent.
+  │   2. Bash tool: omo-agent --model gpt "<plan blocker-finder prompt>" — GPT-5.5 blocker-finder (OKAY/REJECT verdict). Replaces UNAVAILABLE `momus` role agent.
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
   │   (Optional 4th: omo-agent oracle for architecture-sensitive plans)
   ├─ **Targets B/C/D (Code/Files/Diff):** Launch 3 reviewers in ONE MESSAGE:

@@ -8,8 +8,8 @@ For the full agent catalog, cost tiers, parallel patterns, OMO tool access, and 
 
 | Situation | Route | Why |
 |---|---|---|
-| Requirements are ambiguous or open-ended | `oracle` (or `superpowers:brainstorming`) | Strategic pre-plan consult on GPT-5.4 |
-| Need structured plan with tasks + deps | `--model gpt` with a plan-author prompt | GPT-5.4 raw for plan authoring |
+| Requirements are ambiguous or open-ended | `oracle` (or `superpowers:brainstorming`) | Strategic pre-plan consult (configured model) |
+| Need structured plan with tasks + deps | `--model gpt` with a plan-author prompt | GPT-5.5 raw for plan authoring |
 | Review plan for blockers before execution | `--model gpt` with a blocker-finder prompt | Max 3 issues, OKAY/REJECT verdict |
 | 1-2 standalone complex implementation tasks | `--model codex` | GPT-5.3 Codex for autonomous deep work |
 | Fresh perspective after stalled debugging | `oracle` | Read-only strategic advice |
