@@ -69,20 +69,14 @@ If the synthesis table from step 3 contains ANY row tagged `NEEDS_DIRECTION = �
 **Procedure:**
 
 1. **Display the Big Picture header** drafted in step 3 — verbatim, before any clarification block. If missing, halt and demand step 3 produce it before proceeding.
-2. **Re-display each clarification block** drafted in step 3 — verbatim, in finding-number order. Do NOT summarize, condense, or skip blocks even if "obvious." Each block must include the numbered heading (`### Decision #<N>:` matching the table row), `**Bottom line:**` plain-language one-liner, `Axis:`, `Severity inheritance:`, per-option `Impact:` lines, options A/B/C plus always-D ("Reject framing") and conditionally-E ("Split this fix off"), and `Decider:` footer. **If any block lacks a numbered heading or Bottom line, halt and re-draft step 3 — do not present blind blocks to the user.**
+2. **Surface each DECIDE block** using the compact format from `../../x-shared/done-format.md § Shape 3 — DECIDE`, **one at a time** — surface the first, wait for user reply, then surface the next. Do NOT display all blocks at once. Safety rules from step-03 carry through into every DECIDE block: axis-aware Decider footer, security/compliance deferral restriction (option C must say "Fix in immediate follow-up PR" not "keep as-is"), effort label omitted for security/compliance axis. Verify each DECIDE block has a numbered heading and Bottom line before surfacing — if missing, re-draft from step 3's "Draft Clarification Block" template.
 3. **Display the meta-finding** if step 3 emitted one (`META: Plan scope mismatch`). Pause for user reaction before listing per-finding choices.
 4. **Display the Follow-up options menu** (paste-verbatim block below) AFTER the last clarification block and BEFORE the per-decision prompt. The menu gives the user a top-level route choice; the per-decision prompt only applies if they pick `[P]`.
 
-   **Follow-up options menu (paste verbatim — do NOT re-derive, do NOT reorder):**
+   **Follow-up options line (from `../../x-shared/done-format.md § Follow-up Options Line` — emit on one line):**
 
    ```
-   Follow-up options — pick how to proceed:
-   [Y] Yolo — accept every Recommended pick from the clarification blocks above and enter Fix Mode immediately (no per-decision prompt)
-   [P] Pick per-decision — answer A/B/C/D/E for each NEEDS_DIRECTION finding (granular control)
-   [R] Review-only — post findings to the PR, no local fixes (cross-team review)
-   [S] Skip NEEDS_DIRECTION — fix only the unambiguous CRITICAL/HIGH rows; defer the flagged ones with tracker fields
-   [X] Re-dispatch reviewers on a patched diff (you push fixes elsewhere, then come back)
-   [N] Done — stop here, no further action
+   → [Y] all recommended · [P] per-decision · [R] review-only · [S] skip flagged · [X] re-dispatch · [N] done
    ```
 
    **Branching:**
