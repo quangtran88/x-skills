@@ -268,7 +268,7 @@ Do not bury this inside an option's con list. It is its own bug class.
 | 3 | MEDIUM | ... | Claude + GPT | ✓ | — |
 ```
 
-If any row has `NEEDS_DIRECTION = ✓`, append the drafted clarification blocks (one per flagged row) immediately after the table under a `### Clarification needed before fix` heading. **Block headings MUST be numbered to match the finding row** (`### Decision #2:`, `### Decision #5:`) so the user can reply `2: A`, `5: B` without scanning titles.
+If any row has `NEEDS_DIRECTION = ✓`, draft the DECIDE blocks internally (using the "Draft Clarification Block" template above) but do **NOT** display them here. Step 4 surfaces them one at a time using `../../x-shared/done-format.md § Shape 3 — DECIDE`. The findings table is the only user-facing output from this step.
 
 ## Next Step
 
