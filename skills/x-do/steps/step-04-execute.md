@@ -11,20 +11,40 @@
 
 Execute the reviewed plan and verify completion.
 
-## Route Selection
+## Route Selection (3 axes: mode, task count, walk-away signal)
 
-| Signal | Route | Why |
-|--------|-------|-----|
-| 3+ tasks | `oh-my-claudecode:ralph` | Persistence loop, TDD, verification per story |
-| 1-2 complex tasks | OMO `--model codex` | GPT-5.3 Codex for autonomous deep work (replaces the UNAVAILABLE `hephaestus` role agent — see `../../x-omo/gotchas.md`) |
-| 1-2 simple tasks | Direct execution via OMC `executor` | Fastest path |
-| Plan is a superpowers plan | `superpowers:subagent-driven-development` | Fresh subagent per task |
+Decide route from the 3 axes pinned in `../SKILL.md § Routing Signals`. There is no other input — no file-count scoring, no depth ladder.
+
+| Task count | Walk-away signal | Plan source | Route | Inner executor model |
+|------------|------------------|-------------|-------|----------------------|
+| 1 task, ≤ 10 lines, single file (Mode D) | — | — | Direct edit via `morph-mcp edit_file` | n/a |
+| 1-2 tasks, ≤ 5 files, single module | absent | any | OMC `executor` agent | sonnet |
+| 1-2 tasks, crosses 2+ modules OR architectural decision | absent | any | OMC `executor` agent | opus |
+| 3+ tasks, stay in session | absent | superpowers plan (from `writing-plans`) | `superpowers:subagent-driven-development` | per-task: OMC `code-reviewer` (see Per-Task Reviewer below) |
+| 3+ tasks, "until done" / "don't stop" / "walk away" in user prompt | present | PRD-shaped checklist with acceptance criteria | OMC `ralph` | ralph's internal architect/critic verifier |
+| 3+ tasks, all truly independent (no shared state) | — | any | OMC `ultrawork` | parallel executors |
+
+**One axis at a time:** Pick the row by task count first, then walk-away signal, then plan source. Stop at the first match. Do **not** layer alternatives — pick exactly one route and dispatch.
+
+**Removed defaults (do NOT pick these without explicit user request):** `autopilot`, `team`, `ralplan`, `planner`, `deep-interview`, `critic` per-task. All collapse to tier-C overlap with the rows above.
+
+## Per-Task Reviewer (subagent-driven-development only)
+
+Inside `superpowers:subagent-driven-development`, dispatch one reviewer per task as the second stage (after spec compliance). Scale the reviewer model to task sensitivity:
+
+| Task sensitivity | Reviewer | Model |
+|------------------|----------|-------|
+| Cross-module, architectural, security-touching | OMC `code-reviewer` | opus |
+| Standard feature / 2-5 files / single module | OMC `code-reviewer` | sonnet |
+| Cosmetic / style / single-file refactor | OMC `code-reviewer` (style mode) | haiku |
+
+**Additionally:** When files touched include `auth/*`, `payments/*`, `migrations/*`, or any path matching the project's `SECURITY.md` sensitive list, dispatch OMC `security-reviewer` in **parallel** with `code-reviewer`. Cheap, high-leverage.
 
 ## Forward Intelligence
 
 Before executing, gather key constraints discovered in earlier steps and inject them into the execution prompt:
 
-- **From step-01 (gather):** Conventions to follow, existing patterns to match, scope boundaries
+- **From step-01 (gather):** Conventions to follow, existing patterns to match, scope boundaries, `DESIGN_DIR` / `PLAN_DIR`
 - **From step-02 (plan):** Decisions already made, rejected alternatives, verification criteria
 - **From step-03 (review):** Blocker resolutions, risk mitigations agreed upon
 
@@ -55,26 +75,57 @@ In addition to the run-specific `[CONSTRAINTS]` block above, every executor disp
    signals — go produce evidence (rule 2) instead of writing code on top of an assumption.
 ```
 
-This block is mandatory for Modes A/B/F and for any 3+ task ralph run. For Mode D (quick tasks), rules 2 and 3 still apply; rule 1 scales down (a one-line config edit does not need a log).
+This block is mandatory for Modes A/B and for any 3+ task ralph run. For Mode D (quick tasks), rules 2 and 3 still apply; rule 1 scales down (a one-line config edit does not need a log).
+
+## Pre-Execution Gate (AskUserQuestion when 3+ tasks)
+
+Before dispatching the executor route for 3+ tasks, surface ONE question to confirm route selection:
+
+```
+AskUserQuestion:
+  question: "Plan has N tasks. Route = <chosen-row>. Proceed?"
+  options:
+    - label: "Proceed"
+      description: "Dispatch the chosen route now"
+    - label: "Switch route"
+      description: "Pick a different row from the route table (e.g., ralph instead of subagent-driven)"
+    - label: "Revise plan first"
+      description: "Go back to step-02-plan.md before executing"
+```
+
+Skip this gate for 1-2 task routes and Mode D (overhead > value).
 
 ## Execution
 
-1. **Select route** based on task count and complexity (use depth calibration from SKILL.md).
+1. **Select route** based on the 3-axis table above.
 
 2. **Capture baseline HEAD.** Before dispatch, record `BASE_SHA=$(git rev-parse HEAD)` and the upstream `BASE_UPSTREAM=$(git rev-parse @{u} 2>/dev/null || echo "")`. Needed for commit recomposition (step 5).
 
 3. **Execute.**
    - For ralph: `Skill` tool → `oh-my-claudecode:ralph` with the plan
-   - For OMO codex (autonomous deep work): `Bash` tool → `omo-agent --model codex "<structured prompt>"`, `timeout: 600000`
-   - For executor: `Agent` tool → `subagent_type="oh-my-claudecode:executor"`
-   - For subagent-driven: `Skill` tool → `superpowers:subagent-driven-development`
-   - For direct execution (Mode D / surgical edits): Use `morph-mcp edit_file` for edits, `morph-mcp codebase_search` to locate targets
+   - For ultrawork: `Skill` tool → `oh-my-claudecode:ultrawork` with parallel task graph
+   - For subagent-driven: `Skill` tool → `superpowers:subagent-driven-development` with per-task reviewer pinned to OMC `code-reviewer` (see Per-Task Reviewer above)
+   - For executor: `Agent` tool → `subagent_type="oh-my-claudecode:executor"`, set `model=sonnet` or `model=opus` per the route table
+   - For direct execution (Mode D / surgical edits): `morph-mcp edit_file` for edits, `morph-mcp codebase_search` to locate targets
 
-4. **Verify** — `superpowers:verification-before-completion` before claiming done.
+4. **Verify** — dispatch the `verifier` slot from `../SKILL.md` (default: `x-verify`). Runs the completion cascade.
 
-5. **Recompose commits** (see "Commit Recomposition" below) — runs after verification passes, before branch finish.
+5. **Verification failure → bounded escalation:**
+   - **1st fail:** Re-run the verifier with the failure context (single retry).
+   - **2nd fail:** Surface AskUserQuestion gate:
+     ```
+     AskUserQuestion:
+       question: "Verification failed twice. Pick recovery."
+       options:
+         - "Escalate to OMC architect for cross-module diagnosis"
+         - "Cycle test/fix via OMC ultraqa (max 5 cycles, 3x-same-error stop)"
+         - "Abort — surface state for manual debugging"
+     ```
+   - Per OMC `debugger.md:35,50` and `executor.md:40`: after 2 failed executor attempts → architect is the canonical escalation target; codex / oracle only AFTER architect diagnosis fails to unblock.
 
-6. **Finish branch** — `superpowers:finishing-a-development-branch` to decide merge/PR/keep.
+6. **Recompose commits** (see "Commit Recomposition" below) — runs after verification passes, before branch finish.
+
+7. **Finish branch** — `superpowers:finishing-a-development-branch` to decide merge/PR/keep/discard.
 
 ## Commit Recomposition (executor / ralph routes)
 

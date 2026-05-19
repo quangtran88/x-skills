@@ -48,25 +48,10 @@ After x-bugfix completes:
    - Only spawn OMC `executor` if the quick task still benefits from isolation (e.g., touches multiple files or needs exploration first)
 2. Still verify — even quick tasks need evidence
 
-## E: Visual Input
+## E (Visual) and F (Refactor) — collapsed
 
-1. **If image is already in the conversation** (user attached it): Claude can analyze it directly first — no agent needed for simple screenshots or UI mockups.
-2. **For complex visual analysis** (dense diagrams, PDFs, detailed UI extraction): dispatch OMO `multimodal-looker` (Gemini 3.1 Pro, better vision for complex visuals) + OMC Explore in parallel for related code.
-3. Synthesize, then route to A/B/C based on what the visual reveals
+These modes are no longer separate branches. Per `../SKILL.md § Detection`:
 
-## F: Refactor
-
-**Detect first.** `/refactor` is an external skill (not in this plugin). Check the available-skills list at session start (or `~/.claude/skills/refactor/` and the harness's skill registry). If present → delegate. If absent → fall back to Mode A (treat as a multi-task plan): brainstorm scope, write a plan, dispatch executor, post-impl review. Do NOT silently call `Skill("refactor", ...)` and hope it resolves.
-
-**Delegate to `/refactor`** (when available) — it has a 6-phase workflow (intent gate → codebase analysis → codemap → test assessment → plan → execute with per-step verification → final verification). Uses AST-grep, LSP, and Morph codebase_search for structural precision.
-
-Route: hand off the user's refactoring description to refactor via `Skill("refactor", args="<target and scope>")` — primitive: `handoff` (sync, depends on result). Include a [handoff context](../../x-shared/context-envelope.md) block: from x-do Mode F, target/scope, files in scope, why-now reason. It will handle analysis, planning, and execution internally.
-
-**Enumerated review-feedback exception:** When the user provides specific, numbered changes on an existing commit (e.g., "I have feedback for commit abc123: 1. use csv lib, 2. extract method, 3. fix error type..."), treat as **Mode A** instead — the feedback list IS the plan. `/refactor`'s discovery phases (intent gate, codemap) add ceremony that duplicates what the user already scoped. Route to Mode A and follow its plan review → execute → post-impl review pipeline.
-
-After refactor completes:
-1. **Post-Refactor Review.** Dispatch `Skill: x-skills:x-review` on the changeset. Honor verdict per `verification-failed` reaction.
-   **Small-scope refactors (single module, < 3 files):** Pass `--reduced` hint to x-review.
-2. Verify and finish branch
-
-> **Verdict-envelope vs Fix Mode contract:** x-review returns a structured `plan-mode envelope` (with `verdict: APPROVE | REQUEST_CHANGES`) only for **Target A (plan/spec)**. For code/diff targets (B/C/D), x-review applies fixes inline via its own Fix Mode (`superpowers:receiving-code-review` + `verification-before-completion`) and returns after fixes are on disk. x-do should treat code-target review as "x-review owns the fix loop" — re-run tsc/eslint/tests on the resulting tree rather than routing on a verdict token. The `verification-failed` reaction below applies to **plan-review** REQUEST_CHANGES and to code-target reviews where the user explicitly picked Review-Only Mode (no inline fixes).
+- **Visual input** (image / PDF / screenshot / diagram) → Claude is multimodal. Read the artifact directly inside Mode B brainstorming (`superpowers:brainstorming`); for dense diagrams or complex PDFs, dispatch OMO `multimodal-looker` in parallel during step-01. No separate Mode E branch.
+- **Refactor with plan ref** → Mode A (treat the plan as authoritative). **Refactor without plan ref** → Mode B (brainstorm scope → write plan → execute). The external `/refactor` skill is no longer a default route; it can still be invoked explicitly by the user, but x-do does not auto-delegate to it.
+- **Enumerated review-feedback** on an existing commit → Mode A. The numbered feedback list IS the plan.

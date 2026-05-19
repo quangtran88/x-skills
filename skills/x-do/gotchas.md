@@ -11,13 +11,13 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 - **Don't force the planning pipeline on small tasks.** A single rename or config change doesn't need `oracle` pre-plan → `--model gpt` plan → `--model gpt` blocker-finder. Use Mode D.
 - **Mechanical batch detection:** A task qualifies as a "mechanical batch" when ALL changes follow the same structural pattern (e.g., delete import + remove call site in N files). Test: if you could describe the change as a template applied N times, it's mechanical. If any file requires unique logic or decisions, it's NOT mechanical — use full ceremony.
 
-## Review Feedback Misclassified as Mode F
+## Review Feedback Misclassified (was: as Mode F)
 
-**Symptom:** User provides numbered feedback on an existing commit (e.g., "I have feedback: 1. use X, 2. extract Y, 3. fix Z"). x-do classifies as Mode F (Refactor) and attempts to delegate to `/refactor`, which adds unnecessary discovery ceremony since the user already scoped every change.
+**Symptom:** User provides numbered feedback on an existing commit (e.g., "I have feedback: 1. use X, 2. extract Y, 3. fix Z"). x-do treats it as new-work brainstorming (Mode B) and re-runs design discovery, ignoring that the user already scoped every change.
 
-**Root cause:** The detection table matches "refactor" keywords in individual feedback items, ignoring that the overall pattern is "apply enumerated changes" — which is Mode A (existing plan).
+**Root cause:** The detection table matches "refactor" / "fix" keywords in individual feedback items rather than recognizing the overall "apply enumerated changes" pattern.
 
-**Fix:** When the user provides specific, numbered changes on an existing commit/implementation, route to Mode A. The feedback list IS the plan. See the "Review feedback → Mode A" rule in the Detection section of SKILL.md.
+**Fix:** When the user provides specific, numbered changes on an existing commit/implementation, route to **Mode A** — the feedback list IS the plan. See the "Review feedback → Mode A" rule in the Detection section of SKILL.md. (Mode F has been removed; refactors with no plan go through Mode B, with plan go through Mode A.)
 
 ## File Count ≠ Complexity
 
@@ -25,7 +25,7 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 
 **Root cause:** Using file count as the primary complexity signal. A mechanical 10-file rename is simpler than a 2-file auth change.
 
-**Fix:** Use the Depth Calibration table in SKILL.md. Assess scope, risk, novelty, and dependencies — not just file count. A change touching payments or auth is Heavy regardless of file count.
+**Fix:** Mode D's "≤ 10 lines, single file, no ambiguity" rule is strict — if a change touches auth/payments/migrations or crosses modules, it is NOT Mode D regardless of line count. Route to Mode A or B and let the plan + reviewer decide ceremony. The previous Depth Calibration ladder has been replaced by the 3-axis Routing Signals (mode + task count + walk-away) in SKILL.md.
 
 ## Post-Impl Review ≠ TypeScript Verification
 

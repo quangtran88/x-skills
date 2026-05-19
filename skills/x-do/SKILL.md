@@ -122,22 +122,22 @@ x-research owns the signal taxonomy and tool selection — do NOT re-classify he
 
 **Return path:** If x-research just completed in the same session and provided findings/context, skip this gate entirely. Proceed directly to Detection. This includes cases where x-research's quick-action exception applied a small fix inline.
 
-## Detection
+## Detection (pattern-match, no LLM judgment)
 
-Classify the user's input into ONE mode:
+Classify into ONE of 4 modes via observable signals:
 
 | Mode | Detect When | Key Signals |
 |------|------------|-------------|
-| **A: Existing Plan** | User references a plan/spec/doc file | File path, "implement the plan", "execute the spec" |
-| **B: New Feature** | Something to build/add/create, no existing plan | Creative/new work, no plan referenced |
-| **C: Bug Fix** | Error, stack trace, failure description | "fix", "bug", "error", "broken", "crash", "failing" |
-| **D: Quick Task** | Trivial change, clearly < 5 min, no ambiguity | Rename, small edit, config change, single-file |
-| **E: Visual Input** | PDF, image, screenshot, diagram provided | Binary file attachment, visual reference |
-| **F: Refactor** | Structural code change, not a bug or new feature | "refactor", "restructure", "reorganize", "extract", "inline", "move to", "clean up" (multi-file) |
+| **A: Existing Plan** | Prompt references an existing plan/spec/doc file path | `.md` file path that exists, "implement the plan", "execute the spec", numbered feedback list on a prior commit |
+| **B: New Work** | Build / add / create / refactor with no plan referenced | Creative/new work, structural changes, no plan path in prompt |
+| **C: Bug Fix** | Error, stack trace, or failure described | "fix", "bug", "error", "broken", "crash", "failing", stack trace text |
+| **D: Quick Task** | Trivial single-file change, ≤ 10 lines, no ambiguity | Rename, typo, config tweak, comment fix, one-line edit |
 
-**Review feedback → Mode A:** When the user provides numbered/enumerated feedback on an existing commit or implementation (e.g., "I have feedback for commit abc: 1. use X lib, 2. extract method, 3. fix error..."), route to **Mode A** — the feedback list IS the plan. Do NOT classify as Mode F even if most items are refactoring.
+**Modes E (Visual) and F (Refactor) collapsed:**
+- Visual input (image / PDF / screenshot) → Claude is multimodal; read the artifact inside Mode B brainstorming.
+- Refactor **with** plan ref → Mode A. Refactor **without** plan ref → Mode B (still goes through brainstorm + writing-plans).
 
-**Mode D vs F boundary:** A single-file rename or trivial cleanup → Mode D. Multi-file structural changes, pattern migrations, or architecture reorganization → Mode F.
+**Review feedback → Mode A:** When the user provides numbered/enumerated feedback on an existing commit or implementation, the feedback list IS the plan.
 
 ## Pre-Flight Checklist (MANDATORY)
 
@@ -159,54 +159,16 @@ Before starting any mode, complete ALL of these checks:
   - `specs_dir` — uncommitted design docs → offer to continue
   - Draft plan files (`spec-wip.md`) → offer to continue
 - [ ] **Gotchas:** Read `gotchas.md` for known failure patterns before starting
-- [ ] **Depth check:** Assess complexity to calibrate ceremony (see below)
 
-## Depth Calibration
+## Routing Signals (3 axes — replaces Depth Calibration)
 
-Before entering mode guidance, assess the task along these dimensions to decide how much ceremony it needs:
+After mode detection, only three axes drive routing — no scoring, no depth ladder:
 
-| Dimension | Light | Standard | Heavy |
-|-----------|-------|----------|-------|
-| **Scope** | 1-2 files, single module | 3-5 files, 2 modules | 5+ files, 3+ modules |
-| **Risk** | No shared state, reversible | Touches shared interfaces | Auth, data, payments, migrations |
-| **Novelty** | Known patterns, clear path | Some unknowns | Unfamiliar stack, no precedent |
-| **Dependencies** | Independent changes | Some ordering needed | Cross-task dependencies, integration points |
+1. **Mode** (A / B / C / D from Detection above)
+2. **Task count** (from the plan, after step-02-plan) — `1-2` / `3+`
+3. **Walk-away signal** (from user prompt language) — present when the user says "until done" / "don't stop" / "walk away" / "finish overnight" / similar; otherwise absent (default = stay in session)
 
-**Scoring:** Count how many dimensions land in each column. Majority determines ceremony level:
-
-- **Light** → Skip brainstorming, skip plan review, 1 reviewer post-impl. Applies to Mode D always.
-- **Standard** → Brief brainstorm, plan if 3+ tasks, full 3-reviewer post-impl.
-- **Heavy** → Full pipeline: brainstorm → plan → plan review → execute → post-impl review.
-
-This overrides file-count heuristics. A 3-file auth change (Heavy risk) needs more ceremony than a 6-file rename (Light scope, Light risk).
-
-### Optional gitnexus grounding (gated — counts only, C1)
-
-The heuristic table above is the default. **This grounding step is OPTIONAL and only runs when ALL of the following hold** — otherwise the heuristic Depth Calibration is used unchanged (the gated-out path is byte-identical to pre-change behavior):
-
-- **Mode ∈ {A, B, F}** — never Mode D, never Mode C (C delegates to x-bugfix). No `impact` call ever fires on Mode D or Mode C.
-- **The named-symbol set is non-empty**, resolved by ONE pinned mechanism (no guessing):
-  - **Mode A** — symbols referenced in the plan file.
-  - **Mode F** — symbols named in the refactor prompt.
-  - **Mode B** — symbols carried in the inbound x-research / x-mindful handoff envelope, OR backtick-quoted identifiers in the user prompt that resolve to existing graph nodes. **Mode B with no resolvable existing symbol ⇒ gate OUT (heuristic path); do NOT speculate `impact` on a greenfield feature.**
-- **Task 1 gate satisfied** = "pinned + indexed + **fresh**", READ FROM the shared session-pinned probe (`../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe") — NOT a per-skill `gitnexus list` call. `impact` is **correctness-sensitive** per the use-class index in `../x-shared/mcp-toolbox.md`, so a stale index hard-degrades this step OUT (heuristic path).
-
-**Consume x-mindful, do not re-run (C5).** Before grounding, if a `<!-- x-mindful-envelope v1 -->` block is present in the handoff context (Mode A path — x-do Mode A triggers x-mindful), extract the **already-analyzed symbol set**:
-
-- Backtick-quoted identifiers in each `[<id>] <title>` line across **all** sections (Confirmed / Modified / Rejected / Skipped / Pending).
-- **Additionally**, for **Modified** items only, backtick-quoted identifiers in the `**Original plan:**` and `**User direction:**` text (these fields exist on Modified items only per the canonical emitter `../x-mindful/steps/step-05-handoff.md:9-39`; Confirmed/Skipped/Pending carry only the `[<id>] <title>` line, Rejected adds a `Reason:` line — do NOT mine prose that the schema does not emit).
-
-x-mindful already routed BREAK/ARCH items in that set through `gitnexus impact` during its own run. x-do **MUST NOT re-invoke `impact` on any symbol in the envelope set** — C5 is a no-re-run dedup keyed on symbol membership (the envelope carries no blast-radius payload to reuse). Depth grounding applies **only to named symbols NOT in the envelope set**.
-
-**When gated-in:** call `gitnexus impact` on the named symbols (those NOT covered by the envelope). Take the **depth-1 caller count + affected-process count ONLY**. Map to the Light / Standard / Heavy ladder via the explicit counts→ceremony table in `references/delegation-and-scaling.md`. **NEVER read or branch on gitnexus's `risk` field** — it is a hardcoded threshold bucket (C1); consume raw counts only.
-
-**Surface one `Depth grounding:` line per grounding class that applies** (the Task 6.4 grep signal — the `[covered]`/`[direct]` tag PLUS the explicit `symbols=` list together make the C5 no-double-run check measurable). A single task may emit BOTH a `[covered]` line and a `[direct]` line when it has envelope-covered symbols AND additionally self-grounded symbols — emit both so the C5 grep sees each set; do NOT collapse them into one line. When fully gated out, emit the single bare `heuristic` line only:
-
-- Self-grounded symbols (x-do called `impact`): `Depth grounding: gitnexus.impact (N callers, M processes) [direct] symbols=[<comma-separated names>]`
-- Envelope-covered symbols (x-mindful already analyzed — NOT re-run): `Depth grounding: x-mindful envelope [covered] symbols=[<comma-separated names>]`
-- Gated-out (not pinned / not indexed / stale / empty symbol set / Mode D or C): `Depth grounding: heuristic` — **no `symbols=` field** (nothing was graph-grounded; the heuristic line is intentionally unmeasurable for Task 6.4 and is skipped by its grep).
-
-The `symbols=[…]` field is **mandatory on every non-heuristic** `Depth grounding:` line. A symbol appearing in a `[direct]` line's `symbols=` list while also present in an envelope item is the C5 violation Task 6.4 detects.
+That's the entire routing surface. Depth scoring (Light / Standard / Heavy) and gitnexus-grounded impact routing are **removed** — they added complexity without proportional value. The optional x-mindful envelope consumption (Mode A handoff) remains intact: symbols named in envelope items are already analyzed, do NOT re-invoke `impact`.
 
 ## Available Tools
 
@@ -224,18 +186,16 @@ Cross-model review (plan or post-implementation) is delegated to **x-review**. D
 
 See `references/mode-guidance.md` for detailed per-mode instructions. Key rules:
 
-- **A/B: Plan Review is NON-NEGOTIABLE** for 3+ tasks or multi-module plans. Dispatch `Skill: x-skills:x-review <plan-path>` — x-review owns the multi-reviewer fan-out.
-- **A: Consume x-mindful envelope.** When the Mode A handoff carries a `<!-- x-mindful-envelope v1 -->` block, follow the consume-don't-re-run contract in § Depth Calibration → "Optional gitnexus grounding" (C5): symbols named in envelope items are already-analyzed; x-do MUST NOT re-invoke `impact` on them.
-- **A/B: Post-Implementation Review** is also mandatory (dispatch `Skill: x-skills:x-review` on the diff; x-review runs the full code-review fan-out). Separate from tsc/eslint verification.
-- **A/B: ralph for 3+ tasks** unless mechanical batch or surgical edit exception applies.
-- **C: Delegate to `/x-bugfix`**, then post-fix review.
-- **D: Direct execution**, still verify.
-- **E: Analyze visual**, then route to A/B/C.
-- **F: Delegate to `/refactor`**, then post-refactor review.
+- **A/B: Plan Review** — dispatch `Skill: x-skills:x-review <plan-path>` when plan has 3+ tasks or crosses modules. x-review owns the cross-model fan-out — single call, single envelope.
+- **A: Consume x-mindful envelope** when present. Symbols named in envelope items are already analyzed; do NOT re-invoke `impact` on them.
+- **A/B: Post-Implementation Review** mandatory before claiming done — dispatch `Skill: x-skills:x-review` on the diff.
+- **B: Brainstorming gate** — when no plan/spec ref provided, dispatch `superpowers:brainstorming` FIRST (creates `design.md` per project convention), then `superpowers:writing-plans`. Run `explore` in parallel to detect the convention. See `steps/step-01-gather.md`.
+- **C: Delegate to `/x-bugfix`** — uses `systematic-debugging` gate + `debugger` agent + TDD failing test before fix.
+- **D: Direct execution** via `morph-mcp edit_file`, still verify.
 
 ## Complexity Scaling
 
-See `references/delegation-and-scaling.md` for the full scaling table. Key: single-file → skip brainstorming; 5+ files → full pipeline; mechanical batch → direct execution with reduced review.
+The 3-axis Routing Signals above replace previous file-count and depth heuristics. `references/delegation-and-scaling.md` is retained for its agent fallback table and escalation rules — ignore any scaling guidance in it that contradicts the 3-axis model.
 
 ## Implementation Discipline (MANDATORY)
 
@@ -272,7 +232,7 @@ This skill references shared infrastructure in `../x-shared/`:
 - `workflow-chains.md` — cross-skill chaining
 - `context-envelope.md` — handoff context format
 
-External skills used: `x-research` (Mode B vague-requirements path + step-01-gather delegation), `x-review` (Modes A/B/C/F plan review + post-impl review delegation), `x-omo` (agent catalog), `x-bugfix` (Mode C), `refactor` (Mode F), `superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:verification-before-completion`, `superpowers:finishing-a-development-branch`, `superpowers:requesting-code-review`, `oh-my-claudecode:ralph`.
+External skills used: `x-research` (Mode B vague-requirements path + step-01-gather delegation), `x-review` (Modes A/B/C plan review + post-impl review delegation), `x-omo` (agent catalog), `x-bugfix` (Mode C), `superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:test-driven-development`, `superpowers:subagent-driven-development`, `superpowers:verification-before-completion`, `superpowers:finishing-a-development-branch`, `superpowers:requesting-code-review`, `oh-my-claudecode:ralph`, `oh-my-claudecode:ultrawork`.
 
 ## Gotchas
 

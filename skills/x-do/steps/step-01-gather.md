@@ -1,4 +1,4 @@
-# Step 1: Gather Requirements & Context
+# Step 1: Gather Context & Brainstorm Design
 
 **Progress: Step 1 of 4** — Next: Plan
 
@@ -11,26 +11,53 @@
 
 ## Goal
 
-Gather requirements analysis and codebase context before planning. **x-research owns the dispatch and synthesis** — this step delegates and consumes the envelope.
+Two outputs depending on mode:
 
-## When to Use This Step
+1. **Mode B (no plan/spec ref):** A user-approved `design.md` saved per the project's convention. Brainstorming is **mandatory** — per superpowers `brainstorming/SKILL.md:12-18`, every project (including those that feel simple) runs through this gate. Hidden assumptions are the #1 source of wasted work.
+2. **Mode A or B with research signals:** A context envelope from `x-research` covering hidden requirements, conventions, related code.
 
-- Requirements are vague, open-ended, or cross 3+ modules
-- User provides only a rough idea without clear scope
-- You need both "what should we build?" and "what exists already?"
+Most Mode B work produces BOTH (design.md + research envelope when warranted).
 
 ## When to Skip
 
-- **x-research handoff already exists in this session** → requirements already collected, go to `step-02-plan.md`
-- Requirements are already clear and scoped → go to `step-02-plan.md`
-- User already brainstormed in a prior session → go to `step-02-plan.md`
-- Single-task work → skip the pipeline entirely, use `--model codex` or direct execution
+- Mode A (user already provided a plan/spec ref that exists on disk) → skip to `step-02-plan.md` if plan needs refinement, or `step-03-review.md` if plan is ready
+- Mode D (trivial single-file change ≤ 10 lines) → skip the entire pipeline
+- Brainstorm already completed in this session OR x-research handoff already in session → skip to `step-02-plan.md`
+- User explicitly says "I've already designed this" / "skip brainstorm" → skip the brainstorming sub-step (research sub-step may still fire)
 
 ## Execution
 
-### 1. Delegate to x-research (Pre-planning lane)
+### 1. Fire parallel detection (single message, multiple tools)
 
-Dispatch via the Skill tool — x-research runs the canonical Pre-planning fan-out (`OMO oracle ∥ morph codebase_search ∥ OMO explore`) per `../x-research/references/prompt-templates.md` § Type F (also indexed in `../x-research/SKILL.md` Detection table row `Pre-planning`) and synthesizes the three lanes into a single envelope:
+Before deciding what to dispatch, fan out two independent reads in parallel:
+
+```
+Agent (subagent_type=Explore, parallel):
+  description: "Detect project doc convention"
+  prompt: "Find where this project stores design / plan / spec docs. Check:
+    - Existing files under docs/**/*.md, specs/**/*.md, plans/**/*.md
+    - docs/superpowers/specs/ or docs/superpowers/plans/ paths
+    - References in README / CONTRIBUTING / AGENTS.md / CLAUDE.md to spec location
+    Return one absolute directory path to save new design.md under.
+    If no convention exists, default to: docs/superpowers/specs/.
+    Also return the plan-doc directory (often docs/superpowers/plans/).
+    Report in under 100 words."
+```
+
+Pin the returned directories as `DESIGN_DIR` and `PLAN_DIR` for the rest of the task.
+
+### 2. Research gate (optional — only when warranted)
+
+Dispatch `Skill: x-skills:x-research` **only** when ANY of these hold:
+
+- Unfamiliar library, framework, API, or external system involved
+- "How does X work in our codebase?" must be answered before building
+- User explicitly asks for research / investigation / understanding
+- Requirements vague AND scope crosses 3+ modules
+
+Otherwise SKIP — research-for-research's-sake adds latency without value. x-research owns its own multi-lane fan-out (`oracle ∥ morph codebase_search ∥ OMO explore`) per `../x-research/references/prompt-templates.md` § Type F. Do NOT re-classify here.
+
+When dispatched:
 
 ```
 Skill: x-skills:x-research
@@ -40,32 +67,50 @@ args: Pre-planning consult for: {{user's request}}.
       existing related code, and conventions to follow.
 ```
 
-x-research will:
-1. Run `oracle` (strategic consult) — surfaces hidden requirements, scope risks, AI-slop patterns
-2. Run `morph codebase_search` — semantic local code search for related implementations
-3. Run `OMO explore` — pattern/path discovery via grep/glob/ast_grep for conventions and prior implementations
-4. Synthesize into a single context envelope (per `../x-research/references/synthesis-rules.md`)
+### 3. Brainstorming (Mode B only — MANDATORY when no plan/spec ref)
 
-**Why delegate instead of dispatching inline:** Reviewer + research fan-out lives in canonical owner skills (x-review, x-research). x-do is a router — it does NOT redefine multi-agent dispatch. Inline duplication has historically drifted away from the canonical lane shape.
+When mode is B and the user did NOT provide a plan/spec path:
 
-### 2. Consume x-research's envelope
+```
+Skill: superpowers:brainstorming
+args: {{user's idea}}.
+      Save the design doc to: {{DESIGN_DIR}}/YYYY-MM-DD-<slug>-design.md
+      Convention detected from project layout in step 1.
+```
 
-Read the returned synthesis. Extract for downstream steps:
-- **Requirements:** what oracle identified (scope, risks, hidden requirements)
-- **Context:** what morph + explore found (related code, conventions, patterns to follow)
-- **Constraints:** anything that limits the approach
-- **Commit recompose hint** (optional, router-only): if the user mentioned a preference for how to group commits at the end (e.g., "keep granular commits", "squash by feature", "one commit per domain"), persist as `commit_recompose_hint` in run state. Allowed values: `"preserve"` (skip recompose) or `"axis:<topic|domain|feature|item>"` (force axis). Step-04 reads this before dispatching the `commit` skill.
+`brainstorming` produces a design.md following its 9-step workflow (explore → clarifying questions → 2-3 approaches → design doc → spec self-review → user reviews spec). The `superpowers:writing-plans` step in `step-02-plan.md` will be invoked by `brainstorming` automatically at its terminal step, OR you can chain it yourself in step-02.
 
-### 3. Present to user for validation (router-level gate)
+**Why mandatory:** superpowers `brainstorming/SKILL.md:12-18` Iron Law — "Do NOT invoke any implementation skill...until you have presented a design and the user has approved it." The "too simple to design" exception is explicitly rejected.
 
-> Here's what x-research found. Does this match your intent? Anything to add or change before I create a plan?
+### 4. Capture commit-recompose hint (optional, router-only)
 
-**Wait for explicit confirmation** before proceeding to `step-02-plan.md`.
+If the user mentioned a commit-grouping preference (e.g., "keep granular commits", "squash by feature", "one commit per domain"), persist as `commit_recompose_hint` in run state. Allowed values: `"preserve"` (skip recompose) or `"axis:<topic|domain|feature|item>"`. Step-04 reads this before dispatching the `commit` skill.
+
+### 5. User validation checkpoint (AskUserQuestion)
+
+After all parallel dispatches return, surface ONE question:
+
+```
+AskUserQuestion:
+  question: "Design + context match your intent? Ready to write the plan?"
+  options:
+    - label: "Proceed to plan-writing"
+      description: "Design.md and research findings (if any) look good — go to step-02-plan.md"
+    - label: "Revise the design"
+      description: "Re-run brainstorming with adjustments"
+    - label: "Add more context"
+      description: "Run x-research with a more specific question first"
+```
+
+**Wait for explicit confirmation** before proceeding.
 
 ## Output
 
-A validated requirements + context summary (sourced from x-research's envelope) ready to feed into `step-02-plan.md`.
+- Mode B: `design.md` saved at `${DESIGN_DIR}/YYYY-MM-DD-<slug>-design.md`
+- Optional: x-research context envelope
+- Pinned variables: `DESIGN_DIR`, `PLAN_DIR`, optional `commit_recompose_hint`
+- User confirmation to proceed
 
 ## Next Step
 
-Proceed to `step-02-plan.md` with the validated summary.
+Proceed to `step-02-plan.md` with the design.md path and pinned directories.
