@@ -87,3 +87,15 @@
 27. **bash 3.2 compatibility.** macOS ships bash 3.2 — no `declare -A`.
     All KB scripts compute streaks / fail-streaks via jq instead of
     associative arrays so they run on stock macOS.
+
+### Regression False-Positive on Single-Run History
+
+`kb-writeback.sh --check-regression <slug>` requires `history[-2].pass AND history[-1].fail|error`. A signature with only one entry returns `false` — it cannot have regressed yet. But a flaky case whose history is `..., pass, pass, fail` correctly emits `regression: true` even though the underlying issue might be transient. Cross-reference the flaky-rate gate (`tests.flakyRate`) before treating a single regression as actionable; if the same signature also has a high `flakyRate`, the regression is likely a flake and not a true bug. Do NOT auto-page on regression alone.
+
+### Gate Threshold Drift
+
+Quality-gate thresholds are static in `TEST_PLAN.yml` or `profile.json.gates.defaults`. When upstream services tighten their SLOs (p95 drops from 500ms to 300ms) or the team adds new auth-required endpoints, the local gates can drift out of alignment. `aggregate-results.sh` records every gate evaluation with its bound and measured value in `gate_results[]`, but it does NOT alert on a string of `warn`s that suggest the threshold is too loose. Audit `gate_results` periodically; bump thresholds when the team agrees the new floor is the real floor, not when one run happens to be warmer.
+
+### Gap-Analyzer Clock Skew
+
+`scripts/gap-analyze.sh` computes `staleness_days` against `date +%s` on the host running the analyzer. If the host's clock is significantly skewed (CI runner with wrong NTP, a developer machine asleep mid-run), the `stale` category can spike or collapse. The script logs `gap-analyze: skipping <sig> — unparseable timestamp <ts>` for obviously bad timestamps but does NOT detect "the host is off by 14 days." Run `date -u` before trusting a large stale set; if the host clock is suspect, set `--staleness-days 99999` to suppress staleness while you investigate, never to mark stale signatures as fresh.

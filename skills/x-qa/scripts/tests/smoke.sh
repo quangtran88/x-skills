@@ -71,5 +71,7 @@ echo "→ running kb smoke"
 bash "$SKILL_DIR/scripts/tests/kb-smoke.sh"
 echo "→ running writeback-history smoke"
 bash "$SKILL_DIR/scripts/tests/writeback-history.sh"
+echo "→ running gap-analyze smoke"
+bash "$SKILL_DIR/scripts/tests/gap-analyze.sh"
 
 echo "✓ x-qa smoke passed"
