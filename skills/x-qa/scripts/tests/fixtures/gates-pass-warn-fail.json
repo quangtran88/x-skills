@@ -1,0 +1,9 @@
+{
+  "metrics": { "tests": { "passRate": 100, "flakyRate": 7 }, "performance": { "p95_ms": 400 }, "kb": { "regressions": 0 } },
+  "gates": [
+    { "metric": "tests.passRate", "threshold": 100, "blocking": true },
+    { "metric": "tests.flakyRate", "max": 5, "blocking": false },
+    { "metric": "performance.p95_ms", "max": 500, "blocking": true },
+    { "metric": "kb.regressions", "max": 0, "blocking": true }
+  ]
+}

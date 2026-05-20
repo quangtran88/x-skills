@@ -88,17 +88,49 @@ flaky=$(jq '[.[] | select(.verdict == "flaky-recovered")] | length' <<<"$results
 flaky_rate=$(awk "BEGIN { if ($total == 0) print \"0.0000\"; else printf \"%.4f\", $flaky / $total }")
 duration_s=$(awk "BEGIN { printf \"%.2f\", $(date +%s) - $run_started_epoch }")
 
-# Verdict logic
-if [[ $failed -gt 0 ]]; then
-  verdict="fail"
-elif [[ $flaky -gt 0 ]]; then
-  if (( $(awk "BEGIN { print ($flaky_rate > $ALLOW_FLAKY_RATE) }") )); then
-    verdict="fail"
+# --- Quality gates evaluation (replaces legacy flaky-rate verdict) ----------
+passRate=$(awk "BEGIN { if ($total == 0) print 0; else printf \"%.2f\", $passed * 100 / $total }")
+flakyRatePct=$(awk "BEGIN { if ($total == 0) print 0; else printf \"%.2f\", $flaky * 100 / $total }")
+
+metrics_json=$(jq -n \
+  --argjson pr "$passRate" --argjson fr "$flakyRatePct" \
+  '{tests: {passRate: $pr, flakyRate: $fr}}')
+
+# Pull gates: plan first, then profile defaults, then empty.
+gates_json='[]'
+plan_gates=$(yq eval -o=json '.gates // []' "$PLAN" 2>/dev/null || echo '[]')
+if [[ "$(jq 'length' <<<"$plan_gates")" -gt 0 ]]; then
+  gates_json="$plan_gates"
+else
+  PROFILE_PATH="$(git rev-parse --show-toplevel 2>/dev/null)/.x-skills/x-qa/profile.json"
+  if [[ -f "$PROFILE_PATH" ]]; then
+    prof_gates=$(jq '.gates.defaults // []' "$PROFILE_PATH" 2>/dev/null || echo '[]')
+    if [[ "$(jq 'length' <<<"$prof_gates")" -gt 0 ]]; then
+      gates_json="$prof_gates"
+    fi
+  fi
+fi
+
+if [[ "$(jq 'length' <<<"$gates_json")" -gt 0 ]]; then
+  verdict_input=$(jq -n --argjson m "$metrics_json" --argjson g "$gates_json" '{metrics: $m, gates: $g}')
+  verdict_out=$(echo "$verdict_input" | "$SCRIPT_DIR/lib/verdict.sh")
+  verdict=$(jq -r '.verdict' <<<"$verdict_out")
+  gate_results=$(jq -c '.gate_results' <<<"$verdict_out")
+  # Compute verdict_reason
+  if [[ "$verdict" == "fail" ]]; then
+    verdict_reason=$(jq -r '.gate_results | map(select(.status == "fail"))[0] | "\(.gate.metric) \(.value) (gate \(.gate))"' <<<"$verdict_out")
+  elif [[ "$verdict" == "warn" ]]; then
+    verdict_reason=$(jq -r '.gate_results | map(select(.status == "warn"))[0] | "\(.gate.metric) \(.value) (gate \(.gate))"' <<<"$verdict_out")
   else
-    verdict="pass"
+    verdict_reason="all gates passed"
   fi
 else
   verdict="pass"
+  if [[ "$failed" -gt 0 ]]; then
+    verdict="fail"
+  fi
+  verdict_reason="no gates declared"
+  gate_results='[]'
 fi
 
 # Build report — emit cases via jq -> YAML so quoting is safe
@@ -161,6 +193,17 @@ cases_yaml=$(jq -r '.[] |
   jq -r '.[] | select(.verdict == "fail") | "### \(.id)\n\nError: \(.error)\n\n"' <<<"$results"
 } > "$report_path"
 
+if [[ "$(jq 'length' <<<"$gate_results")" -gt 0 ]]; then
+  {
+    echo
+    echo "## Quality Gates"
+    echo
+    echo "| Metric | Bound | Measured | Status |"
+    echo "|---|---|---|---|"
+    jq -r '.[] | "| `\(.gate.metric)` | \(.gate.threshold // .gate.max // "—") | \(.value // "—") | \(.status) |"' <<<"$gate_results"
+  } >> "$report_path"
+fi
+
 # KB write-back + auto-promote (skipped on --no-kb).
 kb_promoted=0
 kb_status="disabled"
@@ -221,6 +264,7 @@ fi
 # Emit envelope
 echo "✓ x-qa run complete"
 echo "QA_VERDICT=$verdict"
+echo "QA_VERDICT_REASON=$verdict_reason"
 echo "QA_TOTAL=$total"
 echo "QA_PASSED=$passed"
 echo "QA_FAILED=$failed"

@@ -71,7 +71,8 @@ The bootstrap step pins the runner pair into env vars `X_QA_SIMPLE_RUNNER` and `
 Success:
 ```
 ✓ x-qa run complete
-QA_VERDICT=pass|fail
+QA_VERDICT=pass|warn|fail
+QA_VERDICT_REASON=<one-line>   # first blocking failure, or first warning, or "all gates passed"
 QA_TOTAL=<n>
 QA_PASSED=<n>
 QA_FAILED=<n>
@@ -88,6 +89,8 @@ KB_GENERATED=<n>       # cases minted this run
 KB_PROMOTED=<n>        # cases auto-promoted to corpus this run
 KB_PROMOTE_STATUS=ok|disabled|error
 ```
+
+> `QA_VERDICT` is ternary as of v2. `warn` = non-blocking gates failed, no blocking ones did. Consumers branching on `pass|fail` should treat `warn` as `pass` for back-compat OR opt into ternary semantics via `QA_VERDICT_REASON`.
 
 Failure:
 ```

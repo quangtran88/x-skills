@@ -42,6 +42,23 @@ After front-matter, render:
 4. Flaky cases (pass-on-retry) — informational.
 5. Per-category breakdown.
 
+## Quality Gates
+
+When the run evaluated quality gates (plan-level `gates:` or profile defaults), `QA_REPORT.md` includes a `## Quality Gates` section listing each gate with its measured value and status:
+
+```markdown
+## Quality Gates
+
+| Metric | Bound | Measured | Status |
+|---|---|---|---|
+| `tests.passRate` | ≥ 100 | 100 | ✅ pass |
+| `tests.flakyRate` | ≤ 5 | 7 | ⚠ warn (non-blocking) |
+| `performance.p95_ms` | ≤ 500 | 400 | ✅ pass |
+| `security.critical` | ≤ 0 | — | ⚠ unmeasured (blocking) |
+```
+
+`unmeasured` rows are flagged for human attention but do NOT flip the verdict — see `references/quality-gates.md § Missing metric handling`.
+
 ## Example skeleton
 
 ```markdown
