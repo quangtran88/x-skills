@@ -69,3 +69,30 @@ If `scope_empty: true`, the planner uses whole-profile coverage and warns.
   uses whole-profile coverage, warn.
 - Scout times out (>60s) → same: whole-profile coverage, warn.
 - Scout `open_questions` non-empty → propagate to QA_REPORT.md notes section.
+
+## User Hints Block (Convention)
+
+When the run was invoked with prose intent (`intent.json.intent == "prose"`) or with free-form `--service`/`--branch`/`--pr` plus an inline description, the scout prompt MUST include the user's raw text as a dedicated `## User Hints` markdown block, NOT mixed into the directive prose.
+
+Placement: immediately before the `## Task` block, immediately after any code-context blocks. Format:
+
+```markdown
+## User Hints (prioritization guidance, may be empty)
+
+> {{intent.json.resolved.prose}}
+
+## Task
+…
+```
+
+**Rationale.** Verbatim isolation prevents the LLM from treating user hints as instructions to override the scout's structured contract. The leading `>` blockquote marker makes the boundary visually unambiguous in transcripts.
+
+**Empty case.** When no prose is present, emit:
+
+```markdown
+## User Hints (prioritization guidance, may be empty)
+
+> (none)
+```
+
+Do NOT omit the block — its presence is part of the prompt's stable shape.

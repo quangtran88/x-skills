@@ -118,6 +118,33 @@ folds these counters into the run envelope.
 
 See `skills/x-qa/templates/test-plan.example.yml`.
 
+## User Hints Block (Convention)
+
+When the run was invoked with prose intent (`intent.json.intent == "prose"`) or with free-form `--service`/`--branch`/`--pr` plus an inline description, the planner prompt MUST include the user's raw text as a dedicated `## User Hints` markdown block, NOT mixed into the directive prose.
+
+Placement: immediately before the `## Task` block, immediately after any code-context blocks. Format:
+
+```markdown
+## User Hints (prioritization guidance, may be empty)
+
+> {{intent.json.resolved.prose}}
+
+## Task
+…
+```
+
+**Rationale.** Verbatim isolation prevents the LLM from treating user hints as instructions to override the planner's structured contract. The leading `>` blockquote marker makes the boundary visually unambiguous in transcripts.
+
+**Empty case.** When no prose is present, emit:
+
+```markdown
+## User Hints (prioritization guidance, may be empty)
+
+> (none)
+```
+
+Do NOT omit the block — its presence is part of the prompt's stable shape.
+
 ## Gates
 
 Optional plan-level quality gates. Schema and evaluation rules in `references/quality-gates.md`. When the plan declares a `gates:` block, it **fully replaces** profile defaults — no merging.
@@ -127,3 +154,22 @@ gates:
   - { metric: tests.passRate, threshold: 100, blocking: true }
   - { metric: tests.flakyRate, max: 5, blocking: false }
 ```
+
+## Optional Step Mode: `ai_action` / `ai_assertion` (forward-compat, deferred)
+
+A TEST_PLAN step MAY declare `mode: ai_fallback` to express "this step is best satisfied by an LLM-driven action when literal selectors/paths fail." Two action shapes are reserved:
+
+```yaml
+steps:
+  - mode: ai_fallback
+    type: ai_action
+    goal: "dismiss the cookie banner if present"
+    optional: true              # true → skip step if AI declines (default false)
+  - mode: ai_fallback
+    type: ai_assertion
+    goal: "the order confirmation page shows a green checkmark"
+```
+
+**Status.** Schema-only in v1. The dispatcher rejects `mode: ai_fallback` steps with a clear error message pointing to this section, until the browser/selector phase activates the tier. This reservation prevents future schema collisions.
+
+**Routing once wired.** `mode: ai_fallback` steps force the complex (claude) runner per `classification-rules.md` — the cheap (gemini) runner skips them. Runner consumes the step under the `FallbackResponse` contract from `fallback-contract.md`.

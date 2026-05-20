@@ -30,3 +30,9 @@ With `--allow-flaky-rate 0.10`: up to 10% of cases may be flaky-recovered withou
 ## Persistent Flake List
 
 After a run with flaky cases, write `<run-dir>/flaky.txt` listing case IDs. Future runs (same plan) start with those flagged for visibility. Eventually feed into a stability dashboard (out of v1 scope).
+
+## Tier 2 (forward-compat, deferred)
+
+A vision-grounded retry tier is specified in `references/fallback-contract.md` but **not yet wired** in v1 (HTTP-only entry types have insufficient signals to ground it). The contract defines the `FallbackResponse` shape, call budget, and decision states. Future browser/selector entry types will activate the tier — runner templates + aggregator are designed to accept `FallbackResponse` already so integration is additive.
+
+For HTTP-only v1, retry strategy remains: blind `--retry-flaky <N>` with `--allow-flaky-rate <pct>` gate, surfaced in the KB ledger and (per Phase 2) as a `tests.flakyRate` gate metric.

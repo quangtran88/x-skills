@@ -30,3 +30,9 @@ Plan author can set `complexity: simple` or `complexity: complex` per-case to ov
 ## Classifier Output Bias
 
 When ambiguous, prefer `complex`. Cost of misclassifying simple → complex: pay claude price for a gemini-suitable case (~10x cost). Cost of misclassifying complex → simple: gemini fails the case, retry escalates to flaky, eventual fail. Latter is worse (false negatives).
+
+### `mode: ai_fallback` Steps
+
+Any case containing one or more steps with `mode: ai_fallback` is classified `complex` regardless of other signals. The cheap runner cannot satisfy the `FallbackResponse` contract (see `references/fallback-contract.md`). When the dispatcher encounters such a step in v1, it rejects the plan with:
+
+> `plan rejected: step uses 'mode: ai_fallback' but tier 2 fallback is not yet wired (forward-compat schema only). Remove the step or wait for browser entry type support.`
