@@ -4,35 +4,36 @@ Goal: render the final decision envelope, present a next-step menu, and (only on
 
 ## Envelope (canonical form)
 
-Render exactly this Markdown block. x-do Mode A and any other consumer reads `x-mindful-envelope v1`.
+Render exactly this Markdown block. x-do Mode A and any other consumer reads `x-mindful-envelope v1` — that marker is preserved for backward compatibility. The taxonomy upgrade is signaled by the `taxonomy: v2` line and the new item id prefixes (`TRADEOFF` / `ASSUMPTION` / `BLIND-SPOT` / `SHAPE` / `FUTURE-DEBT`). Section headers are unchanged so existing consumers keep working.
 
 ```markdown
 <!-- x-mindful-envelope v1 -->
+<!-- taxonomy: v2 (TRADEOFF / ASSUMPTION / BLIND-SPOT / SHAPE / FUTURE-DEBT) -->
 **Source:** <path-or-paste-id>
 **Slug:** <slug-from-step-01>
 **Reviewed:** <ISO date> · items=<N> (C=<c> / M=<m> / R=<r> / S=<s> / P=<p>)
 
 ### Confirmed (proceed as written)
-- [<id>] <title> — severity: <SEV>
+- [<id>] <architect-level title> — severity: <SEV>
 
 ### Modified (revise plan before executing)
-- [<id>] <title>
+- [<id>] <architect-level title>
   - **Original plan:** <plan quote>
   - **User direction:** <verbatim user text>
 
 ### Rejected (drop from plan)
-- [<id>] <title>
+- [<id>] <architect-level title>
   - **Reason:** <user reason or "unspecified">
 
 ### Skipped (revisit later)
-- [<id>] <title>
+- [<id>] <architect-level title>
 
 ### Pending (user quit before deciding)
-- [<id>] <title>
+- [<id>] <architect-level title>
 <!-- /x-mindful-envelope -->
 ```
 
-Section headers must match exactly (consumers grep for them). Empty sections may be omitted.
+Section headers must match exactly (consumers grep for them). Empty sections may be omitted. Item titles are architect-level — no code identifiers — same hard rule as extraction.
 
 ## Validity Checks
 

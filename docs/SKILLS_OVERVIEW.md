@@ -19,7 +19,7 @@ Every skill in x-skills follows the **router principle**: it classifies, it rout
 | **x-research** | *(not declared)* | Universal research router — classifies questions by information-source signal and routes to optimal tools/agents |
 | **x-review** | `reviewer` | Code/plan/PR review orchestrator — cross-model review with Claude + GPT perspectives, structured verdicts |
 | **x-bugfix** | *(not declared)* | Structured debugging — routes through investigation, hypothesis testing, and verified fix with evidence collection |
-| **x-mindful** | *(not declared)* | Pre-implementation impact gate — extracts ARCH/BREAK/SEC/PERF items from a plan and walks the user through them before execution |
+| **x-mindful** | *(not declared)* | Pre-implementation architect-review gate — walks the user through the tradeoffs AI silently picked, assumptions baked in, blind spots, over/under-engineering, and future-debt at architect level (never code-level) |
 | **x-design** | *(not declared)* | Visual design system integration — resolves brand references to curated DESIGN.md files |
 | **x-api-pentest** | *(not declared)* | API security testing — OWASP API Top 10 testing with schemathesis, nuclei, sqlmap, spectral |
 | **x-qa** | *(not declared)* | Profile-driven E2E QA — scans the project once, persists a launch/test profile, fans tests out across cheap/strong models against an isolated stack |

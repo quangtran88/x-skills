@@ -11,7 +11,7 @@
 | **x-review** | plugin | Code review, plan review, PR review (gitnexus-aware, optional) | Best with: opencode, OMC, superpowers |
 | **x-verify** | plugin | Run the completion cascade ("am I done?") | Standalone |
 | **x-bugfix** | plugin | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
-| **x-mindful** | plugin | Pre-implementation impact gate — extracts ARCH/BREAK/SEC/PERF items from a plan, ranks by severity × blast-radius × reversibility, walks the user one item at a time with confirm/modify/reject/skip menu. Auto-invoked by x-do Mode A on high-risk plans. | Standalone; better with: opencode, x-gemini |
+| **x-mindful** | plugin | Pre-implementation architect-review gate — extracts TRADEOFF / ASSUMPTION / BLIND-SPOT / SHAPE / FUTURE-DEBT items from an AI-generated plan, hard-blocks code-level details, ranks by severity × surface × reversibility with a senior-weigh-in filter, opens with a "Plan at Architect Level" 5-bullet framing, then walks the user one item at a time with confirm/modify/reject/skip menu. Auto-invoked by x-do Mode A on high-risk plans. | Standalone; better with: opencode, x-gemini |
 | **x-design** | plugin | Apply visual design systems | Standalone |
 | **x-api-pentest** | plugin | API security testing (OWASP Top 10) | External security CLIs |
 | **x-omo** | plugin | OpenCode multi-model bridge | opencode CLI |

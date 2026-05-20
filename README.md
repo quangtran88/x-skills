@@ -36,7 +36,7 @@ The plugin's SessionStart hook detects stale capabilities and reminds you, but y
 | **x-review** | `/x-skills:x-review` | Code/plan/PR review orchestrator — cross-model review with Claude + GPT perspectives, structured verdicts |
 | **x-verify** | `/x-skills:x-verify` | Completion-cascade dispatcher — answers "am I done?" for long-running skills with mandatory fallback to prevent silent success claims |
 | **x-bugfix** | `/x-skills:x-bugfix` | Structured debugging — routes through investigation, hypothesis testing, and verified fix with evidence collection |
-| **x-mindful** | `/x-skills:x-mindful` | Pre-implementation impact gate — extracts ARCH/BREAK/SEC/PERF items from a plan and walks the user through them one at a time before execution |
+| **x-mindful** | `/x-skills:x-mindful` | Pre-implementation architect-review gate — walks the user through the tradeoffs AI silently picked, assumptions it baked in, blind spots, over/under-engineering, and future-debt at architect level (never code-level), one item at a time |
 | **x-design** | `/x-skills:x-design` | Visual design system integration — resolves brand references (Linear-like, Stripe-like) to curated DESIGN.md files from 58 indexed sites |
 | **x-api-pentest** | `/x-skills:x-api-pentest` | API security testing — OWASP API Top 10 testing with schemathesis, nuclei, sqlmap, spectral |
 | **x-qa** | `/x-skills:x-qa` | Profile-driven E2E QA — scans the project once, persists a launch/test profile, fans tests out across cheap/strong models against an isolated stack |
