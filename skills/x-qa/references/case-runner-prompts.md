@@ -87,3 +87,42 @@ Agent(
 ## Retries (flaky-handling)
 
 If a case verdict is `fail` AND the case is marked `--retry-flaky` eligible, the orchestrator re-runs the SAME prompt up to N times in foreground. If any retry passes, set verdict to `flaky-recovered`.
+
+## Precondition Chaining
+
+If the case has a non-null `precondition_case_id`, the runner MUST execute the precondition's steps first.
+
+### Template (env-var-driven, both simple and complex runners)
+
+The dispatcher pre-resolves the precondition chain into an ordered list and exposes it as `$X_QA_PRECONDITION_STEPS` (JSON array of step objects). The runner reads this env var; if non-empty, it executes each step before the current case's body and propagates context (cookies, captured tokens, server-state references) into the body via `$X_QA_CONTEXT_CARRY`.
+
+```
+You are executing test case {{case.id}}.
+
+{{#if X_QA_PRECONDITION_STEPS}}
+## Preconditions (must succeed before the body)
+
+The following steps establish required state. Run them in order. On failure,
+abort the entire case with reason "precondition <step.id> failed: <details>".
+
+{{#each X_QA_PRECONDITION_STEPS}}
+- {{this.method}} {{this.path}}: expect {{this.expect.status}}
+{{/each}}
+{{/if}}
+
+## Body
+
+{{#each case.steps}}
+- {{this.method}} {{this.path}}: expect {{this.expect.status}}
+{{/each}}
+
+Return JSON: { "passed": <bool>, "duration_s": <float>, "failure_reason": <str|null>, ... }
+```
+
+### Dispatcher Responsibility
+
+The dispatcher resolves the full chain by walking `precondition_case_id` pointers up to a depth cap of 4 (deeper chains rejected at plan time). The resolved chain is emitted into `X_QA_PRECONDITION_STEPS` as a flattened JSON array — the runner does NOT walk pointers itself.
+
+### `auth_case_id` Default Wiring
+
+If `profile.json.auth_case_id` is non-null AND the current case has `precondition_case_id: null` (or unset) AND the case is not in `profile.public_endpoints`, the dispatcher injects `auth_case_id` as the precondition. A case may opt out by setting `precondition_case_id: ""` (explicit empty) or by tagging the case `public: true`.

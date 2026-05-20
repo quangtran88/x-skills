@@ -99,3 +99,15 @@ Quality-gate thresholds are static in `TEST_PLAN.yml` or `profile.json.gates.def
 ### Gap-Analyzer Clock Skew
 
 `scripts/gap-analyze.sh` computes `staleness_days` against `date +%s` on the host running the analyzer. If the host's clock is significantly skewed (CI runner with wrong NTP, a developer machine asleep mid-run), the `stale` category can spike or collapse. The script logs `gap-analyze: skipping <sig> — unparseable timestamp <ts>` for obviously bad timestamps but does NOT detect "the host is off by 14 days." Run `date -u` before trusting a large stale set; if the host clock is suspect, set `--staleness-days 99999` to suppress staleness while you investigate, never to mark stale signatures as fresh.
+
+### Precondition Cycle Detected at Plan Time
+
+`doctor.sh` shells out to `scripts/run/resolve-preconditions.sh` for every case in `kb/index.json` and rejects the KB if any resolution exits non-zero with `precondition cycle detected: …`. If you see `plan rejected: precondition cycle detected: tc-a → tc-b → tc-a`, run `scripts/kb-prune.sh --orphans` to surface stale entries, then manually break the cycle by setting one case's `precondition_case_id` to `null` or pointing it at a fresh setup case.
+
+### Auth Case Staleness
+
+`auth_case_id` points at a single case that ages independently. If the login endpoint changes and the case is not updated, EVERY authenticated case fails with `precondition tc-login-* failed: ...`. The gap-analyzer flags the auth case's regression first; fix it before re-running feature cases.
+
+### Forward-Compat Fallback Drift
+
+`references/fallback-contract.md` defines `FallbackResponse` NOW for a tier that wires LATER. If the wiring lands and the contract has drifted (new field added without versioning, types changed), runner outputs will silently miscompile. Bump the schema header from `fallback.v0` to `fallback.v1` BEFORE the first wiring PR, and reject runner outputs whose top-level keys don't match.

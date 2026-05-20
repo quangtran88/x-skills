@@ -42,6 +42,7 @@ Authoritative manifest. Refused on `schema != 1`.
       "endpoint": "POST /api/users/me/avatar",
       "category": "happy",
       "coverage_signature": "POST /api/users/me/avatar :: happy-jpeg-upload",  // NEW
+      "precondition_case_id": "tc-login-bearer",
       "promoted_at": "2026-04-30T12:00:00Z",
       "promoted_from_run": "2026-04-30-1142-9f0c",
       "green_streak": 7,
@@ -128,6 +129,31 @@ teardown: ""
 timeout_ms: 5000
 tags: [upload, multipart]
 ```
+
+### `precondition_case_id` (string, optional)
+
+The ID of another case in `kb/cases/` whose steps MUST execute before this case's body. Composes flows from atomic cases without duplicating setup. Most common use: chaining a login/auth case before any authenticated request.
+
+```yaml
+# kb/cases/tc-avatar-happy-jpeg.yaml
+id: tc-avatar-happy-jpeg
+endpoint: POST /api/users/me/avatar
+category: happy
+coverage_signature: "POST /api/users/me/avatar :: happy-jpeg-upload"
+precondition_case_id: tc-login-bearer   # NEW
+steps: [ ... ]
+```
+
+**Resolution rules.**
+1. `precondition_case_id` MUST refer to an existing case in `kb/cases/` (validated by `doctor.sh`).
+2. Preconditions form a DAG. Cycles are a fatal `doctor.sh` error.
+3. The runner executes the precondition's steps first, then the current case's `steps`. Precondition failures fail the current case with `failure_reason: "precondition <id> failed: <reason>"` — NOT retried as the current case's flake.
+4. Side effects from preconditions (cookies, tokens, server state) MUST be propagated by the runner via shared context per `case-runner-prompts.md`.
+
+**Why not inline the setup steps?** Three reasons:
+- Cases mutate; centralizing login keeps fan-out small.
+- KB ledger tracks the precondition's pass/fail separately, surfacing auth-flow regressions independently.
+- The cheap runner can replay a known-green precondition without re-evaluating it.
 
 **Promotion rule** (full detail in `kb-curation.md`):
 

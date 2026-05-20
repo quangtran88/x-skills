@@ -97,3 +97,20 @@ The `fixtures` block itself is optional (top-level). When present, `reset_strate
 ## Examples
 
 See `skills/x-qa/templates/profile.example.json` (full) and `profile.minimal.json` (http-only starter).
+
+### `auth_case_id` (string | null)
+
+The case ID of the canonical login/authentication flow for the service under test. When set, the planner attaches this case as a default `precondition_case_id` for every case whose `tags` include `requires-auth` (or whose `endpoint` is not in `profile.public_endpoints`).
+
+```json
+{
+  "schema": 1,
+  "auth_case_id": "tc-login-bearer-default-admin",
+  "public_endpoints": ["GET /health", "GET /api/version"],
+  ...
+}
+```
+
+**Set during `init` interview** when the scanner detects an auth endpoint. `null` = no auth required, or auth handled externally (service mesh).
+
+**Override.** A case may opt out by setting `precondition_case_id: ""`. A plan-level override is possible via `--no-auth`.

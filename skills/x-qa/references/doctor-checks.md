@@ -31,6 +31,10 @@
 13. If `launch.kind == npm-script`: package.json must contain the named script (skipped under `--template-mode`)
 14. If `launch.command` references docker compose: a compose file must exist in `working_dir` (skipped under `--template-mode`)
 
+## KB integrity
+
+15. **Precondition cycle check.** Build a directed graph of `precondition_case_id` edges across all cases in `kb/index.json`. Refuse if the graph contains a cycle (Tarjan SCC). Refuse if any `precondition_case_id` points at a missing case.
+
 ## Reporting
 
 Output format:

@@ -84,3 +84,14 @@ Accept all detected defaults. Set `auto_managed: true` and `verified: false` for
 ## Profile-from-import (`--profile-from <path>`)
 
 Read pre-written profile YAML/JSON, validate against schema, copy to `.x-skills/x-qa/profile.json`. Skip interview.
+
+### Step N: Auth Case Detection
+
+If the scanner found a login/auth endpoint, prompt:
+
+> Detected potential auth endpoint: `POST /api/auth/login`. Should I generate a login case and pin it as the default authentication precondition?
+> [Y] Generate `tc-login-bearer-default` and set `auth_case_id`
+> [s] Skip — no auth, or auth handled differently
+> [c] Use an existing case ID I'll provide
+
+On `[Y]`: emit a stub `kb/cases/tc-login-bearer-default.yaml` with the detected endpoint and a TODO for the credentials source. Set `profile.json.auth_case_id`.

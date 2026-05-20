@@ -1,0 +1,11 @@
+id: tc-feature-x
+endpoint: POST /api/feature/x
+category: happy
+coverage_signature: "POST /api/feature/x :: happy"
+precondition_case_id: tc-login-bearer
+steps:
+  - method: POST
+    path: /api/feature/x
+    headers: { Authorization: "Bearer {{context.bearer_token}}" }
+    body: { ok: true }
+    expect: { status: 200 }

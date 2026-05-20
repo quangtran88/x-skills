@@ -1,0 +1,8 @@
+id: tc-a
+endpoint: POST /a
+category: happy
+precondition_case_id: tc-b
+steps:
+  - method: POST
+    path: /a
+    expect: { status: 200 }
