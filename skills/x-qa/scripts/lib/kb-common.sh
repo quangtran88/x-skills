@@ -63,6 +63,17 @@ kb_text_slug() {
     | cut -c1-60
 }
 
+# Slugify coverage signature "POST /a :: happy" → "post-a-happy" (max 80).
+# Rule: lowercase, [^a-z0-9]+ → single -, trim leading/trailing -, cap 80 chars.
+# Must match kb-writeback.sh and gap-analyze.sh exactly.
+kb_signature_slug() {
+  echo "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | tr -c '[:alnum:]\n' '-' \
+    | sed 's/--*/-/g; s/^-//; s/-$//' \
+    | cut -c1-80
+}
+
 # Compute sha256 of a file in a portable way.
 kb_sha256() {
   if command -v sha256sum >/dev/null 2>&1; then

@@ -69,5 +69,7 @@ echo "→ running topo-order smoke"
 bash "$SKILL_DIR/scripts/tests/topo.sh"
 echo "→ running kb smoke"
 bash "$SKILL_DIR/scripts/tests/kb-smoke.sh"
+echo "→ running writeback-history smoke"
+bash "$SKILL_DIR/scripts/tests/writeback-history.sh"
 
 echo "✓ x-qa smoke passed"

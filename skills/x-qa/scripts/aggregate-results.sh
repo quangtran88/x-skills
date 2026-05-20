@@ -176,6 +176,32 @@ if [[ "$KB_ENABLED" == true ]]; then
     : "${kb_reused:=0}"
     : "${kb_generated:=0}"
   fi
+  # Emit per-case history into kb/history/<slug>.jsonl via kb-writeback --stdin.
+  # Coverage signature comes from kb/index.json.cases[id].coverage_signature;
+  # falls back to "<endpoint> :: <category>" when index has no entry.
+  KB_INDEX="$(git rev-parse --show-toplevel 2>/dev/null)/.x-skills/x-qa/kb/index.json"
+  HIST_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  while IFS= read -r case_json; do
+    cid=$(jq -r '.id' <<<"$case_json")
+    cverdict=$(jq -r '.verdict' <<<"$case_json")
+    cdur_ms=$(jq -r '.duration_ms // 0' <<<"$case_json")
+    cerr=$(jq -r '.error // empty' <<<"$case_json")
+    # Lookup case in plan for endpoint+category
+    cep=$(jq -r --arg id "$cid" '.[] | select(.id == $id) | (.endpoint // ((.request.method // "GET") + " " + (.request.path // "/")))' <<<"$all_cases")
+    ccat=$(jq -r --arg id "$cid" '.[] | select(.id == $id) | (.category // "unknown")' <<<"$all_cases")
+    csig=""
+    if [[ -f "$KB_INDEX" ]]; then
+      csig=$(jq -r --arg id "$cid" '.cases[$id].coverage_signature // empty' "$KB_INDEX" 2>/dev/null || true)
+    fi
+    [[ -z "$csig" ]] && csig="$cep :: $ccat"
+    cdur_s=$(awk "BEGIN { printf \"%.3f\", $cdur_ms / 1000 }")
+    line=$(jq -c -n \
+      --arg run "$run_id" --arg ts "$HIST_TS" --arg sig "$csig" \
+      --arg result "$cverdict" --argjson dur "$cdur_s" --arg cid "$cid" \
+      --arg reason "$cerr" \
+      '{run_id:$run, timestamp:$ts, signature:$sig, result:$result, duration_s:$dur, case_id:$cid} + (if $reason == "" then {} else {failure_reason:$reason} end)')
+    echo "$line" | "$SCRIPT_DIR/kb-writeback.sh" --stdin || true
+  done < <(jq -c '.[]' <<<"$results")
   if ! writeback_out=$("$SCRIPT_DIR/kb-writeback.sh" --run-dir "$RUN_DIR" --plan "$PLAN" 2>&1); then
     echo "$writeback_out" >&2
     kb_status="error"

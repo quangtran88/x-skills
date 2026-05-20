@@ -15,6 +15,8 @@ instead of regenerating from scratch.
 │   │   └── fl-<slug>.yaml
 │   ├── baselines/         # per-endpoint passive memory (one JSON per endpoint)
 │   │   └── <method>__<path-slug>.json
+│   ├── history/            # NEW — one .jsonl per coverage_signature, trimmed to 20
+│   │   └── <signature-slug>.jsonl
 │   └── .ledger.jsonl      # append-only run history (one line per run)
 └── runs/<run-id>/         # transient per-run artifacts (existing layout)
 ```
@@ -39,6 +41,7 @@ Authoritative manifest. Refused on `schema != 1`.
       "file": "cases/tc-avatar-happy-jpeg.yaml",
       "endpoint": "POST /api/users/me/avatar",
       "category": "happy",
+      "coverage_signature": "POST /api/users/me/avatar :: happy-jpeg-upload",  // NEW
       "promoted_at": "2026-04-30T12:00:00Z",
       "promoted_from_run": "2026-04-30-1142-9f0c",
       "green_streak": 7,
@@ -69,6 +72,17 @@ Authoritative manifest. Refused on `schema != 1`.
   }
 }
 ```
+
+**`coverage_signature` (string, required for v2)** — A stable abstract
+identifier emitted by the planner the first time a case is minted.
+Survives endpoint renames + case-ID churn. Format:
+`"<verb> <path> :: <category>-<intent-slug>"`. Two cases with the same
+signature MUST refer to the same behavioral contract; `kb-prune.sh`
+surfaces duplicates.
+
+Back-compat: cases minted before v2 have no signature. The promote step
+back-fills via `coverage_signature: "<endpoint> :: <category>"` and emits
+a WARN in the ledger so a human can refine later.
 
 **Invariants:**
 1. Every `cases/*.yaml`, `flows/*.yaml`, `baselines/*.json` on disk MUST
@@ -184,6 +198,25 @@ draft also tracked p99/max/EWMA, an additive response-shape JSON Schema
 union, flaky-rate, and drift signals; those layers were cut as a separate
 regression-monitoring feature the user did not ask for. Bring them back
 if/when monitoring becomes an explicit goal.
+
+## `kb/history/<signature-slug>.jsonl`
+
+Append-only history of the last 20 runs for a given `coverage_signature`. One JSON object per line. Slug = signature lowercased, non-alphanumerics replaced with `-`, truncated to 80 chars.
+
+```jsonc
+{
+  "run_id": "2026-05-12-0900-aa11",
+  "timestamp": "2026-05-12T09:00:42Z",
+  "result": "pass | fail | error | skipped",
+  "duration_s": 1.42,
+  "failure_reason": null,
+  "case_id": "tc-avatar-happy-jpeg"
+}
+```
+
+**Trim policy.** `kb-writeback.sh` keeps the last 20 lines. Older history is dropped — for full audit, consult `.ledger.jsonl`.
+
+**Regression check.** Regression for signature S is detected when `history[-2].result == "pass" AND history[-1].result in {"fail", "error"}`. Emitted as `regression: true` in the run report. `kb-prune.sh --orphans` removes history files whose signature is no longer in `index.json.cases`.
 
 ## `kb/.ledger.jsonl`
 

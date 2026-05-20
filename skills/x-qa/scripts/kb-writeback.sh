@@ -16,14 +16,76 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 # X_QA_KB_BASELINE_WINDOW was cut as anticipatory configuration.
 BASELINE_WINDOW=50
 
-RUN_DIR=""; PLAN=""
+# Mode detection. --stdin and --check-regression are mutually exclusive with --run-dir/--plan.
+MODE=""
+CHECK_SLUG=""
+RUN_DIR=""
+PLAN=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --run-dir) RUN_DIR="$2"; shift 2 ;;
-    --plan)    PLAN="$2";    shift 2 ;;
+    --stdin)
+      [[ -n "$MODE" ]] && { echo "✗ kb-writeback: --stdin is mutually exclusive with --run-dir/--plan/--check-regression" >&2; exit 2; }
+      MODE="stdin"; shift ;;
+    --check-regression)
+      [[ -n "$MODE" ]] && { echo "✗ kb-writeback: --check-regression is mutually exclusive with --run-dir/--plan/--stdin" >&2; exit 2; }
+      MODE="check"; CHECK_SLUG="$2"; shift 2 ;;
+    --run-dir)
+      [[ "$MODE" == "stdin" || "$MODE" == "check" ]] && { echo "✗ kb-writeback: --run-dir is mutually exclusive with --stdin/--check-regression" >&2; exit 2; }
+      RUN_DIR="$2"; MODE="legacy"; shift 2 ;;
+    --plan)
+      [[ "$MODE" == "stdin" || "$MODE" == "check" ]] && { echo "✗ kb-writeback: --plan is mutually exclusive with --stdin/--check-regression" >&2; exit 2; }
+      PLAN="$2"; MODE="legacy"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+if [[ "$MODE" == "stdin" ]]; then
+  # Read one JSONL line, append (under flock) to kb/history/<slug>.jsonl, trim to last 20.
+  KB_ROOT=$(kb_root)
+  HIST_DIR="$KB_ROOT/history"
+  mkdir -p "$HIST_DIR"
+  LINE=$(cat)
+  SIG=$(jq -r '.signature // empty' <<<"$LINE")
+  [[ -z "$SIG" ]] && { echo "✗ kb-writeback --stdin: input missing 'signature' field" >&2; exit 2; }
+  SLUG=$(kb_signature_slug "$SIG")
+  HIST="$HIST_DIR/$SLUG.jsonl"
+  if command -v flock >/dev/null 2>&1; then
+    (
+      flock -x 9
+      echo "$LINE" >>"$HIST"
+      # Trim to last 20 lines
+      if [[ $(wc -l < "$HIST") -gt 20 ]]; then
+        tail -20 "$HIST" > "$HIST.tmp" && mv "$HIST.tmp" "$HIST"
+      fi
+    ) 9>"$HIST.lock"
+  else
+    echo "$LINE" >>"$HIST"
+    if [[ $(wc -l < "$HIST") -gt 20 ]]; then
+      tail -20 "$HIST" > "$HIST.tmp" && mv "$HIST.tmp" "$HIST"
+    fi
+  fi
+  exit 0
+fi
+
+if [[ "$MODE" == "check" ]]; then
+  [[ -z "$CHECK_SLUG" ]] && { echo "✗ kb-writeback --check-regression: missing slug arg" >&2; exit 2; }
+  KB_ROOT=$(kb_root)
+  HIST="$KB_ROOT/history/$CHECK_SLUG.jsonl"
+  if [[ ! -f "$HIST" ]] || [[ $(wc -l < "$HIST") -lt 2 ]]; then
+    echo "false"; exit 0
+  fi
+  PREV=$(tail -2 "$HIST" | head -1 | jq -r '.result // empty')
+  LAST=$(tail -1 "$HIST" | jq -r '.result // empty')
+  if [[ "$PREV" == "pass" ]] && [[ "$LAST" == "fail" || "$LAST" == "error" ]]; then
+    echo "true"
+  else
+    echo "false"
+  fi
+  exit 0
+fi
+
+# Legacy mode — fall through to existing logic.
 [[ -d "$RUN_DIR" && -f "$PLAN" ]] || { echo "✗ kb-writeback: bad args" >&2; exit 2; }
 
 kb_ensure_layout
