@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>x-mindful — Architect-Review Gate for AI-Generated Plans</title>
+<style>
+  :root {
+    --bg: #07080c; --bg-elev: #0e1017; --bg-card: #11141c;
+    --border: #1a1f2c; --border-strong: #2a3142;
+    --text: #e8eaf0; --text-dim: #9aa3b4; --text-faint: #5b6273;
+    --p: #7c5cff; --g: #34d4a1; --y: #ffb340; --r: #ff5c7a; --b: #6bb6ff;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: var(--p); text-decoration: none; }
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+  .ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(700px 500px at 10% -10%, rgba(255,179,64,0.16), transparent 60%),
+      radial-gradient(600px 400px at 95% 5%, rgba(124,92,255,0.18), transparent 60%),
+      radial-gradient(800px 500px at 50% 110%, rgba(255,92,122,0.06), transparent 60%);
+  }
+  main { position: relative; z-index: 1; }
+
+  nav.top { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(14px); background: rgba(7,8,12,0.7); border-bottom: 1px solid var(--border); }
+  nav.top .row { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .logo .mark { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--y), var(--p)); display: grid; place-items: center; color: #07080c; font-family: var(--mono); font-weight: 800; font-size: 13px; }
+  nav.top .links { display: flex; gap: 22px; font-size: 14px; }
+  nav.top .links a { color: var(--text-dim); }
+  nav.top .links a:hover { color: var(--text); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border-strong); border-radius: 999px; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--y); box-shadow: 0 0 8px var(--y); }
+
+  header.hero { padding: 80px 0 60px; }
+  .hero-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 60px; align-items: center; }
+  @media (max-width: 980px) { .hero-grid { grid-template-columns: 1fr; gap: 36px; } }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--text-dim); font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--border-strong); padding: 5px 11px; border-radius: 999px; margin-bottom: 22px; }
+  h1 { font-size: clamp(36px, 5.5vw, 60px); line-height: 1.02; letter-spacing: -0.025em; margin: 0 0 18px; font-weight: 600; }
+  h1 .grad { background: linear-gradient(110deg, var(--text) 25%, var(--y) 65%, var(--p) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: 17px; color: var(--text-dim); max-width: 470px; margin: 0 0 28px; }
+  .cta-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 10px; font-weight: 500; font-size: 14px; border: 1px solid transparent; transition: transform .12s ease; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(180deg, #ffc55a, #d68a18); color: #1a1206; box-shadow: 0 8px 24px -8px rgba(255,179,64,0.5); }
+  .btn.ghost { background: var(--bg-elev); color: var(--text); border-color: var(--border-strong); }
+  .kbd { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text-dim); }
+
+  .hero-visual { position: relative; border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,179,64,0.06), rgba(124,92,255,0.04));
+    border: 1px solid var(--border); padding: 30px; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.6); overflow: hidden; }
+  .hero-visual::before { content: ""; position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 28px 28px; mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%); }
+  .hero-visual svg { width: 100%; height: auto; position: relative; z-index: 1; }
+
+  section { padding: 90px 0; position: relative; }
+  section .kicker { color: var(--y); font-family: var(--mono); font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 10px; font-weight: 600; }
+  section h2 { font-size: clamp(28px, 4vw, 42px); letter-spacing: -0.018em; margin: 0 0 12px; font-weight: 600; }
+  section .sub { color: var(--text-dim); font-size: 16px; max-width: 620px; margin: 0 0 44px; }
+  .section-head { text-align: center; margin-bottom: 50px; }
+  .section-head .sub { margin-left: auto; margin-right: auto; }
+
+  .panel { border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(180deg, var(--bg-card), #0a0c12); padding: 36px; overflow-x: auto; }
+  .panel svg { display: block; width: 100%; height: auto; min-width: 760px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 36px; }
+  @media (max-width: 760px) { .stats { grid-template-columns: 1fr 1fr; } }
+  .stat { border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); padding: 18px 20px; }
+  .stat .v { font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--text); }
+  .stat .v.p { color: var(--p); } .stat .v.g { color: var(--g); } .stat .v.y { color: var(--y); } .stat .v.b { color: var(--b); }
+  .stat .l { color: var(--text-dim); font-size: 12.5px; margin-top: 4px; font-family: var(--mono); }
+
+  .taxonomy { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  @media (max-width: 1000px) { .taxonomy { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .taxonomy { grid-template-columns: 1fr; } }
+  .tax-card { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 22px; transition: transform .15s ease, border-color .15s ease; }
+  .tax-card:hover { transform: translateY(-2px); }
+  .tax-card.t1 { border-top: 3px solid #ff5c7a; } /* tradeoff */
+  .tax-card.t2 { border-top: 3px solid #ffb340; } /* assumption */
+  .tax-card.t3 { border-top: 3px solid #7c5cff; } /* blind-spot */
+  .tax-card.t4 { border-top: 3px solid #34d4a1; } /* shape */
+  .tax-card.t5 { border-top: 3px solid #6bb6ff; } /* future-debt */
+  .tax-card h3 { margin: 0 0 8px; font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; }
+  .tax-card.t1 h3 { color: #ff5c7a; } .tax-card.t2 h3 { color: #ffb340; } .tax-card.t3 h3 { color: #a78bff; } .tax-card.t4 h3 { color: #34d4a1; } .tax-card.t5 h3 { color: #6bb6ff; }
+  .tax-card p { margin: 0 0 10px; color: var(--text-dim); font-size: 13.5px; }
+  .tax-card .ex { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); font-style: italic; border-top: 1px dashed var(--border); padding-top: 10px; }
+
+  /* Menu */
+  .menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 800px) { .menu-grid { grid-template-columns: 1fr 1fr; } }
+  .menu { border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); padding: 22px; }
+  .menu .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; font-weight: 700; margin-bottom: 8px; }
+  .menu.confirm .k { color: var(--g); }
+  .menu.modify .k { color: var(--y); }
+  .menu.reject .k { color: var(--r); }
+  .menu.skip .k { color: var(--text-faint); }
+  .menu h4 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+  .menu p { margin: 0; color: var(--text-dim); font-size: 13px; }
+
+  /* Steps */
+  .step { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); padding: 26px 28px; margin-bottom: 16px; }
+  .step-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+  .step-head h3 { margin: 0; font-size: 18px; font-weight: 600; }
+  .step-n { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 9px; font-family: var(--mono); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+  .step-n.p { background: rgba(124,92,255,0.12); color: var(--p); border: 1px solid rgba(124,92,255,0.3); }
+  .step-n.g { background: rgba(52,212,161,0.12); color: var(--g); border: 1px solid rgba(52,212,161,0.3); }
+  .step-n.y { background: rgba(255,179,64,0.12); color: var(--y); border: 1px solid rgba(255,179,64,0.3); }
+  .step-n.b { background: rgba(107,182,255,0.12); color: var(--b); border: 1px solid rgba(107,182,255,0.3); }
+  .step-n.r { background: rgba(255,92,122,0.12); color: var(--r); border: 1px solid rgba(255,92,122,0.3); }
+  .step-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; }
+  @media (max-width: 800px) { .step-grid { grid-template-columns: 1fr; } }
+  .step-body p { margin: 0 0 10px; color: var(--text-dim); font-size: 14.5px; }
+  .step-body p:last-child { margin-bottom: 0; }
+  .step-body code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-elev); padding: 1px 6px; border-radius: 4px; color: var(--y); border: 1px solid var(--border); }
+  .step-body strong { color: var(--text); }
+  ul.bul, ol.bul { margin: 6px 0 10px 0; padding-left: 18px; color: var(--text-dim); font-size: 14px; }
+  ul.bul li, ol.bul li { padding: 3px 0; }
+  .step-viz { border-radius: 11px; background: linear-gradient(180deg, #07080c, #0a0c12); border: 1px solid var(--border); padding: 14px; }
+  .step-viz svg { display: block; width: 100%; height: auto; }
+
+  /* Envelope */
+  .env-box { border: 1px solid var(--border); border-radius: 14px; background: #07080c; padding: 22px 24px; }
+  .env-box pre { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; color: var(--text-dim); overflow-x: auto; }
+  .env-box .h1 { color: var(--y); }
+  .env-box .h2 { color: var(--g); }
+  .env-box .h3 { color: var(--r); }
+  .env-box .h4 { color: var(--text-faint); }
+  .env-box .id { color: var(--p); }
+  .env-box .sev { color: var(--r); font-weight: 700; }
+
+  /* Anti-trigger table */
+  .anti { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 14px; }
+  .anti th, .anti td { text-align: left; padding: 13px 18px; border-bottom: 1px solid var(--border); }
+  .anti th { background: #0a0c12; color: var(--text-dim); font-family: var(--mono); font-weight: 500; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .anti tr:last-child td { border-bottom: 0; }
+  .anti code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-elev); padding: 2px 7px; border-radius: 5px; color: var(--y); border: 1px solid var(--border); }
+
+  /* Principles */
+  .principles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 900px) { .principles { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 540px) { .principles { grid-template-columns: 1fr; } }
+  .principle { border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); padding: 20px; }
+  .principle .pn { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: var(--y); margin-bottom: 10px; }
+  .principle h4 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+  .principle p { margin: 0; color: var(--text-dim); font-size: 13px; }
+
+  footer { border-top: 1px solid var(--border); padding: 50px 0; color: var(--text-faint); font-size: 13px; }
+  footer .row { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  footer .col strong { color: var(--text); display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+  footer .col a { color: var(--text-dim); display: block; padding: 3px 0; }
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+<main>
+
+<nav class="top">
+  <div class="container row">
+    <div class="logo">
+      <div class="mark">∴</div>
+      <span>x-mindful</span>
+      <span class="pill"><span class="dot"></span> architect-review gate</span>
+    </div>
+    <div class="links">
+      <a href="#taxonomy">Taxonomy</a>
+      <a href="#flow">Flow</a>
+      <a href="#deep">Internals</a>
+      <a href="#envelope">Output</a>
+      <a href="#start">Start</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow">Pre-implementation architect-review</div>
+      <h1>What did AI <span class="grad">silently decide?</span></h1>
+      <p class="lead">Before you build the plan, x-mindful surfaces the tradeoffs AI picked without naming, the assumptions it embedded, the blind spots a senior would catch — one item at a time, with confirm / modify / reject / skip gates.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="#start">Walk me through →</a>
+        <span class="kbd">/x-skills:x-mindful</span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v y">5</div><div class="l">categories</div></div>
+        <div class="stat"><div class="v p">5</div><div class="l">phases</div></div>
+        <div class="stat"><div class="v g">4</div><div class="l">gate actions</div></div>
+        <div class="stat"><div class="v b">1</div><div class="l">decision envelope</div></div>
+      </div>
+    </div>
+
+    <!-- Hero visual: a gate -->
+    <div class="hero-visual">
+      <svg viewBox="0 0 520 460" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gateGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ffb340" stop-opacity="0.0"/>
+            <stop offset="50%" stop-color="#ffb340" stop-opacity="0.45"/>
+            <stop offset="100%" stop-color="#ffb340" stop-opacity="0.0"/>
+          </linearGradient>
+          <filter id="gateGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Left side: AI plan -->
+        <g>
+          <rect x="20" y="160" width="130" height="140" rx="10" fill="#0e1017" stroke="#2a3142"/>
+          <text x="85" y="180" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#5b6273" letter-spacing="2">AI PLAN</text>
+          <g font-family="ui-monospace,monospace" font-size="9" fill="#9aa3b4">
+            <text x="32" y="202">- Switch to events</text>
+            <text x="32" y="218">- Drop column X</text>
+            <text x="32" y="234">- Microservice Y</text>
+            <text x="32" y="250">- Rename API z</text>
+            <text x="32" y="266">- Add Redis layer</text>
+            <text x="32" y="282">- ...</text>
+          </g>
+        </g>
+
+        <!-- Beam in -->
+        <rect x="150" y="225" width="80" height="10" fill="url(#gateGrad)"/>
+
+        <!-- Gate (central pillar) -->
+        <g filter="url(#gateGlow)">
+          <rect x="230" y="80" width="60" height="300" rx="14" fill="#1a1206" stroke="#ffb340" stroke-width="1.8"/>
+          <text x="260" y="106" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="800" fill="#ffd680" letter-spacing="3">GATE</text>
+
+          <!-- 5 category bars -->
+          <rect x="240" y="130" width="40" height="36" rx="4" fill="#1f1410" stroke="#ff5c7a"/>
+          <text x="260" y="153" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" font-weight="700" fill="#ff5c7a">TRADE</text>
+
+          <rect x="240" y="172" width="40" height="36" rx="4" fill="#1f1410" stroke="#ffb340"/>
+          <text x="260" y="195" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" font-weight="700" fill="#ffb340">ASSUME</text>
+
+          <rect x="240" y="214" width="40" height="36" rx="4" fill="#1f1410" stroke="#7c5cff"/>
+          <text x="260" y="237" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" font-weight="700" fill="#a78bff">BLIND</text>
+
+          <rect x="240" y="256" width="40" height="36" rx="4" fill="#1f1410" stroke="#34d4a1"/>
+          <text x="260" y="279" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" font-weight="700" fill="#34d4a1">SHAPE</text>
+
+          <rect x="240" y="298" width="40" height="36" rx="4" fill="#1f1410" stroke="#6bb6ff"/>
+          <text x="260" y="316" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" font-weight="700" fill="#6bb6ff">DEBT</text>
+          <text x="260" y="328" text-anchor="middle" font-family="ui-monospace,monospace" font-size="7" fill="#6bb6ff">FUTURE</text>
+
+          <text x="260" y="360" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#ffd680">human gate</text>
+        </g>
+
+        <!-- Beam out -->
+        <rect x="290" y="225" width="80" height="10" fill="url(#gateGrad)"/>
+
+        <!-- Right side: outputs -->
+        <g>
+          <rect x="370" y="100" width="130" height="36" rx="8" fill="#0e1017" stroke="#34d4a1"/>
+          <text x="435" y="118" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#34d4a1">✓ confirm</text>
+          <text x="435" y="130" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" fill="#9aa3b4">proceed as-is</text>
+
+          <rect x="370" y="148" width="130" height="36" rx="8" fill="#0e1017" stroke="#ffb340"/>
+          <text x="435" y="166" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#ffb340">✎ modify</text>
+          <text x="435" y="178" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" fill="#9aa3b4">revise direction</text>
+
+          <rect x="370" y="196" width="130" height="36" rx="8" fill="#0e1017" stroke="#ff5c7a"/>
+          <text x="435" y="214" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#ff5c7a">✗ reject</text>
+          <text x="435" y="226" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" fill="#9aa3b4">drop from plan</text>
+
+          <rect x="370" y="244" width="130" height="36" rx="8" fill="#0e1017" stroke="#5b6273"/>
+          <text x="435" y="262" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#9aa3b4">› skip</text>
+          <text x="435" y="274" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" fill="#9aa3b4">revisit later</text>
+
+          <!-- envelope -->
+          <rect x="370" y="300" width="130" height="60" rx="8" fill="#0e1017" stroke="#7c5cff"/>
+          <text x="435" y="320" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#a78bff">envelope</text>
+          <text x="435" y="338" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#9aa3b4">v1 markdown</text>
+          <text x="435" y="352" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#9aa3b4">→ x-do Mode A</text>
+        </g>
+
+        <!-- pulses -->
+        <circle cx="200" cy="230" r="3" fill="#ffb340"><animate attributeName="cx" values="155;225" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/></circle>
+        <circle cx="320" cy="230" r="3" fill="#ffd680"><animate attributeName="cx" values="295;365" dur="2s" begin="0.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.4;1;0.4" dur="2s" begin="0.5s" repeatCount="indefinite"/></circle>
+      </svg>
+    </div>
+  </div>
+</header>
+
+<!-- TAXONOMY -->
+<section id="taxonomy">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">The taxonomy</div>
+      <h2>Five things AI does silently.</h2>
+      <p class="sub">Every extracted item lands in exactly one category. No code-level findings — the human reviews direction, not implementation.</p>
+    </div>
+
+    <div class="taxonomy">
+      <div class="tax-card t1">
+        <h3>TRADEOFF</h3>
+        <p>A fork in the road. AI picked side X without naming the cost on the other axis.</p>
+        <div class="ex">sync vs async · monolith vs split · build vs buy · one-way vs two-way door</div>
+      </div>
+      <div class="tax-card t2">
+        <h3>ASSUMPTION</h3>
+        <p>A load-bearing claim AI silently relied on without surfacing.</p>
+        <div class="ex">scale · NFRs · environment · human capacity · trust boundary</div>
+      </div>
+      <div class="tax-card t3">
+        <h3>BLIND-SPOT</h3>
+        <p>What's NOT in the plan that a senior would expect.</p>
+        <div class="ex">failure modes · rollback · observability · runbook · threat model · owner</div>
+      </div>
+      <div class="tax-card t4">
+        <h3>SHAPE</h3>
+        <p>The solution shape doesn't fit constraints — over- or under-engineered.</p>
+        <div class="ex">modular mirage · microservice for nothing · missing idempotency · no retries</div>
+      </div>
+      <div class="tax-card t5">
+        <h3>FUTURE-DEBT</h3>
+        <p>What gets harder later. Paint-into-corner choices and curves that grow.</p>
+        <div class="ex">vendor lock-in · cost curve · org-fit assumption that won't hold</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FLOW -->
+<section id="flow">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">Workflow</div>
+      <h2>Five phases. One decision envelope.</h2>
+    </div>
+
+    <div class="panel">
+      <svg viewBox="0 0 1100 420" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="pg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#7c5cff" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#7c5cff" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="yg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#ffb340" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#ffb340" stop-opacity="0.08"/>
+          </linearGradient>
+          <linearGradient id="ggr" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#34d4a1" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#34d4a1" stop-opacity="0.08"/>
+          </linearGradient>
+          <marker id="far" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6273"/></marker>
+          <style>
+            .lt { font: 600 13px Inter,sans-serif; fill: #e8eaf0; }
+            .ls { font: 500 10.5px ui-monospace,monospace; fill: #9aa3b4; }
+            .lb { font: 600 11px ui-monospace,monospace; fill: #5b6273; text-transform: uppercase; letter-spacing: 0.14em; }
+            .e { stroke: #5b6273; stroke-width: 1.5; fill: none; }
+          </style>
+        </defs>
+
+        <text x="24" y="50" class="lb">Input</text>
+        <text x="24" y="180" class="lb">Phases</text>
+        <text x="24" y="360" class="lb">Output</text>
+
+        <!-- Input boxes -->
+        <rect x="120" y="22" width="180" height="58" rx="10" fill="url(#yg)" stroke="#ffb340"/>
+        <text x="210" y="50" text-anchor="middle" class="lt">Plan / Spec / PRD</text>
+        <text x="210" y="68" text-anchor="middle" class="ls">file · paste · handoff</text>
+
+        <rect x="320" y="22" width="180" height="58" rx="10" fill="url(#yg)" stroke="#ffb340"/>
+        <text x="410" y="50" text-anchor="middle" class="lt">Design doc / RFC</text>
+        <text x="410" y="68" text-anchor="middle" class="ls">architectural surface</text>
+
+        <rect x="520" y="22" width="180" height="58" rx="10" fill="url(#yg)" stroke="#ffb340"/>
+        <text x="610" y="50" text-anchor="middle" class="lt">AI proposal</text>
+        <text x="610" y="68" text-anchor="middle" class="ls">code-bearing</text>
+
+        <rect x="720" y="22" width="180" height="58" rx="10" fill="url(#yg)" stroke="#ffb340"/>
+        <text x="810" y="50" text-anchor="middle" class="lt">x-do Mode A gate</text>
+        <text x="810" y="68" text-anchor="middle" class="ls">auto-invoke</text>
+
+        <!-- Phase row -->
+        <g>
+          <rect x="80" y="160" width="160" height="80" rx="11" fill="url(#pg)" stroke="#7c5cff"/>
+          <text x="160" y="186" text-anchor="middle" class="lt">01 · Detect</text>
+          <text x="160" y="204" text-anchor="middle" class="ls">locate content</text>
+          <text x="160" y="218" text-anchor="middle" class="ls">classify size</text>
+          <text x="160" y="232" text-anchor="middle" class="ls">refuse if empty</text>
+
+          <rect x="260" y="160" width="160" height="80" rx="11" fill="url(#pg)" stroke="#7c5cff"/>
+          <text x="340" y="186" text-anchor="middle" class="lt">02 · Extract</text>
+          <text x="340" y="204" text-anchor="middle" class="ls">5-category scan</text>
+          <text x="340" y="218" text-anchor="middle" class="ls">claude / gemini /</text>
+          <text x="340" y="232" text-anchor="middle" class="ls">oracle / codex</text>
+
+          <rect x="440" y="160" width="160" height="80" rx="11" fill="url(#pg)" stroke="#7c5cff"/>
+          <text x="520" y="186" text-anchor="middle" class="lt">03 · Rank</text>
+          <text x="520" y="204" text-anchor="middle" class="ls">senior_weigh_in</text>
+          <text x="520" y="218" text-anchor="middle" class="ls">severity × surface</text>
+          <text x="520" y="232" text-anchor="middle" class="ls">× reversibility</text>
+
+          <rect x="620" y="160" width="200" height="80" rx="11" fill="url(#ggr)" stroke="#34d4a1" stroke-width="1.8"/>
+          <text x="720" y="186" text-anchor="middle" class="lt">04 · Walkthrough</text>
+          <text x="720" y="204" text-anchor="middle" class="ls">"Plan at Architect Level"</text>
+          <text x="720" y="218" text-anchor="middle" class="ls">loop one item at a time</text>
+          <text x="720" y="232" text-anchor="middle" class="ls">confirm/modify/reject/skip</text>
+
+          <rect x="840" y="160" width="160" height="80" rx="11" fill="url(#pg)" stroke="#7c5cff"/>
+          <text x="920" y="186" text-anchor="middle" class="lt">05 · Handoff</text>
+          <text x="920" y="204" text-anchor="middle" class="ls">emit envelope</text>
+          <text x="920" y="218" text-anchor="middle" class="ls">offer next skill</text>
+          <text x="920" y="232" text-anchor="middle" class="ls">→ x-do Mode A</text>
+        </g>
+
+        <!-- Output -->
+        <rect x="380" y="330" width="320" height="60" rx="11" fill="url(#yg)" stroke="#ffb340" stroke-width="1.8"/>
+        <text x="540" y="356" text-anchor="middle" class="lt">x-mindful-envelope v1 (markdown)</text>
+        <text x="540" y="376" text-anchor="middle" class="ls">Confirmed · Modified · Rejected · Skipped</text>
+
+        <!-- arrows input → phase1 -->
+        <path class="e" d="M210 80  C 210 130, 175 140, 160 160" marker-end="url(#far)"/>
+        <path class="e" d="M410 80  C 410 130, 200 145, 170 160" marker-end="url(#far)"/>
+        <path class="e" d="M610 80  C 610 130, 220 150, 180 160" marker-end="url(#far)"/>
+        <path class="e" d="M810 80  C 810 130, 240 155, 190 160" marker-end="url(#far)"/>
+
+        <!-- phase chain -->
+        <path class="e" d="M240 200 L260 200" marker-end="url(#far)"/>
+        <path class="e" d="M420 200 L440 200" marker-end="url(#far)"/>
+        <path class="e" d="M600 200 L620 200" marker-end="url(#far)"/>
+        <path class="e" d="M820 200 L840 200" marker-end="url(#far)"/>
+
+        <!-- phase 5 → envelope -->
+        <path class="e" d="M920 240 C 920 290, 700 320, 540 330" marker-end="url(#far)"/>
+
+        <!-- walkthrough loop arrow -->
+        <path d="M720 240 C 760 280, 680 280, 720 240" fill="none" stroke="#34d4a1" stroke-width="1.4" marker-end="url(#far)"/>
+        <text x="720" y="295" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#34d4a1">loop per item</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- MENU -->
+<section>
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">The gate</div>
+      <h2>Four actions per item.</h2>
+      <p class="sub">Phase 4 walks the ranked queue. For each item the user picks exactly one of:</p>
+    </div>
+
+    <div class="menu-grid">
+      <div class="menu confirm">
+        <div class="k">✓ CONFIRM</div>
+        <h4>proceed as written</h4>
+        <p>The item lands in the envelope's <code>Confirmed</code> section. x-do Mode A executes it unchanged.</p>
+      </div>
+      <div class="menu modify">
+        <div class="k">✎ MODIFY</div>
+        <h4>revise the direction</h4>
+        <p>User supplies a new direction in prose. Lands in <code>Modified</code>; x-do revises the plan before executing.</p>
+      </div>
+      <div class="menu reject">
+        <div class="k">✗ REJECT</div>
+        <h4>drop from plan</h4>
+        <p>User gives one-line reason. Item lands in <code>Rejected</code> and is removed from x-do's queue.</p>
+      </div>
+      <div class="menu skip">
+        <div class="k">› SKIP</div>
+        <h4>revisit later</h4>
+        <p>Item lands in <code>Skipped</code> — surfaced again on the next x-mindful run against the same plan.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEEP DIVE -->
+<section id="deep">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">Step by step</div>
+      <h2>What each phase actually does — in plain English.</h2>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="step">
+      <div class="step-head"><span class="step-n p">01</span><h3>Find the plan and check it's worth reviewing</h3></div>
+      <div class="step-grid">
+        <div class="step-body">
+          <p>You can give x-mindful the plan in three ways: point at a file, paste the text right in, or hand off from another skill that just produced one. The first step normalizes all three into the same shape.</p>
+          <ul class="bul">
+            <li>If you point at a file, x-mindful reads it.</li>
+            <li>If you paste content, it's tagged so we can refer back to it.</li>
+            <li>If another skill (like x-do) is calling in, the plan content rides along in the handoff message.</li>
+            <li>If there's no actual plan content, x-mindful stops and points you to x-do — there's nothing to review yet.</li>
+            <li>The plan's size (short / medium / long) decides which AI helper does the deep read in the next step.</li>
+          </ul>
+        </div>
+        <div class="step-viz">
+          <svg viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">
+            <defs><marker id="d1ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6273"/></marker></defs>
+            <rect x="10" y="20" width="100" height="34" rx="7" fill="#0a0c12" stroke="#ffb340"/>
+            <text x="60" y="40" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ffb340">file</text>
+            <rect x="10" y="60" width="100" height="34" rx="7" fill="#0a0c12" stroke="#ffb340"/>
+            <text x="60" y="80" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ffb340">paste</text>
+            <rect x="10" y="100" width="100" height="34" rx="7" fill="#0a0c12" stroke="#ffb340"/>
+            <text x="60" y="120" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ffb340">handoff env</text>
+            <rect x="10" y="140" width="100" height="34" rx="7" fill="#0a0c12" stroke="#ff5c7a"/>
+            <text x="60" y="160" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ff5c7a">empty</text>
+
+            <line x1="110" y1="37" x2="170" y2="80" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d1ar)"/>
+            <line x1="110" y1="77" x2="170" y2="90" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d1ar)"/>
+            <line x1="110" y1="117" x2="170" y2="100" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d1ar)"/>
+            <line x1="110" y1="157" x2="170" y2="160" stroke="#ff5c7a" stroke-width="1.3" stroke-dasharray="3 3" marker-end="url(#d1ar)"/>
+
+            <rect x="170" y="65" width="170" height="50" rx="9" fill="#0a0c12" stroke="#34d4a1"/>
+            <text x="255" y="86" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#34d4a1">normalized + sized</text>
+            <text x="255" y="102" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#9aa3b4">small / medium / large</text>
+
+            <rect x="170" y="145" width="170" height="32" rx="7" fill="#0a0c12" stroke="#ff5c7a"/>
+            <text x="255" y="165" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ff5c7a">refuse → suggest x-do</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="step">
+      <div class="step-head"><span class="step-n g">02</span><h3>Read the plan and pull out the senior-engineer concerns</h3></div>
+      <div class="step-grid">
+        <div class="step-body">
+          <p>An AI helper reads the plan five times, once per category. Each pass asks a different question: "what tradeoff was made silently?", "what assumption is load-bearing?", "what's missing that a senior would expect?", and so on.</p>
+          <ul class="bul">
+            <li>Short plans → one quick pass by Claude directly.</li>
+            <li>Medium plans → Gemini if available, otherwise Claude with the plan broken into chunks.</li>
+            <li>Long plans (a whole RFC, design doc, or PRD) → a deep-reading agent that can hold the whole thing at once.</li>
+            <li><strong>Hard rule:</strong> any finding that mentions a function name, file path, or variable is dropped or rewritten. Those belong in code review (x-review), not architectural review.</li>
+            <li>When code-graph data is available, the actual blast-radius of touching a piece of code (depth-1 = will break, depth-2 = likely affected) replaces guesswork.</li>
+          </ul>
+        </div>
+        <div class="step-viz">
+          <svg viewBox="0 0 360 240" xmlns="http://www.w3.org/2000/svg">
+            <defs><marker id="d2ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6273"/></marker></defs>
+            <rect x="130" y="10" width="100" height="32" rx="7" fill="#0a0c12" stroke="#7c5cff"/>
+            <text x="180" y="30" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#e8eaf0">plan content</text>
+
+            <line x1="180" y1="42" x2="180" y2="60" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d2ar)"/>
+
+            <!-- size router -->
+            <polygon points="180,60 240,100 180,140 120,100" fill="#0a0c12" stroke="#ffb340" stroke-width="1.4"/>
+            <text x="180" y="95" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ffb340">size?</text>
+            <text x="180" y="110" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8.5" fill="#9aa3b4">small/med/large</text>
+
+            <!-- three lanes -->
+            <line x1="120" y1="100" x2="40"  y2="170" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d2ar)"/>
+            <line x1="180" y1="140" x2="180" y2="170" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d2ar)"/>
+            <line x1="240" y1="100" x2="320" y2="170" stroke="#5b6273" stroke-width="1.3" marker-end="url(#d2ar)"/>
+
+            <rect x="0" y="170" width="80" height="34" rx="7" fill="#0a0c12" stroke="#34d4a1"/>
+            <text x="40" y="186" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#34d4a1">claude</text>
+            <text x="40" y="198" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8" fill="#9aa3b4">single pass</text>
+
+            <rect x="140" y="170" width="80" height="34" rx="7" fill="#0a0c12" stroke="#6bb6ff"/>
+            <text x="180" y="186" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#6bb6ff">gemini</text>
+            <text x="180" y="198" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8" fill="#9aa3b4">chunked</text>
+
+            <rect x="280" y="170" width="80" height="34" rx="7" fill="#0a0c12" stroke="#a78bff"/>
+            <text x="320" y="186" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#a78bff">oracle</text>
+            <text x="320" y="198" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8" fill="#9aa3b4">deep read</text>
+
+            <text x="180" y="228" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#ff5c7a">→ drop code-level findings</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="step">
+      <div class="step-head"><span class="step-n y">03</span><h3>Rank by what really matters — and drop the noise</h3></div>
+      <div class="step-grid">
+        <div class="step-body">
+          <p>The extract step usually finds more items than a human wants to walk through. Step 3 throws away anything trivial and orders the rest by what would actually keep a senior engineer up at night:</p>
+          <ul class="bul">
+            <li><strong>How bad if it goes wrong?</strong> — Critical / High / Medium / Low</li>
+            <li><strong>How much of the system does it touch?</strong> — one file, one team, the whole org</li>
+            <li><strong>How hard is it to undo?</strong> — Renaming an internal helper tomorrow is cheap. Switching from sync to async, or breaking a public API, is not.</li>
+          </ul>
+          <p>The output is a short, ordered list. The most consequential items come first so you can stop early if you've already heard enough.</p>
+        </div>
+        <div class="step-viz">
+          <svg viewBox="0 0 360 220" xmlns="http://www.w3.org/2000/svg">
+            <g font-family="ui-monospace,monospace" font-size="10">
+              <text x="20" y="30" fill="#5b6273" letter-spacing="2">RAW ITEMS</text>
+              <rect x="20" y="40" width="140" height="24" rx="5" fill="#0a0c12" stroke="#5b6273"/>
+              <text x="90" y="56" text-anchor="middle" fill="#9aa3b4">code-level finding</text>
+              <rect x="20" y="68" width="140" height="24" rx="5" fill="#0a0c12" stroke="#34d4a1"/>
+              <text x="90" y="84" text-anchor="middle" fill="#34d4a1">tradeoff · HIGH</text>
+              <rect x="20" y="96" width="140" height="24" rx="5" fill="#0a0c12" stroke="#34d4a1"/>
+              <text x="90" y="112" text-anchor="middle" fill="#34d4a1">blind-spot · CRIT</text>
+              <rect x="20" y="124" width="140" height="24" rx="5" fill="#0a0c12" stroke="#5b6273"/>
+              <text x="90" y="140" text-anchor="middle" fill="#9aa3b4">nit · LOW</text>
+              <rect x="20" y="152" width="140" height="24" rx="5" fill="#0a0c12" stroke="#34d4a1"/>
+              <text x="90" y="168" text-anchor="middle" fill="#34d4a1">future-debt · MED</text>
+            </g>
+
+            <line x1="160" y1="100" x2="195" y2="100" stroke="#5b6273" stroke-width="1.4"/>
+            <text x="180" y="92" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#ffb340">filter</text>
+
+            <g font-family="ui-monospace,monospace" font-size="10">
+              <text x="200" y="30" fill="#ffb340" letter-spacing="2">RANKED QUEUE</text>
+              <rect x="200" y="40" width="140" height="24" rx="5" fill="#0a0c12" stroke="#ff5c7a"/>
+              <text x="270" y="56" text-anchor="middle" fill="#ff5c7a">1. CRIT · blind</text>
+              <rect x="200" y="68" width="140" height="24" rx="5" fill="#0a0c12" stroke="#ffb340"/>
+              <text x="270" y="84" text-anchor="middle" fill="#ffb340">2. HIGH · tradeoff</text>
+              <rect x="200" y="96" width="140" height="24" rx="5" fill="#0a0c12" stroke="#34d4a1"/>
+              <text x="270" y="112" text-anchor="middle" fill="#34d4a1">3. MED · debt</text>
+
+              <text x="270" y="170" text-anchor="middle" fill="#5b6273" font-size="9">code-finding · dropped</text>
+              <text x="270" y="185" text-anchor="middle" fill="#5b6273" font-size="9">nit · below threshold</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="step">
+      <div class="step-head"><span class="step-n g">04</span><h3>Walk you through one item at a time</h3></div>
+      <div class="step-grid">
+        <div class="step-body">
+          <p>This is the core of the skill. First, a 5-bullet summary of the plan at the architect level — so you can see what AI is proposing before diving into the concerns.</p>
+          <p>Then x-mindful walks the ranked list one item at a time. Each item shows: what category it falls in, how serious it is, what part of the system it touches, and the question the senior engineer would ask. You pick: <strong>confirm</strong> it, <strong>modify</strong> it (give a new direction in your own words), <strong>reject</strong> it (drop from the plan with a reason), or <strong>skip</strong> it for now.</p>
+          <p>Your decisions live in the session — nothing is written to disk unless you ask. The conversation is the artifact.</p>
+        </div>
+        <div class="step-viz">
+          <svg viewBox="0 0 360 240" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="20" width="320" height="48" rx="9" fill="#0a0c12" stroke="#ffb340"/>
+            <text x="180" y="40" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#ffb340">Plan at Architect Level</text>
+            <text x="180" y="56" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#9aa3b4">5-bullet framing</text>
+
+            <rect x="20" y="80" width="320" height="80" rx="9" fill="#0a0c12" stroke="#34d4a1"/>
+            <text x="180" y="100" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#34d4a1">item N/M · BLIND-SPOT · CRIT</text>
+            <text x="180" y="118" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#9aa3b4">"Plan introduces a new public endpoint</text>
+            <text x="180" y="132" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#9aa3b4">but doesn't surface a threat model.</text>
+            <text x="180" y="146" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9.5" fill="#9aa3b4">Auth / abuse / rate-limit?"</text>
+
+            <rect x="20" y="172" width="60" height="44" rx="7" fill="#0a0c12" stroke="#34d4a1"/>
+            <text x="50" y="200" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#34d4a1">✓</text>
+
+            <rect x="98" y="172" width="60" height="44" rx="7" fill="#0a0c12" stroke="#ffb340"/>
+            <text x="128" y="200" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#ffb340">✎</text>
+
+            <rect x="176" y="172" width="60" height="44" rx="7" fill="#0a0c12" stroke="#ff5c7a"/>
+            <text x="206" y="200" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#ff5c7a">✗</text>
+
+            <rect x="254" y="172" width="60" height="44" rx="7" fill="#0a0c12" stroke="#5b6273"/>
+            <text x="284" y="200" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#9aa3b4">›</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="step">
+      <div class="step-head"><span class="step-n b">05</span><h3>Hand off a clear, copy-pastable decision summary</h3></div>
+      <div class="step-grid">
+        <div class="step-body">
+          <p>At the end, x-mindful prints a short markdown summary with four sections: what you confirmed, what you modified (with your direction quoted), what you rejected (with your reason), and what you skipped for later.</p>
+          <ul class="bul">
+            <li><strong>Confirmed</strong> → the build step uses the original plan for these items.</li>
+            <li><strong>Modified</strong> → the plan is revised to match your direction before any code is written.</li>
+            <li><strong>Rejected</strong> → these items are removed from the plan entirely.</li>
+            <li><strong>Skipped</strong> → tracked as follow-ups; they'll come back on the next review.</li>
+            <li>If you want a permanent record, ask x-mindful to save it. Otherwise the summary lives in the chat for the rest of the session.</li>
+          </ul>
+        </div>
+        <div class="step-viz">
+          <svg viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">
+            <defs><marker id="h5ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5b6273"/></marker></defs>
+            <rect x="20" y="20" width="100" height="34" rx="7" fill="#0a0c12" stroke="#34d4a1"/>
+            <text x="70" y="40" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#34d4a1">Confirmed[]</text>
+            <rect x="20" y="60" width="100" height="34" rx="7" fill="#0a0c12" stroke="#ffb340"/>
+            <text x="70" y="80" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ffb340">Modified[]</text>
+            <rect x="20" y="100" width="100" height="34" rx="7" fill="#0a0c12" stroke="#ff5c7a"/>
+            <text x="70" y="120" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#ff5c7a">Rejected[]</text>
+            <rect x="20" y="140" width="100" height="34" rx="7" fill="#0a0c12" stroke="#5b6273"/>
+            <text x="70" y="160" text-anchor="middle" font-family="ui-monospace,monospace" font-size="10" fill="#9aa3b4">Skipped[]</text>
+
+            <path d="M120 37 C 160 37, 160 100, 200 100" fill="none" stroke="#5b6273" stroke-width="1.2"/>
+            <path d="M120 77 C 160 77, 160 100, 200 100" fill="none" stroke="#5b6273" stroke-width="1.2"/>
+            <path d="M120 117 C 160 117, 160 100, 200 100" fill="none" stroke="#5b6273" stroke-width="1.2"/>
+            <path d="M120 157 C 160 157, 160 100, 200 100" fill="none" stroke="#5b6273" stroke-width="1.2"/>
+
+            <rect x="200" y="75" width="80" height="50" rx="9" fill="#0a0c12" stroke="#7c5cff"/>
+            <text x="240" y="95" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" font-weight="700" fill="#a78bff">envelope</text>
+            <text x="240" y="113" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#9aa3b4">v1 markdown</text>
+
+            <line x1="280" y1="100" x2="320" y2="100" stroke="#5b6273" stroke-width="1.3" marker-end="url(#h5ar)"/>
+
+            <rect x="320" y="75" width="30" height="50" rx="6" fill="#0a0c12" stroke="#34d4a1"/>
+            <text x="335" y="95" text-anchor="middle" font-family="ui-monospace,monospace" font-size="9" fill="#34d4a1">x-do</text>
+            <text x="335" y="108" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8" fill="#9aa3b4">Mode</text>
+            <text x="335" y="118" text-anchor="middle" font-family="ui-monospace,monospace" font-size="8" fill="#9aa3b4">A</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ENVELOPE -->
+<section id="envelope">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">Output contract</div>
+      <h2>The decision envelope.</h2>
+      <p class="sub">Stable markdown shape. x-do Mode A reads it directly. Copy-paste safe — review with your team before executing.</p>
+    </div>
+
+    <div class="env-box">
+<pre>&lt;!-- x-mindful-envelope v1 --&gt;
+&lt;!-- taxonomy: v2 (TRADEOFF / ASSUMPTION / BLIND-SPOT / SHAPE / FUTURE-DEBT) --&gt;
+<span class="h4">**Source:**</span> docs/plans/2026-05-18-inventory-events.md
+<span class="h4">**Items reviewed:**</span> 7 (3 confirmed / 2 modified / 1 rejected / 1 skipped)
+
+<span class="h1">### Confirmed (proceed as written)</span>
+- <span class="id">[TRADEOFF-001]</span> Adopt event-driven inventory propagation — severity: <span class="sev">HIGH</span>
+- <span class="id">[BLIND-SPOT-002]</span> Add threat model for the new public endpoint — severity: <span class="sev">CRITICAL</span>
+- <span class="id">[SHAPE-001]</span> Idempotency keys on every inventory mutation — severity: HIGH
+
+<span class="h2">### Modified (revise plan before executing)</span>
+- <span class="id">[BLIND-SPOT-001]</span> Break a public function-call contract
+  - **Original plan:** rename in one shot, all callers updated in same PR
+  - **User direction:** add deprecation alias for two releases, then remove
+
+- <span class="id">[ASSUMPTION-001]</span> Single-region routing for traffic
+  - **User direction:** keep single-region for v1, flag multi-region as M3 work
+
+<span class="h3">### Rejected (drop from plan)</span>
+- <span class="id">[SHAPE-002]</span> Add Redis cache for product list
+  - **Reason:** out of scope this sprint
+
+<span class="h4">### Skipped (revisit later)</span>
+- <span class="id">[FUTURE-DEBT-001]</span> Hardcode single-region routing
+&lt;!-- /x-mindful-envelope --&gt;</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ANTI -->
+<section>
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">Anti-triggers</div>
+      <h2>When NOT to use x-mindful.</h2>
+      <p class="sub">x-mindful gates work <em>before</em> it starts. If the request is closer to one of these, route there.</p>
+    </div>
+
+    <table class="anti">
+      <thead><tr><th>User intent</th><th>Route to</th></tr></thead>
+      <tbody>
+        <tr><td>"Review this code / PR / diff" — judging existing work</td><td><code>x-review</code></td></tr>
+        <tr><td>"Walk me through and teach me this doc" — comprehension</td><td><code>x-guide</code></td></tr>
+        <tr><td>"Investigate / find how X works" — open research</td><td><code>x-research</code></td></tr>
+        <tr><td>"Just build it" — no plan content provided</td><td><code>x-do</code> (gathers requirements)</td></tr>
+        <tr><td>"Audit / improve this skill" — meta-work</td><td><code>x-skill-review</code> / <code>x-skill-improve</code></td></tr>
+        <tr><td>"Pick names / refactor names / clean code"</td><td><code>x-do</code> Mode E / <code>refactor</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- PRINCIPLES -->
+<section>
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">Design principles</div>
+      <h2>Why it works the way it does.</h2>
+    </div>
+    <div class="principles">
+      <div class="principle">
+        <div class="pn">P1</div>
+        <h4>You decide direction, AI handles the rest</h4>
+        <p>No talk of function names, file paths, or syntax. Those AI does fine on its own — humans should be weighing in on direction.</p>
+      </div>
+      <div class="principle">
+        <div class="pn">P2</div>
+        <h4>One item at a time</h4>
+        <p>x-mindful never dumps a wall of concerns. You see one, decide, move on. You set the pace.</p>
+      </div>
+      <div class="principle">
+        <div class="pn">P3</div>
+        <h4>Worry more about what's hard to undo</h4>
+        <p>Choosing a name can be fixed tomorrow. Switching to event-driven and changing a public API cannot. The ranking reflects that.</p>
+      </div>
+      <div class="principle">
+        <div class="pn">P4</div>
+        <h4>No files unless you ask</h4>
+        <p>The review lives in the chat. You can save the summary if you want a record — otherwise nothing is written.</p>
+      </div>
+      <div class="principle">
+        <div class="pn">P5</div>
+        <h4>Before, not after</h4>
+        <p>x-review reads code after it's written. x-mindful reads the plan before it's built. Same goal, different timing.</p>
+      </div>
+      <div class="principle">
+        <div class="pn">P6</div>
+        <h4>The summary is the contract</h4>
+        <p>The next step (usually x-do) reads your decisions from the summary, not from anywhere else. Clean handoff, no surprises.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- START -->
+<section id="start">
+  <div class="container">
+    <div class="section-head">
+      <div class="kicker">Get started</div>
+      <h2>Run before you build.</h2>
+    </div>
+
+    <div class="env-box">
+<pre><span class="h4"># Walk through any AI-generated plan, spec, or PRD</span>
+$ /x-skills:x-mindful docs/plans/2026-05-18-inventory-events.md
+
+<span class="h4"># Or paste content directly</span>
+$ /x-skills:x-mindful "&lt;paste the plan content&gt;"
+
+<span class="h4"># Or chain from x-do Mode A (auto-invokes when plan has architectural signals)</span>
+$ /x-skills:x-do  <span class="h4"># architect-review signals detected → x-mindful gate → revised plan → execute</span></pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container row">
+    <div class="col"><strong>x-mindful</strong><span>Part of x-skills for Claude Code.</span></div>
+    <div class="col"><strong>Docs</strong>
+      <a href="../skills/x-mindful/SKILL.md">SKILL.md</a>
+      <a href="../skills/x-mindful/gotchas.md">Gotchas</a>
+      <a href="../skills/x-mindful/references/">References</a>
+    </div>
+    <div class="col"><strong>Related</strong>
+      <a href="x-qa.html">x-qa</a>
+      <a href="x-worktree-isolate.html">x-worktree-isolate</a>
+      <a href="../skills/x-do/SKILL.md">x-do</a>
+    </div>
+    <div class="col"><strong>Repo</strong>
+      <a href="../README.md">README</a>
+      <a href="../CLAUDE.md">CLAUDE.md</a>
+    </div>
+  </div>
+</footer>
+
+</main>
+</body>
+</html>
