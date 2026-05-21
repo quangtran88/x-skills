@@ -510,3 +510,19 @@ After a one-week soak with the x-bugfix wiring, fan out to the remaining consume
 - **Type consistency:** `mcp.agentmemory` (capability key), `agentmemory.server_up` (runtime probe, derived from HTTP `/agentmemory/livez`), `mcp__plugin_agentmemory_agentmemory__memory_*` (tool namespace — standalone tier ONLY, 7 tools), `${AGENTMEMORY_URL}/api/*` (server tier, reached via HTTP) are used consistently across all tasks. ✓
 - **Naming:** matches the existing `mcp.gitnexus` / GitNexus indexed+fresh probe pattern — readers familiar with that section will recognize the shape. ✓
 - **Probe-shape correction (post-review):** the probe was originally specified as `memory_diagnose({})` over MCP. That call would have failed because `memory_diagnose` is NOT in the standalone shim's IMPLEMENTED_TOOLS set (verified upstream). The probe was rewritten as an out-of-band HTTP livez call, which matches the upstream's own server-health convention. ✓
+
+---
+
+## Corrections (2026-05-21 post-review)
+
+Cross-model review (x-review: Claude opus + GPT oracle + Gemini-pro + general-purpose agent) caught four substantive issues in the original plan. All applied in the follow-up fix commit (see `git log --oneline -2`).
+
+1. **All `/api/*` HTTP paths were hallucinated.** Actual upstream routes are under `/agentmemory/*` with kebab-case (verified at `research/rohitg00/agentmemory/src/triggers/api.ts`; `grep -rn '"/api/' research/rohitg00/agentmemory/src` returns zero matches). Examples: `/api/file_history` does not exist — `memory_file_history` MCP tool wraps `mem::file-context` whose HTTP equivalent is `POST /agentmemory/file-context` (:790); `/api/commit_lookup` does not exist — equivalent is `GET /agentmemory/session/by-commit` (:711). Full corrected mapping in `skills/x-shared/mcp-toolbox.md` server-tier table.
+
+2. **The "server-tier tools NEVER callable via MCP" premise was false.** Verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:354-415`: when the shim is in proxy mode (backend reachable), `tools/list` returns the full server tool list and unknown tool calls are forwarded to `/agentmemory/mcp/call`. So server-tier tools ARE callable via the `mcp__plugin_agentmemory_agentmemory__*` namespace when `server_up=true`. The probe is still useful — it tells us which mode the shim is in. The two-tier framing now reads as: standalone mode (7 IMPLEMENTED_TOOLS) vs proxy mode (full set, including `memory_diagnose`).
+
+3. **`memory_recall` documented param shape was wrong.** Upstream validator at `research/rohitg00/agentmemory/src/mcp/standalone.ts:115-133` requires `query` (not `search`) and reads `token_budget` (not `budget`). The standalone-tier table in `mcp-toolbox.md` was corrected.
+
+4. **`bin/setup` plan-gap (LOW).** Task 1 only specified the `check_mcp` call. The actual fix also required `"agentmemory": cap("$(cap_get mcp_agentmemory)")` in the Python manifest builder at `bin/setup:921` for the boolean to round-trip into `~/.config/x-skills/capabilities.json`. The executor caught this at fix time. Future plans of this shape should call out the manifest builder explicitly.
+
+Original plan body above is preserved for traceability. Authoritative behavior is now whatever the corrected skill files say.

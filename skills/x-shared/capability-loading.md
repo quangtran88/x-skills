@@ -126,11 +126,15 @@ Same shape as the GitNexus probe above — solves the same problem (a single cap
 ### Capability key vs. derived probe
 
 - `mcp.agentmemory` — boolean capability key written by `bin/setup`. Answers "is the agentmemory MCP transport available?" When true, the 7 **standalone tools** (`memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_audit`, `memory_export`, `memory_governance_delete`) are callable.
-- `agentmemory.server_up` — runtime-derived session pin. Answers "is the agentmemory HTTP backend reachable at `${AGENTMEMORY_URL:-http://localhost:3111}`?" When true, the 46 **server-tier tools** (`memory_file_history`, `memory_patterns`, `memory_commit_lookup`, `memory_commits`, `memory_timeline`, `memory_consolidate`, `memory_crystallize`, `memory_diagnose`, `memory_graph_query`, `memory_facet_query`, `memory_facet_tag`, `memory_vision_search`, `memory_relations`, `memory_obsidian_export`, etc.) become callable through the HTTP backend.
+- `agentmemory.server_up` — runtime-derived session pin. Answers "is the agentmemory HTTP backend reachable at `${AGENTMEMORY_URL:-http://localhost:3111}`?" When true, the MCP shim enters **proxy mode** — `tools/list` returns the full server tool list (`mcp__plugin_agentmemory_agentmemory__memory_file_history`, `memory_commit_lookup`, `memory_diagnose`, `memory_patterns`, `memory_timeline`, `memory_consolidate`, `memory_crystallize`, `memory_graph_query`, `memory_facet_query`, `memory_facet_tag`, `memory_vision_search`, `memory_relations`, `memory_obsidian_export`, etc.) and unknown tool calls are forwarded to `/agentmemory/mcp/call`. When false, only the 7 IMPLEMENTED_TOOLS work locally — every other `memory_*` MCP call returns `Unknown tool`.
 
 The probe is gated by `mcp.agentmemory` being pinned. Without the capability key, no probe runs.
 
-**Important:** The `@agentmemory/mcp` shim registers only the 7 standalone tools with Claude Code regardless of backend state (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:16-24`). Server-tier tools are NOT exposed through the MCP transport — `memory_diagnose` is never callable as `mcp__plugin_agentmemory_agentmemory__memory_diagnose`. Server-tier consumers must reach the HTTP backend directly via `${AGENTMEMORY_URL:-http://localhost:3111}/api/...` rather than through MCP tool calls.
+**Important:** The shim has TWO modes, controlled by backend reachability (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:343-415`):
+- **Standalone mode** (backend NOT reachable): only the 7 IMPLEMENTED_TOOLS at `standalone.ts:16-24` are callable via MCP. Server-tier tools return `Unknown tool`.
+- **Proxy mode** (backend reachable): `tools/list` returns the full remote tool list, AND any non-standalone tool call is forwarded to `/agentmemory/mcp/call`. Server-tier tools become callable as `mcp__plugin_agentmemory_agentmemory__*` — there is no "MCP-never" tier.
+
+Direct HTTP access to `${AGENTMEMORY_URL}/agentmemory/<route>` is also possible (routes live under `/agentmemory/*`, never `/api/*`; verified at `src/triggers/api.ts`), and is documented in `mcp-toolbox.md` as a fallback for non-MCP consumers (CLI scripts, integration tests). The probe itself MUST use HTTP `/agentmemory/livez` (not MCP) because the probe runs before the MCP shim's mode is settled.
 
 ### Derivation (run once, then session-pinned)
 
