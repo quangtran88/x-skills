@@ -526,3 +526,15 @@ Cross-model review (x-review: Claude opus + GPT oracle + Gemini-pro + general-pu
 4. **`bin/setup` plan-gap (LOW).** Task 1 only specified the `check_mcp` call. The actual fix also required `"agentmemory": cap("$(cap_get mcp_agentmemory)")` in the Python manifest builder at `bin/setup:921` for the boolean to round-trip into `~/.config/x-skills/capabilities.json`. The executor caught this at fix time. Future plans of this shape should call out the manifest builder explicitly.
 
 Original plan body above is preserved for traceability. Authoritative behavior is now whatever the corrected skill files say.
+
+### Round 3 corrections (post-empirical-validation, 2026-05-21)
+
+After v1.15.0 shipped and `AGENTMEMORY_FORCE_PROXY=1` was applied, restarting Claude Code exposed the proxy-mode MCP catalog empirically. Two new findings:
+
+1. **Proxy mode exposes 8 MCP tools, not 40+.** Empirical deferred-tools list against agentmemory v0.9.21: `memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_diagnose`, `memory_consolidate`, `memory_lesson_save`, `memory_reflect`. The previous corrections doc claimed "tools/list returns the full server tool list" — empirically that list is a CURATED subset, not the full tools-registry enumeration. `mcp-toolbox.md`, `capability-loading.md`, `x-bugfix/SKILL.md`, and `x-bugfix/gotchas.md` corrected to split MCP-callable from HTTP-only.
+
+2. **Three standalone tools disappear in proxy mode:** `memory_audit`, `memory_export`, `memory_governance_delete` are in `standalone.ts:16-24` IMPLEMENTED_TOOLS but NOT in the proxy `tools/list`. Asymmetry surfaced in `gotchas.md`.
+
+x-bugfix Investigate switched from `mcp__plugin_agentmemory_agentmemory__memory_file_history` (would fail with "Unknown tool" in proxy mode) to direct HTTP `POST /agentmemory/file-context` with `files: []`. Body shape now matches the HTTP route (array, not CSV), verified at `research/rohitg00/agentmemory/src/triggers/api.ts:783-790`.
+
+These findings were ONLY observable after the v1.15.0 hook fix landed AND `AGENTMEMORY_FORCE_PROXY=1` was set — both prerequisites for the harness to register proxy-mode tools. Future docs touching agentmemory should re-run the proxy-mode catalog probe against the installed backend version rather than trusting tools-registry.ts as a "what's MCP-callable" oracle.

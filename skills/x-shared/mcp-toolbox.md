@@ -79,23 +79,36 @@ Persistent memory MCP from `rohitg00/agentmemory`. Two tiers — standalone (7 t
 | Save an insight, decision, or lesson | `agentmemory` → `memory_save` (`{ content, type, concepts, files }`) | Append to native Claude memory |
 | List sessions for replay | `agentmemory` → `memory_sessions` | Manual `ls ~/.claude/projects/` |
 
+> **Asymmetry in proxy mode:** When the shim is in proxy mode, the upstream's `tools/list` does NOT include `memory_audit`, `memory_export`, or `memory_governance_delete` — empirically verified against agentmemory v0.9.21. If you need user-driven export / audit / delete, the upstream `agentmemory:forget` and `agentmemory:export` skills (separate plugin) own those flows over HTTP. The standalone tier is the source of truth for these three tools; proxy mode is a NEAR-superset, not strict.
+
 ### Server tier (gated by `agentmemory.server_up` — extended MCP toolset, proxy-forwarded)
 
-When the agentmemory backend is reachable, the `@agentmemory/mcp` shim enters **proxy mode** (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:354-415`): `tools/list` returns the full server tool list, and any unknown tool call is forwarded to `/agentmemory/mcp/call`. Server-tier tools therefore become callable through the standard `mcp__plugin_agentmemory_agentmemory__*` namespace whenever the `agentmemory.server_up` probe (per `capability-loading.md`) is true. Direct HTTP routes are listed as a fallback for non-MCP consumers (CLI scripts, debugging).
+When the agentmemory backend is reachable, the `@agentmemory/mcp` shim enters **proxy mode** (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:354-415`): `tools/list` returns the upstream server's curated tool list, and any unknown tool call is forwarded to `/agentmemory/mcp/call`. The proxy-mode tool list is **NOT a strict superset** of the standalone tools — empirically (against agentmemory v0.9.21 with `AGENTMEMORY_FORCE_PROXY=1`) the shim exposes 8 MCP tools total, three of the standalone seven disappear, and several documented "server-tier" capabilities remain HTTP-only. Direct HTTP routes are listed as the canonical interface for those.
 
-| Need | Primary MCP tool (proxy-forwarded when server up) | Direct HTTP route | Fallback when server down |
+#### MCP-callable in proxy mode (4 server-tier additions on top of 4 standalone survivors)
+
+| Need | Primary MCP tool (proxy-forwarded when server up) | Direct HTTP route (fallback / non-MCP consumers) | Fallback when server down |
 |---|---|---|---|
-| Past observations about specific files (regression hunt) | `memory_file_history({ files: "<csv>", sessionId? })` | `POST ${AGENTMEMORY_URL}/agentmemory/file-context` (body: `{ files: ["..."], sessionId? }`) | `git log -p -- <file>` |
-| Find the session that produced a commit | `memory_commit_lookup({ commit })` | `GET ${AGENTMEMORY_URL}/agentmemory/session/by-commit?commit=<sha>` | `git show <sha>` + manual reconstruction |
-| Recent commits with session linkage | `memory_commits` | `GET ${AGENTMEMORY_URL}/agentmemory/commits` | `git log --oneline` |
-| Recurring patterns across sessions | `memory_patterns({ project? })` | `POST ${AGENTMEMORY_URL}/agentmemory/patterns` | Skip — manual review |
-| Chronological observations around an anchor | `memory_timeline(...)` | `POST ${AGENTMEMORY_URL}/agentmemory/timeline` | `git log --since/--until` |
-| Knowledge-graph traversal | `memory_graph_query(...)` | `POST ${AGENTMEMORY_URL}/agentmemory/graph/query` | Skip — no fallback |
-| Typed-dimension filtering | `memory_facet_query(...)` | `POST ${AGENTMEMORY_URL}/agentmemory/facets/query` | Skip — manual triage |
-| Image-similarity search (UI regression) | `memory_vision_search(...)` | `POST ${AGENTMEMORY_URL}/agentmemory/vision-search` | Manual visual diff |
-| Health probe (used for server_up derivation) | n/a — probe must NOT go through MCP | `GET ${AGENTMEMORY_URL}/agentmemory/livez` | n/a |
+| Run health checks across all subsystems | `memory_diagnose({ categories? })` | n/a — proxy-only | n/a |
+| Run the 4-tier memory consolidation pipeline | `memory_consolidate({ tier? })` | n/a — proxy-only | n/a |
+| Save a lesson with confidence scoring | `memory_lesson_save({ content, confidence?, context?, project?, tags? })` | n/a — proxy-only | Skip — use `memory_save` instead |
+| Traverse the knowledge graph and synthesize higher-order insights | `memory_reflect({ project?, maxClusters? })` | n/a — proxy-only | Skip — no fallback |
 
-> Note: the MCP tool wrappers (e.g. `memory_file_history`) accept their own argument shapes which may differ from the direct HTTP body — e.g., the MCP tool takes `files` as a comma-separated STRING (schema at `research/rohitg00/agentmemory/src/mcp/tools-registry.ts:83-95`), while the direct HTTP `mem::file-context` route takes `files` as an array. Prefer the MCP path when available — the shim handles the conversion.
+#### HTTP-only when server up (NOT exposed through MCP proxy)
+
+| Need | Direct HTTP route | Fallback when server down |
+|---|---|---|
+| Past observations about specific files (regression hunt) | `POST ${AGENTMEMORY_URL}/agentmemory/file-context` (body: `{ files: ["..."], sessionId? }`) | `git log -p -- <file>` |
+| Find the session that produced a commit | `GET ${AGENTMEMORY_URL}/agentmemory/session/by-commit?commit=<sha>` | `git show <sha>` + manual reconstruction |
+| Recent commits with session linkage | `GET ${AGENTMEMORY_URL}/agentmemory/commits` | `git log --oneline` |
+| Recurring patterns across sessions | `POST ${AGENTMEMORY_URL}/agentmemory/patterns` | Skip — manual review |
+| Chronological observations around an anchor | `POST ${AGENTMEMORY_URL}/agentmemory/timeline` | `git log --since/--until` |
+| Knowledge-graph traversal | `POST ${AGENTMEMORY_URL}/agentmemory/graph/query` | Skip — no fallback |
+| Typed-dimension filtering | `POST ${AGENTMEMORY_URL}/agentmemory/facets/query` | Skip — manual triage |
+| Image-similarity search (UI regression) | `POST ${AGENTMEMORY_URL}/agentmemory/vision-search` | Manual visual diff |
+| Health probe (used for `server_up` derivation) | `GET ${AGENTMEMORY_URL}/agentmemory/livez` | n/a |
+
+> Empirically verified set; backend versions other than 0.9.21 may expose different curations. Re-test with: ToolSearch `+memory agentmemory` after `memory_diagnose` succeeds, and grep `(.tools // []) | map(.name)` against `${AGENTMEMORY_URL}/agentmemory/mcp/tools`.
 
 > Consumers should resolve the canonical request/response shape for each endpoint against the vendored upstream at `research/rohitg00/agentmemory`. MCP tool schemas live in `src/mcp/tools-registry.ts`; function_id ↔ HTTP route mapping lives in `src/triggers/api.ts`; the MCP→function_id dispatcher lives in `src/mcp/server.ts`. The endpoint paths above mirror the upstream's published REST routes (verified `grep -rn '"/agentmemory/' src/triggers/api.ts`).
 
