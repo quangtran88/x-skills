@@ -10,3 +10,6 @@
 [submodule "research/yeachan-heo/oh-my-claudecode"]
 	path = research/yeachan-heo/oh-my-claudecode
 	url = https://github.com/yeachan-heo/oh-my-claudecode
+[submodule "research/rohitg00/agentmemory"]
+	path = research/rohitg00/agentmemory
+	url = https://github.com/rohitg00/agentmemory
