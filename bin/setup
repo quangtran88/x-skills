@@ -785,6 +785,8 @@ check_mcp "morph"       "semantic codebase search + editing" \
   "claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_KEY -- npx -y @morph-llm/morph-fast-apply" || true
 check_mcp "gitnexus"    "code knowledge graph (impact / context / rename / route_map)" \
   "npm install -g gitnexus" || true
+check_mcp "agentmemory" "persistent memory + replay (rohitg00/agentmemory)" \
+  "/plugin marketplace add rohitg00/agentmemory && /plugin install agentmemory  # or: npx -y @agentmemory/mcp" || true
 
 # --- 4. Peer Plugins ---
 header "4. Peer Plugins"
@@ -917,6 +919,7 @@ manifest = {
             "context7":   cap("$(cap_get mcp_context7)"),
             "morph":      cap("$(cap_get mcp_morph)"),
             "gitnexus":   cap("$(cap_get mcp_gitnexus)"),
+            "agentmemory": cap("$(cap_get mcp_agentmemory)"),
         },
         "cli": {
             "gitnexus": cap("$(cap_get cli_gitnexus)"),
