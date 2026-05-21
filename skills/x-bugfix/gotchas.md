@@ -18,3 +18,15 @@ Known failure patterns specific to x-bugfix. For shared OMO patterns, see `../x-
 - **Skipping the debug report template.** After a successful fix + review cycle, it's tempting to skip the formal report. The template (`references/debug-report-template.md`) forces you to document regression test status, blast radius, and prevention measures — all commonly skipped when the fix "obviously works." Output the template even when the fix is clean.
 - **Implementing the fix without baseline logs.** tsc passing and the regression test going green don't prove the fix works at runtime — only that it compiles and the test path is exercised. Logs at the affected call chain's decision points (entry/exit, branches, state transitions) let you verify *behavior under real traffic*, not just *correctness under test fixtures*. Ship logs in the same diff as the fix per rule 1 of `../x-shared/instrument-and-verify.md`.
 - **Hypothesizing without a citation.** "I think it's a race condition" is not a hypothesis — it's a guess. A real hypothesis cites a stack frame, a log line, a test output, or a `file:line`. If you can only describe the suspected cause in conjecture words ("probably", "should be", "usually"), go produce evidence first (scratch script, instrumentation, source read) per rule 3 of `../x-shared/instrument-and-verify.md`. Speculation-first debugging is how 10-hour rabbit holes start.
+
+## agentmemory: standalone vs server-tier confusion
+
+`mcp.agentmemory` pinned does NOT mean every `memory_*` tool is callable through MCP. The `@agentmemory/mcp` shim exposes only **7 tools standalone** (`memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_audit`, `memory_export`, `memory_governance_delete` — verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:16-24`). The other 46 tools (`memory_file_history`, `memory_patterns`, `memory_commit_lookup`, …) are reachable ONLY via the agentmemory HTTP backend on `${AGENTMEMORY_URL:-http://localhost:3111}` — they are NOT registered as MCP tools regardless of whether the backend is up.
+
+**Symptom:** A call to `mcp__plugin_agentmemory_agentmemory__memory_file_history` returns `Unknown tool` despite the capability being pinned and the backend being reachable.
+
+**Fix:** Check the session-pinned `agentmemory.server_up` flag (derived once per session per `../x-shared/capability-loading.md`). If false, fall back to `git log -p -- <file>` — never retry the MCP call in a loop. If true, reach the backend over HTTP instead (e.g., `curl -fsS -X POST ${AGENTMEMORY_URL}/api/file_history ...`).
+
+**Detection:** The user can start the backend with `npx -y @agentmemory/agentmemory` in a separate terminal, or `curl http://localhost:3111/agentmemory/livez` to confirm. A `{"service":"agentmemory","status":"ok"}` reply means the HTTP-tier endpoints are usable.
+
+**Argument-name gotcha:** the upstream `file_history` endpoint expects `sessionId` (NOT `currentSessionId`) — using a wrong name silently disables current-session exclusion and pollutes regression-candidate ranking. Verified at `research/rohitg00/agentmemory/src/mcp/tools-registry.ts:83-95`.
