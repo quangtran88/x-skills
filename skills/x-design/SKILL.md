@@ -42,6 +42,8 @@ Read these files before routing any request:
 
 1. **Resolve target directory.** Confirm cwd is a project root (has `.git`, `package.json`, `pyproject.toml`, or user confirms explicitly). If ambiguous, ask before proceeding. Never write outside the user-confirmed directory.
 
+   - [ ] **Vision-search recall** (only when `agentmemory.server_up` pinned per `../x-shared/capability-loading.md`): one `curl -fsS -X POST "${AGENTMEMORY_URL:-http://localhost:3111}/agentmemory/vision-search" -H 'content-type: application/json' -d '{"query":"<design topic>","limit":5}'` call. Surface prior screenshots / mockups as supplementary context for slug resolution. When `agentmemory.server_up` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+
 2. **Resolve slug from intent.**
    - **Named:** find catalog row whose slug or name matches. Slugs are irregular (`linear.app`, `mistral.ai`, `x.ai`, `cal`, not `cal.com`) — always verify against the catalog.
    - **Descriptive:** match user's adjectives against the `Intent Tags` column. Return top 2–3 candidates with their one-liners. Ask the user to pick.
@@ -93,6 +95,8 @@ Read these files before routing any request:
    | Above + shadcn registries detected | `When generating UI: read DESIGN.md (vision) and design-system/MASTER.md (rules); use the shadcn MCP (search_items_in_registries, get_add_command_for_items) to install matching components.` |
 
    Never modify any other content in `CLAUDE.md`.
+
+   - [ ] **Persist design decision** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<one-line design decision + rationale>", type: "insight", concepts: "x-design,decision,slot:design,<area>" })` call. The `slot:` token in `concepts` substitutes for the upstream slot-store API (not present in agentmemory v0.9.21 — convention, not contract; `memory_save` silently drops unknown top-level fields, so a `category` arg would be invisible — verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:104-114`). Skip silently when not pinned.
 
 ## Quick Reference
 

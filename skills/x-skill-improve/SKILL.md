@@ -41,6 +41,8 @@ Use `session_search` (MCP tool) to find sessions where the target skill was invo
 
 **Search and extract** — see `references/session-discovery.md` for discovery queries, fallback ladder, and deep extraction parameters.
 
+- [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_sessions({ limit: 20 })` call plus one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: "<skill name + improvement keyword>", limit: 5 })` call. When both succeed, prefer these over the ad-hoc JSONL scan for session discovery. When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies and the JSONL fallback above remains the path.
+
 ### 2. Load Skill Files
 
 Read the full skill directory for the identified skill. Resolve location using this precedence:
@@ -144,6 +146,8 @@ After presenting the report, append a summary line to `data/alignment-log.jsonl`
 ```
 
 This enables cross-session pattern tracking — recurring compliance gaps signal systemic issues.
+
+- [ ] **Persist lesson** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<improvement applied to skill X>", type: "lesson", concepts: "x-skill-improve,<skill-name>,<improvement-class>" })` call. Skip silently when not pinned.
 
 ## After This Skill
 

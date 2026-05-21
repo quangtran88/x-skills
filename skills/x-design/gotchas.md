@@ -124,3 +124,5 @@ These skills have overlapping triggers. Quick disambiguation:
 | "Apply Stripe's gradients to my landing page" | `x-design` + `ui-ux-pro-max` (install + adapt) |
 
 When genuinely ambiguous, ask once: "Do you want me to install an existing design reference (x-design) or help you author one from scratch (ui-ux-pro-max)?"
+
+- **agentmemory two-tier dependency.** When wiring agentmemory calls in this skill, the standalone-vs-proxy mode behavior is canonical in `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` and `../x-shared/mcp-toolbox.md § agentmemory`. Do not duplicate; do not work around the capability gate.

@@ -215,3 +215,5 @@ git reset --hard ORIG_HEAD
 ## After Execution
 
 See "After This Skill" in `../SKILL.md` for /x-review handoff and learner hook.
+
+- [ ] **Persist lesson** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<one-line: what was built/changed> → <observed outcome>", type: "lesson", concepts: "x-do,<mode A/B/C/D>,<area>", files: "<touched paths comma-sep>" })` call. Skip silently when not pinned.

@@ -69,6 +69,8 @@ This enrichment **sharpens in-scope findings only** (false-assumption / spec-dev
 
 A clear description of WHAT is being reviewed and the content/diff ready for reviewers. When the enrichment gate passed, include the per-symbol depth-1 summary / route_map consumer list (each line carrying the C2 disclaimer); when it did not, this is byte-identical to the pre-enrichment output.
 
+- [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: "<PR title or diff summary>", limit: 5 })` call. Additionally, when `agentmemory.server_up` is pinned (per `../../x-shared/capability-loading.md`), one `curl -fsS -X POST "${AGENTMEMORY_URL:-http://localhost:3111}/agentmemory/file-context" -H 'content-type: application/json' -d '{"files":[<changed paths array>],"sessionId":"<this session id>"}'` call to surface prior touches on the same files. Treat results as supplementary review context — leads, not verdicts. When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies; when `agentmemory.server_up` is not pinned, skip the HTTP call silently and keep the MCP recall.
+
 ## Next Step
 
 Read fully and follow `step-02-review.md` with the prepared content.

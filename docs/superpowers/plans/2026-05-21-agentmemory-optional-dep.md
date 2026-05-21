@@ -538,3 +538,71 @@ After v1.15.0 shipped and `AGENTMEMORY_FORCE_PROXY=1` was applied, restarting Cl
 x-bugfix Investigate switched from `mcp__plugin_agentmemory_agentmemory__memory_file_history` (would fail with "Unknown tool" in proxy mode) to direct HTTP `POST /agentmemory/file-context` with `files: []`. Body shape now matches the HTTP route (array, not CSV), verified at `research/rohitg00/agentmemory/src/triggers/api.ts:783-790`.
 
 These findings were ONLY observable after the v1.15.0 hook fix landed AND `AGENTMEMORY_FORCE_PROXY=1` was set — both prerequisites for the harness to register proxy-mode tools. Future docs touching agentmemory should re-run the proxy-mode catalog probe against the installed backend version rather than trusting tools-registry.ts as a "what's MCP-callable" oracle.
+
+---
+
+## Fan-Out Amendment (2026-05-21, post-Round-3)
+
+The original plan deferred fan-out for a one-week soak. We're overriding that gate at user request — the proxy catalog has been empirically validated (Round 3) and the wiring pattern from x-bugfix has run cleanly through the release cycle. **Soak risk:** if a regression surfaces in any wiring, we now have 7 places to revert instead of 1; mitigated by keeping every call capability-gated with skip-silently fallback and by bundling reverts per skill if needed.
+
+### Phase 1 — MCP-callable wirings (5 skills, no upstream blockers)
+
+All Phase 1 wirings use only tools in the empirical proxy-mode catalog (`memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_lesson_save`) plus the two HTTP routes confirmed at `research/rohitg00/agentmemory/src/triggers/api.ts` (`POST /agentmemory/file-context`, `POST /agentmemory/patterns`). Every call is gated on `mcp.agentmemory` (for MCP calls) or `agentmemory.server_up` (for HTTP calls) per `skills/x-shared/capability-loading.md`; absent = skip silently, never fail loud.
+
+| Skill | Recall injection point | Recall call | Save injection point | Save call |
+|---|---|---|---|---|
+| **x-research** | `skills/x-research/SKILL.md` Bootstrap step 4 (new bullet after `gotchas.md`) | `memory_smart_search({ query: <topic + signal>, limit: 5 })` — surface prior research as supplementary context | `skills/x-research/SKILL.md` Synthesis (existing § "Synthesis" :108) — append a save bullet | `memory_save({ content: <one-line synthesis takeaway>, type: "insight", concepts: "x-research,<signal>,<topic-token>" })` |
+| **x-do** | `skills/x-do/steps/step-01-gather.md` § 1 "Fire parallel detection" (add to the parallel batch) | `memory_smart_search({ query: <task keywords + project>, limit: 5 })` — leads on prior similar tasks; do NOT auto-apply | `skills/x-do/steps/step-04-execute.md` § "After Execution" (new bullet) | `memory_save({ content: "<one-line: what was built/changed> → <observed outcome>", type: "lesson", concepts: "x-do,<mode A/B/C/D>,<area>", files: <touched paths comma-sep> })` |
+| **x-mindful** | `skills/x-mindful/SKILL.md` § Bootstrap (:29, new bullet) | `memory_recall({ query: <plan-slug + architectural keywords>, token_budget: 1500 })` — past arch lessons relevant to this plan | `skills/x-mindful/steps/step-05-handoff.md` § "Persistence" (:71) — extend existing block | `memory_lesson_save({ content: <one-sentence arch lesson confirmed/rejected by walkthrough>, tags: "x-mindful,architecture,<slug>" })` — per envelope item that produced a *new* lesson |
+| **x-review** | `skills/x-review/steps/step-01-prepare.md` § "Output" (:68) — new pre-output bullet | `memory_smart_search({ query: <PR title or diff summary>, limit: 5 })` + optional `curl POST /agentmemory/file-context` with `files: <changed paths>` when `agentmemory.server_up` | `skills/x-review/steps/step-03-synthesize.md` § "Synthesis" (:51, new tail bullet) | `memory_save({ content: "<finding summary> → <recommendation>", type: "lesson", concepts: "x-review,<severity>,<area>", files: <files cited in finding> })` per CRITICAL/HIGH finding only |
+| **x-skill-improve** | `skills/x-skill-improve/SKILL.md` § Workflow § 1 "Locate Session" (:36) | `memory_sessions({ limit: 20 })` + `memory_smart_search({ query: <skill name + improvement keyword>, limit: 5 })` — replaces ad-hoc JSONL scan when MCP available | `skills/x-skill-improve/SKILL.md` § Persistence (:138) — extend | `memory_save({ content: "<improvement applied to skill X>", type: "lesson", concepts: "x-skill-improve,<skill-name>,<improvement-class>" })` |
+
+### Phase 2 — Best-effort wirings (2 skills, with substitutions for missing upstream routes)
+
+The plan's "Out of Scope" table specified "HTTP slot endpoints" for `x-design` and `x-qa`. **Those endpoints do not exist in agentmemory v0.9.21** (no route under `/agentmemory/*` mentions "slot"; verified via `grep -rn 'slot' research/rohitg00/agentmemory/src/triggers/api.ts` returns zero matches). We substitute `memory_save` with a `category` field as a structured-tag convention. This is a NEW convention not validated by upstream — if upstream adds slot endpoints later, migrate.
+
+| Skill | Recall injection point | Recall call | Save injection point | Save call |
+|---|---|---|---|---|
+| **x-design** | `skills/x-design/SKILL.md` Workflow (:41, first step) | When `agentmemory.server_up`: `curl -fsS -X POST "${AGENTMEMORY_URL:-http://localhost:3111}/agentmemory/vision-search" -H 'content-type: application/json' -d '{"query":"<design topic>","limit":5}'` — surface prior screenshots/mockups. Skip silently otherwise. | `skills/x-design/SKILL.md` Workflow (last step before "Quick Reference") | `memory_save({ content: <one-line design decision + rationale>, type: "insight", concepts: "x-design,decision,slot:design,<area>" })` — `slot:design` token in `concepts` substitutes for slot-store API (per pre-commit correction below) |
+| **x-qa** | `skills/x-qa/SKILL.md` Run Phases (after step 1 Bootstrap, before scout) | `memory_smart_search({ query: <test path or framework + "flake">, limit: 10 })` — surface prior flake notes; treat as test-history context, not autopilot | `skills/x-qa/SKILL.md` § After This Skill (:137) — new save bullet | `memory_save({ content: "<test pattern or flake observation>", type: "lesson", concepts: "x-qa,<framework>,<pattern-kind>,slot:test-plan" })` — `slot:test-plan` token per pre-commit correction below |
+
+### Cross-cutting rules (apply to ALL 7 wirings)
+
+1. **Capability gate is mandatory.** Every call sites starts with: "only when `mcp.agentmemory` pinned in bootstrap-active set" (MCP calls) or "only when `agentmemory.server_up` pinned" (HTTP calls). When absent, **skip silently** — never log a warning, never fail. Pattern verified in x-bugfix Pre-Flight bullet.
+2. **Try/catch all MCP and HTTP calls.** If the call errors at runtime (proxy mode race, transient HTTP failure), proceed with degraded behavior — the skill's primary workflow must not depend on agentmemory being reachable.
+3. **No auto-apply.** Recall results are CONTEXT, never instructions. Skill prompts must phrase results as "prior sessions saw X — consider as supplementary input" not "do X because prior session did".
+4. **Concept-token discipline.** First concept is always the skill name (`x-research`, `x-do`, etc.) so cross-session queries can filter by originating skill.
+5. **Per-skill gotchas.md.** Append one bullet pointing at `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` for the canonical reference; do NOT duplicate the gotcha text.
+6. **No probe duplication.** The `agentmemory.server_up` probe lives in `skills/x-shared/capability-loading.md` and is consumed from the session-pinned snapshot — never re-probe per skill dispatch.
+
+### Validation plan (post-wiring)
+
+After all 7 wirings land:
+
+1. **Static read-through:** spot-check each modified file for the capability gate phrase and skip-silently fallback.
+2. **TS-noop check:** no TypeScript files touched — pure markdown — so `tsc` is N/A. ESLint also N/A.
+3. **Cross-model review:** dispatch x-review on the bundled diff per the v1.15.0 cycle (Claude + GPT oracle + Gemini-pro + general-purpose) with scope guard limited to correctness / capability-gate compliance / false assumptions / plan deviations.
+4. **Manual smoke (deferred):** in a fresh session with backend up, invoke `/x-skills:x-research <topic>` and confirm the recall bullet fires (look for `memory_smart_search` in the deferred tools list AND a citation in the synthesis). Mark as PENDING in the release notes — do not block release on it.
+
+### Release
+
+Phase 1 + Phase 2 bundled into one release per user direction. Bump `1.15.0 → 1.16.0` (MINOR — feature-level: 7 skills now agentmemory-aware). Per CLAUDE.md release workflow, bump the three manifests + commit + tag + `gh release create` + push.
+
+### Rationale for overriding the soak
+
+Original soak rationale was "minimize blast radius if x-bugfix wiring has a bug". After Round 3, the wiring has been empirically validated AND every call is capability-gated with skip-silently fallback — failure mode is "skill behaves as if agentmemory weren't installed," which is the existing-user baseline. So the soak protects against a regression class that the gate already prevents. The risk worth respecting is *plan-reality drift in the new injection points* — handled by the static read-through + cross-model review above.
+
+### Pre-commit corrections (advisor-caught, 2026-05-21)
+
+Advisor surfaced two schema-vs-doc bugs in the executor output BEFORE commit — both fixed in the same diff. Pattern: trust upstream `tools-registry.ts` over plan-amendment author intent.
+
+1. **`category` field silently dropped by `memory_save`.** The original Phase 2 rows used `category: "design-slot"` / `category: "test-plan-slot"` as a "convention substituting for slot-store API." But the standalone validator at `research/rohitg00/agentmemory/src/mcp/standalone.ts:104-114` picks only `content`, `type`, `concepts`, `files` from args — any extra top-level field is invisible to backend storage. Fix: encode the slot as a `slot:design` / `slot:test-plan` token inside the `concepts` comma-list, where it stays queryable via `memory_smart_search`.
+
+2. **`memory_lesson_save` uses `tags`, not `concepts`.** Schema at `research/rohitg00/agentmemory/src/mcp/tools-registry.ts:752-774` accepts `{content, context, confidence, project, tags}` — NOT `concepts` (that's `memory_save`'s field). The x-mindful wiring originally used `concepts: "x-mindful,architecture,<slug>"`; corrected to `tags: "x-mindful,architecture,<slug>"`.
+
+Meta-lesson (Rounds 1-4 all share it): **the plan author wrote from generic "tag-like field" intuition rather than per-tool schema citations.** Future agentmemory wiring tasks must cite the tools-registry.ts line range for every distinct MCP tool invoked, and the standalone.ts validator behavior for the standalone-mode subset.
+
+### What was NOT touched
+
+- The pre-existing x-bugfix wiring (shipped in v1.15.0) uses `type: "lesson"` for `memory_save`. The upstream docs list `type` enum as "pattern, preference, architecture, bug, workflow, or fact" — "lesson" is off-spec. BUT the validator (`standalone.ts:110`) accepts any string and defaults to "fact" if absent, so `type: "lesson"` is stored as-is. Consistency with the shipped x-bugfix pattern beats moving to an enum value that wasn't validated either. Phase 1 + Phase 2 wirings keep `type: "lesson"` and `type: "insight"` as-is.
+- No `bin/setup`, hook, or capability-loading changes — those shipped in v1.15.0 and remain authoritative.

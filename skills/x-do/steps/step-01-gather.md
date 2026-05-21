@@ -46,6 +46,8 @@ Agent (subagent_type=Explore, parallel):
 
 Pin the returned directories as `DESIGN_DIR` and `PLAN_DIR` for the rest of the task.
 
+- [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): in the same parallel batch, one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: <task keywords + project name>, limit: 5 })` call. Surface prior similar tasks as leads for the brainstorming / planning steps — do NOT auto-apply. When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+
 ### 2. Research gate (optional — only when warranted)
 
 Dispatch `Skill: x-skills:x-research` **only** when ANY of these hold:

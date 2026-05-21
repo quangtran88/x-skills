@@ -114,6 +114,7 @@ Refer to:
 ## Run Phases
 
 1. Bootstrap (above).
+   - [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: "<test path or framework + 'flake'>", limit: 10 })` call. Surface prior flake notes as test-history context for case classification — not autopilot. When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 2. Auto-doctor (skippable via `--skip-doctor`).
 3. **Classify intent.** Run `scripts/classify-intent.sh "{{ARGUMENTS}}"`, persist to `<run-dir>/intent.json`. If `confidence == "low"` OR multiple candidates surface, ask the user ONE question per `references/intent-detection.md § Ask-When-Ambiguous`, then rewrite intent.json with `confidence: high`.
 4. Resolve target from intent: `service` → entry name; `branch`/`pr` → PR-surface derivation (`references/pr-surface-derivation.md`); `spec`/`artifact`/`artifact-dir`/`prose` → trigger Phase 5 (Scout). Refuse if resolved entry's `type != http` (v1 limitation).
@@ -139,6 +140,8 @@ Refer to:
 If invoked by `x-team`: emit envelope only, x-team consumes via Skill return value.
 If invoked by user: print envelope + path to `QA_REPORT.md` + summary table.
 On `fail`: surface offer to route into `/x-skills:x-bugfix` with the failed cases as input.
+
+- [ ] **Persist test pattern** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<test pattern or flake observation>", type: "lesson", concepts: "x-qa,<framework>,<pattern-kind>,slot:test-plan" })` call. The `slot:` token in `concepts` substitutes for the upstream slot-store API (not present in agentmemory v0.9.21 — convention, not contract; `memory_save` silently drops unknown top-level fields, so a `category` arg would be invisible — verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:104-114`). Skip silently when not pinned.
 
 ## Dependencies
 

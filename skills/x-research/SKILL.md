@@ -17,6 +17,7 @@ Before dispatching anything, load:
 2. `../x-gemini/SKILL.md` — direct Gemini CLI bridge (Google Search grounding, gemini-3.x, `--file`, `--resume`). **Load only if `gemini_cli` capability is pinned**; if not pinned, drop gemini-agent rows from the routing table and pick the escalation column instead.
 3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph).
 4. `gotchas.md` — known failure patterns.
+5. **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: <topic + signal keywords>, limit: 5 })` call. Surface any prior research sessions on the same topic as supplementary context for the synthesis — leads, not verdicts. When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 
 **Bootstrap shortcut:** if the question is a Standard-Mode local-only direct read with no agent dispatch, you may skip step 1 (OMO) and step 2 (gemini). Steps 3 + 4 are always required.
 
@@ -107,6 +108,8 @@ Role agents (catalog in `../x-omo/SKILL.md`) cover 95% of needs. Use `omo-agent 
 
 Standard Mode: see `references/synthesis-rules.md`.
 Max Mode: same rules + reconciliation template in `references/max-mode.md`.
+
+- [ ] **Persist insight** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<one-line synthesis takeaway>", type: "insight", concepts: "x-research,<signal>,<topic-token>" })` call. Skip silently when not pinned.
 
 ## Follow-Up Rounds
 

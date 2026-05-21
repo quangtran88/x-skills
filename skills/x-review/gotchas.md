@@ -42,3 +42,4 @@ Known failure patterns specific to x-review. For shared OMO patterns, see `../x-
 ## Architecture
 
 - **Rigid step structure is deliberate.** The step-file architecture uses NEVER/ALWAYS language because flexible versions caused models to skip critical steps (merging review/synthesis, dropping verification gates). If you're tempted to skip or reorder steps, check here first — the rigidity prevents real failures.
+- **agentmemory two-tier dependency.** When wiring agentmemory calls in this skill, the standalone-vs-proxy mode behavior is canonical in `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` and `../x-shared/mcp-toolbox.md § agentmemory`. Do not duplicate; do not work around the capability gate.
