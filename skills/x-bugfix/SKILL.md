@@ -64,6 +64,7 @@ Classify the bug into ONE mode:
   - **Behavioral bug?** (duplication, wrong output, timing issue — no error/stack trace exists): Capture expected vs. actual behavior as the baseline instead. Document what the user observes and what correct behavior looks like.
 - [ ] Read error messages carefully — don't skip stack traces
 - [ ] Read `gotchas.md` for known failure patterns
+- [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: <symptom keywords + framework>, limit: 5 })` call. If results include prior bug-fix sessions touching the same symptom or files, surface them in the Investigate step as candidate root-cause hypotheses (do not auto-apply — these are leads, not verdicts). When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 - [ ] `git log --oneline -10 -- <affected-files>` — regression = root cause is in the diff
 
 ## Available Tools
@@ -87,7 +88,7 @@ For MCP tool selection (search, edit, web facts, library docs), see the canonica
 
 ### Investigate
 
-Gather evidence before forming hypotheses. Reproduce the bug, check recent changes, trace the data flow backward from symptom to source. **Use `morph-mcp codebase_search` as your first search tool** for tracing call chains, finding related code, and locating error origins — it's semantic and faster than spawning explore agents. Fall back to OMO `explore` only when you need parallel multi-tool investigation. For deep call stacks, use the backward tracing technique in `references/backward-tracing.md`. Consult `references/pattern-catalog.md` to narrow the search space.
+Gather evidence before forming hypotheses. Reproduce the bug, check recent changes, trace the data flow backward from symptom to source. **Use `morph-mcp codebase_search` as your first search tool** for tracing call chains, finding related code, and locating error origins — it's semantic and faster than spawning explore agents. Fall back to OMO `explore` only when you need parallel multi-tool investigation. For deep call stacks, use the backward tracing technique in `references/backward-tracing.md`. Consult `references/pattern-catalog.md` to narrow the search space. When `agentmemory.server_up` is pinned (per `../x-shared/capability-loading.md`), call the agentmemory HTTP backend directly — server-tier endpoints are NOT exposed through MCP — e.g. `curl -fsS -X POST "${AGENTMEMORY_URL:-http://localhost:3111}/api/file_history" -H 'content-type: application/json' -d '{"files":"<suspected paths, comma-separated>","sessionId":"<this session id>"}'` to surface prior touches on the same files; treat each prior session as a regression-candidate ranked by recency. Note the parameter name is `sessionId` (NOT `currentSessionId`) — using a wrong name silently disables current-session exclusion. When server not up, fall back to `git log -p -- <file>`.
 
 If no pattern matches, search for the error: sanitize first (strip hostnames, IPs, file paths, SQL, customer data), then search "{framework} {sanitized error type}". If the error is too specific to sanitize safely, skip the search.
 
@@ -164,6 +165,7 @@ Append the root cause summary to `debug-log.jsonl` in the skill's state director
 ## Post-Fix Verification (MANDATORY)
 
 In TS/JS projects: `npx tsc --noEmit` + `npx eslint <changed-files>` + full test suite. Fix all errors before claiming done.
+- [ ] **Persist lesson** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<one-sentence root cause> → <one-sentence fix>", type: "lesson", concepts: "x-bugfix,<area>,<symptom-token>", files: <touched paths comma-sep> })` call. Skip silently when not pinned.
 
 ## After This Skill
 
