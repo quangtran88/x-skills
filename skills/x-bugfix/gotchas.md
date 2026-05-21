@@ -26,11 +26,18 @@ The `@agentmemory/mcp` shim has two modes determined at runtime by backend reach
 - **Standalone mode** (no backend on `${AGENTMEMORY_URL:-http://localhost:3111}`): only the 7 IMPLEMENTED_TOOLS at `standalone.ts:16-24` are callable via MCP — `memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_audit`, `memory_export`, `memory_governance_delete`. Calling any other `memory_*` tool returns `Unknown tool`.
 - **Proxy mode** (backend reachable): `tools/list` returns the full remote tool list and any non-standalone tool call is forwarded to `/agentmemory/mcp/call`. Server-tier tools (`memory_file_history`, `memory_commit_lookup`, `memory_diagnose`, etc.) become callable as `mcp__plugin_agentmemory_agentmemory__*`.
 
-**Symptom:** A call to `mcp__plugin_agentmemory_agentmemory__memory_file_history` returns `Unknown tool` despite `mcp.agentmemory` being pinned.
+**Symptom:** A call to `mcp__plugin_agentmemory_agentmemory__memory_file_history` returns `Unknown tool` despite `mcp.agentmemory` being pinned AND `curl ${AGENTMEMORY_URL}/agentmemory/livez` returning ok.
 
-**Cause:** Backend not reachable — shim fell back to standalone mode, where only 7 tools work.
+**Cause:** The MCP shim's mode is decided ONCE at MCP-server startup via `probe(url)` (verified at `research/rohitg00/agentmemory/src/mcp/rest-proxy.ts:101-126`). If the agentmemory backend was not running at the moment Claude Code launched the MCP shim, the shim cached `local` mode and the harness's `tools/list` registered only the 7 IMPLEMENTED_TOOLS for the session. Starting the backend later doesn't help — the harness's tool catalog is frozen. The runtime `agentmemory.server_up` probe will show `true` but server-tier MCP tools will still be missing.
 
-**Fix:** Check the session-pinned `agentmemory.server_up` flag (derived once per session per `../x-shared/capability-loading.md`). If false, fall back to `git log -p -- <file>` — do not retry the MCP call in a loop. If true and the call still fails, the proxy handle may have been invalidated mid-session (`[@agentmemory/mcp] proxy call failed` on stderr); restart the backend with `npx -y @agentmemory/agentmemory`.
+**Fix order (lowest blast radius first):**
+
+1. **Start the backend BEFORE Claude Code** — e.g., `npx -y @agentmemory/agentmemory &` in your shell rc, or run it as a launchd / pm2 service. Next Claude Code session starts the MCP shim in proxy mode and registers all server-tier tools.
+2. **Force proxy mode** — set `AGENTMEMORY_FORCE_PROXY=1` in the env before Claude Code launches. The shim skips the livez probe and trusts the URL (verified at `rest-proxy.ts:113-119`). Useful when the backend is reliably reachable but a slow first-probe race causes the shim to fall back to standalone.
+3. **If you're already mid-session and want the tools NOW** — there is no in-process recovery. Restart Claude Code (or at minimum restart the agentmemory MCP server entry) after the backend is up.
+4. **If the backend genuinely IS down** — fall back to `git log -p -- <file>`. Do not retry the MCP call in a loop.
+
+**Distinguishing the two failure modes:** If `curl ${AGENTMEMORY_URL}/agentmemory/livez` returns ok but the MCP tool errors with `Unknown tool`, it's startup-order (case 1/2/3 above). If livez itself fails, the backend really is down (case 4).
 
 **Argument-name gotcha:** `memory_file_history` schema expects `sessionId` (NOT `currentSessionId`) — verified at `research/rohitg00/agentmemory/src/mcp/tools-registry.ts:83-95`. Using the wrong name silently disables current-session exclusion and pollutes regression-candidate ranking.
 
