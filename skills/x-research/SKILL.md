@@ -70,7 +70,15 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 
 **Cheapest-viable-first.** Free/instant tools (morph, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
 
-**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate. **Max Mode is exempt** — its whole purpose is parallel multi-lane fan-out where the user has accepted the cost. **Pre-planning Type F is also exempt** — the three lanes (`oracle` for strategic framing, `morph codebase_search` for semantic search, `OMO explore` for pattern context) cover orthogonal axes, so parallel dispatch is intentional and not "just in case". See `references/prompt-templates.md` § Type F for the canonical fan-out.
+**🟢 DEFAULT GEMINI FAN-OUT (Standard Mode):** when `gemini_cli` capability is pinned, `gemini-agent` runs in **parallel with the primary** on every Standard Mode dispatch as an intentional fan-out — NOT "just in case". This is exempt from the hard gate below. Rationale: gemini-agent brings axes the primary cannot (Google Search grounding for stale-library/CVE detection, 1M context for large diffs/docs, multimodal for screenshots). Model selection:
+- Local-code rows (gitnexus/morph primary) → `gemini-agent --model pro --file <key entrypoint or directory>` for an independent reading of the same code.
+- Web/library/architecture/factual rows → `gemini-agent --model pro "<question>"` for Google-grounded second opinion.
+- Visual/large-input rows where gemini is already primary → no extra lane needed (already running).
+- Pure symbol-graph rows (`gitnexus context`) → SKIP gemini lane (call-graph data, nothing for gemini to add).
+
+Note the lane skip in synthesis when applicable; reconcile per `references/synthesis-rules.md`.
+
+**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any **OMO agent** (oracle/explore/librarian/multimodal-looker). Firing OMO agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the primary output and judged it inadequate. **Exempt from this gate:** (a) Max Mode (parallel multi-lane fan-out is the point); (b) Pre-planning Type F — the three lanes (`oracle`, `morph codebase_search`, `OMO explore`) cover orthogonal axes; (c) the Default Gemini Fan-Out above — gemini-agent is intentionally parallel when pinned. See `references/prompt-templates.md` § Type F for the canonical fan-out.
 
 **Parallel only when axes differ:** morph (local code) ∥ perplexity (web) is fine. morph ∥ OMO `explore` "just in case" is waste.
 

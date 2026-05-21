@@ -29,11 +29,12 @@ The caller (typically `x-do` for research-produced plans, trivial impls, or mech
 
 ## Plan Review (Target A)
 
-Launch these 3 in ONE message. **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.
+Launch these 4 in ONE message (3 when `gemini_cli` capability is NOT pinned). **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.
 
 1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective. Prepend the Scope Guard above.
 2. **Bash tool:** `<omo_agent from config.json> --model gpt "<SCOPE_GUARD>\n\nYou are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: false assumptions in the plan, missing dependencies, ambiguous success criteria, verification gaps. Do NOT propose new features, alternative architectures, or scope additions."`, `run_in_background: true`, `timeout: 600000` — GPT-5.5 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `../../x-omo/gotchas.md`.*
-3. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow. Prepend the Scope Guard.
+3. **Bash tool:** `gemini-agent --model pro "<SCOPE_GUARD>\n\nYou are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: false assumptions in the plan (especially library/API claims you can verify via Google Search), missing dependencies, ambiguous success criteria, verification gaps. Do NOT propose new features, alternative architectures, or scope additions."`, `run_in_background: true`, `timeout: 600000` — Gemini-3-pro plan blocker-finder. Strengths: Google Search grounding catches stale library claims / removed APIs / outdated framework guidance in the plan that Claude+GPT miss; 1M context handles plan + linked specs in one pass. **Skip this lane only if `gemini_cli` capability is NOT pinned** (per `../../x-shared/capability-loading.md`); note the skip in synthesis.
+4. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow. Prepend the Scope Guard.
 
 For architecture-sensitive plans, add a 4th reviewer **only if the user explicitly asked for an architecture review**:
 - **Bash tool:** `<omo_agent from config.json> oracle "<SCOPE_GUARD>\n\n<architecture review prompt>"`, `run_in_background: true`, `timeout: 600000`
