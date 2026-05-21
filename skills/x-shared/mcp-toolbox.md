@@ -65,3 +65,40 @@ Code-intelligence MCP server (`npm install -g gitnexus`). Provides precomputed c
 **Freshness gate:** when the gate fails *only* on the freshness leg (pinned + indexed but the index is stale), the behavior depends on the tool's use class — resolved from the **Use-class index (F2) above, which is the single source of truth for class membership** (do NOT re-enumerate the tool lists here):
 - Tools in the **correctness-sensitive** class: a stale index produces silently-wrong symbol/flow mappings — **hard-degrade to the Fallback row**. Do not use stale graph output.
 - Tools in the **advisory** class: proceed using the stale index but **append a one-line staleness note** (e.g. `(index N commits stale — results may lag HEAD)`) to the surfaced result. Stale search beats no search; the user reads raw results.
+
+## agentmemory (optional, when `mcp.agentmemory` pinned)
+
+Persistent memory MCP from `rohitg00/agentmemory`. Two tiers — standalone (7 tools exposed through MCP, work without a running server) and server (46 more tools, reachable ONLY via the agentmemory HTTP backend at `${AGENTMEMORY_URL:-http://localhost:3111}`; server-tier tools are NOT registered through the MCP transport — see the `agentmemory.server_up` probe defined in `capability-loading.md`). License: Apache-2.0.
+
+### Standalone tier (always available when `mcp.agentmemory` pinned)
+
+| Need | Primary tool | Fallback (when `mcp.agentmemory` not pinned) |
+|---|---|---|
+| Recall prior decisions/observations on a topic | `agentmemory` → `memory_smart_search` (`{ query, limit }`) | Native Claude memory (`~/.claude/projects/<proj>/memory/MEMORY.md`) |
+| Targeted recall with format + token budget | `agentmemory` → `memory_recall` (`{ search, format: 'compact', budget }`) | Native Claude memory grep |
+| Save an insight, decision, or lesson | `agentmemory` → `memory_save` (`{ content, type, concepts, files }`) | Append to native Claude memory |
+| List sessions for replay | `agentmemory` → `memory_sessions` | Manual `ls ~/.claude/projects/` |
+
+### Server tier (gated by `agentmemory.server_up` — reached via HTTP, not MCP)
+
+| Need | Primary endpoint (correctness class) | Fallback when server down |
+|---|---|---|
+| Past observations about specific files (regression hunting) | HTTP `POST ${AGENTMEMORY_URL}/api/file_history` (correctness-sensitive) | `git log -p -- <file>` + manual scan |
+| Find the session that produced a commit | HTTP `POST ${AGENTMEMORY_URL}/api/commit_lookup` (correctness-sensitive) | `git show <sha>` + manual context reconstruction |
+| Recent commits with session linkage | HTTP `GET ${AGENTMEMORY_URL}/api/commits` (advisory) | `git log --oneline` |
+| Recurring patterns across sessions | HTTP `POST ${AGENTMEMORY_URL}/api/patterns` (advisory) | Skip — manual review |
+| Chronological observations around an anchor | HTTP `POST ${AGENTMEMORY_URL}/api/timeline` (advisory) | `git log --since/--until` |
+| Knowledge-graph traversal | HTTP `POST ${AGENTMEMORY_URL}/api/graph_query` (advisory) | Skip — no fallback |
+| Typed-dimension filtering | HTTP `POST ${AGENTMEMORY_URL}/api/facet_query` (advisory) | Skip — manual triage |
+| Image-similarity search (UI regression) | HTTP `POST ${AGENTMEMORY_URL}/api/vision_search` (advisory) | Manual visual diff |
+| Health probe (used for the server_up derivation itself) | HTTP `GET ${AGENTMEMORY_URL}/agentmemory/livez` (probe-only) | n/a |
+
+> Consumers should resolve the canonical request/response shape for each endpoint against the vendored upstream at `research/rohitg00/agentmemory` (see `src/mcp/server.ts` for the function_id ↔ HTTP route mapping). The endpoint paths above mirror the upstream's published REST routes.
+
+### Tools NOT routed through x-skills
+
+`memory_action_*`, `memory_sketch_*`, `memory_lease`, `memory_signal_*`, `memory_team_*`, `memory_mesh_sync`, `memory_routine_run`, `memory_sentinel_*`, `memory_checkpoint`, `memory_claude_bridge_sync` — workflow/multi-agent coordination overlapping with TodoWrite + `x-team` + `oh-my-claudecode:team`. Auto-deletion tools (`memory_governance_delete`, `memory_export`, `memory_obsidian_export`, `memory_audit`) — user-driven, owned by the upstream `agentmemory:forget` skill.
+
+### Disambiguation: agentmemory vs Claude's auto-memory file
+
+Claude Code already injects `~/.claude/projects/<proj>/memory/MEMORY.md` into every session. That file is best for **the user's stable preferences and project facts**. agentmemory is best for **per-session observations, decisions, and file-touch history** that's too granular for MEMORY.md and benefits from semantic search. Use both — they don't compete.
