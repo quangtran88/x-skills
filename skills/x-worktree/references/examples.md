@@ -89,6 +89,48 @@ ISOLATE_REASON=apply-timeout-5s
 ISOLATE_HINT=run x-worktree-isolate apply manually to retry
 ```
 
+**Doc-driven: single PLAN.md with H1 `# feat: Add user auth`:**
+```
+✓ Worktree ready
+WORKTREE_PATH=<absolute-path-to-new-worktree>
+BRANCH=feat/add-user-auth
+BASE=main
+PROVIDER=git
+CWD_SWITCHED=true
+DOCS_COMMITTED=1
+DOC_COMMIT_SHA=8f3a1e2c9b...
+ISOLATE_APPLIED=skipped
+ISOLATE_REASON=no-profile
+```
+Invocation: `/x-skills:x-worktree main PLAN.md`. The doc was untracked in the original cwd; after the run it lives only in the new branch.
+
+**Doc-driven: multiple docs share one commit:**
+```
+✓ Worktree ready
+WORKTREE_PATH=<absolute-path-to-new-worktree>
+BRANCH=refactor/extract-auth-module
+BASE=main
+PROVIDER=wt
+CWD_SWITCHED=true
+DOCS_COMMITTED=2
+DOC_COMMIT_SHA=2a7d4f9c1e...
+ISOLATE_APPLIED=true
+```
+Invocation: `/x-skills:x-worktree main PLAN.md SPEC.md`. PLAN.md (primary) drove the name; both docs landed in the same `docs: add PLAN.md, SPEC.md` commit.
+
+**Doc-driven: doc commit failed (pre-commit hook rejected), worktree still usable:**
+```
+✓ Worktree ready
+WORKTREE_PATH=<absolute-path-to-new-worktree>
+BRANCH=feat/payment-flow
+BASE=main
+PROVIDER=git
+CWD_SWITCHED=true
+DOCS_COMMITTED=0
+DOCS_ERROR=commit-msg hook rejected: type 'docs' not in allowed list
+```
+Originals were restored to their source location (rollback). `ISOLATE_APPLIED` is omitted because the doc failure takes precedence — caller surfaces `DOCS_ERROR` to user first.
+
 **Auto-isolation explicitly disabled (`--no-isolate`):**
 ```
 ✓ Worktree ready
@@ -132,6 +174,22 @@ CWD_SWITCHED=false
 ```
 ✗ Worktree FAILED
 REASON=branch name 'spike redis' fails git check-ref-format
+PROVIDER_ATTEMPTED=none
+CWD_SWITCHED=false
+```
+
+**Doc outside the repo:**
+```
+✗ Worktree FAILED
+REASON=doc '/tmp/PLAN.md' is outside the repo work tree
+PROVIDER_ATTEMPTED=none
+CWD_SWITCHED=false
+```
+
+**Passed doc is tracked + modified (not safe to migrate):**
+```
+✗ Worktree FAILED
+REASON=doc 'docs/PLAN.md' is tracked + modified; commit or stash before passing to x-worktree
 PROVIDER_ATTEMPTED=none
 CWD_SWITCHED=false
 ```

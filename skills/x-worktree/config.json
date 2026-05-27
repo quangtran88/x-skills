@@ -12,8 +12,14 @@
     "new_branch": {
       "type": "string",
       "required": false,
-      "default": "<base>-<caller>-<6hex>",
-      "description": "Name of the new branch created in the worktree"
+      "default": "<type>/<slug> when docs provided, else <base>-<6hex>",
+      "description": "Name of the new branch created in the worktree. When omitted and one or more .md docs are passed, derived from doc metadata per references/doc-naming.md."
+    },
+    "docs": {
+      "type": "string[]",
+      "required": false,
+      "default": "[]",
+      "description": "Positional .md paths (auto-detected, no flag). Untracked docs are physically moved into the worktree and committed as `docs: add <filenames>`. Already-committed docs are skipped (inherited via base). Modified/staged docs cause a hard error."
     }
   },
   "providers": ["wt", "git"],
