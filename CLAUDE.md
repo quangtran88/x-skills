@@ -2,27 +2,7 @@
 
 14 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
 
-## Skills
-
-| Skill | Source | Purpose | Requires |
-|-------|--------|---------|----------|
-| **x-do** | plugin | Build, implement, fix, execute (gitnexus-aware, optional) | Best with: opencode, OMC, superpowers |
-| **x-research** | plugin | Research, investigate, understand (gitnexus-aware, optional) | Best with: opencode, MCP servers |
-| **x-review** | plugin | Code review, plan review, PR review (gitnexus-aware, optional) | Best with: opencode, OMC, superpowers |
-| **x-verify** | plugin | Run the completion cascade ("am I done?") | Standalone |
-| **x-bugfix** | plugin | Debug, investigate failures, fix bugs | Best with: opencode, OMC |
-| **x-mindful** | plugin | Pre-implementation architect-review gate — extracts TRADEOFF / ASSUMPTION / BLIND-SPOT / SHAPE / FUTURE-DEBT items from an AI-generated plan, hard-blocks code-level details, ranks by severity × surface × reversibility with a senior-weigh-in filter, opens with a "Plan at Architect Level" 5-bullet framing, then walks the user one item at a time with confirm/modify/reject/skip menu. Auto-invoked by x-do Mode A on high-risk plans. | Standalone; better with: opencode, x-gemini |
-| **x-design** | plugin | Apply visual design systems | Standalone |
-| **x-api-pentest** | plugin | API security testing (OWASP Top 10) | External security CLIs |
-| **x-omo** | plugin | OpenCode multi-model bridge | opencode CLI |
-| **x-gemini** | plugin | Direct Gemini CLI bridge (Google Search, gemini-3.x, no API key) | gemini CLI + jq |
-| **x-guide** | plugin | Step-by-step comprehension-gated tutorials for docs/specs/code | Best with: x-gemini, x-research |
-| **x-worktree** | plugin | Provision an isolated git worktree on a new branch — used by `x-do` / `x-bugfix` `--wt` flag, also invokable directly | git (≥ 2.5); optional: worktrunk `wt` CLI |
-| **x-worktree-isolate** | plugin | Per-worktree docker-compose isolation: scan once → emit profile.json → on each new worktree write `compose.override.yml` (with `!reset null`) and `.env.worktree`. Hard-blocks on cross-worktree footguns. | Requires: docker compose ≥ v2.24, python3 + pyyaml; optional: worktrunk wt |
-| **x-upstream** | plugin | Pin upstream repos as `research/<owner>/<repo>` submodules at latest stable release. Commands: add / update (one or all) / list / remove. Stable detection: `gh release` non-prerelease → semver tag fallback. | git ≥ 2.13; optional: gh + jq (without them, semver-tag fallback only) |
-| **x-skill-improve** | plugin | Improve skills from session data | Standalone |
-| **x-shared** | plugin | Shared references (not invokable) | None |
-| **x-skill-review** | external | Audit skill quality | User-level install at `~/.claude/skills/x-skill-review/` |
+See `README.md` for the per-skill table, install steps, and dependency list. This file holds only runtime / behavior-shaping rules that Claude needs at every turn.
 
 ## Feature Gates
 
@@ -43,18 +23,6 @@ Every skill that dispatches to external agents MUST follow the contract in `skil
 
 Quick fallback reference for OMO/OMC agents lives in this file (tables below). Detailed schema, drift handling, and opt-out mechanics live in `skills/x-shared/capability-loading.md`.
 
-### omo-agent Binding
-
-The `omo-agent` script bridges Claude Code skills to OpenCode's multi-model agents. Setup:
-
-```bash
-./bin/setup
-```
-
-This creates a symlink at `~/.local/bin/omo-agent` and writes `~/.config/x-skills/capabilities.json`.
-
-Skills reference omo-agent by name (not path) — it must be on PATH or the skill falls back to Claude-only routing.
-
 ### Claude-Only Fallback Routing
 
 When opencode is unavailable, skills substitute:
@@ -73,23 +41,6 @@ When OMC plugin is unavailable:
 | `executor` | `Agent` tool with `mode=auto` |
 | `code-reviewer` | `Agent` tool with review prompt |
 | `debugger` | `Agent` tool with debug prompt |
-
-## Setup
-
-Run `bin/setup` after installation to configure the omo-agent binding and detect capabilities:
-
-```bash
-# Full setup
-./bin/setup
-
-# Check mode (no changes)
-./bin/setup --check
-
-# Remove binding
-./bin/setup --uninstall
-```
-
-Or invoke the setup skill: `/x-skills:setup`
 
 ## Release Workflow
 
