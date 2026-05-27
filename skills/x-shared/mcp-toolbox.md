@@ -81,6 +81,14 @@ Persistent memory MCP from `rohitg00/agentmemory`. Two tiers — standalone (7 t
 
 > **Asymmetry in proxy mode:** When the shim is in proxy mode, the upstream's `tools/list` does NOT include `memory_audit`, `memory_export`, or `memory_governance_delete` — empirically verified against agentmemory v0.9.21. If you need user-driven export / audit / delete, the upstream `agentmemory:forget` and `agentmemory:export` skills (separate plugin) own those flows over HTTP. The standalone tier is the source of truth for these three tools; proxy mode is a NEAR-superset, not strict.
 
+### Consumer rules — quality filtering & cross-project tagging
+
+These rules apply to ALL skill bootstraps that call `memory_smart_search` / `memory_save`. They address two issues empirically observed in cross-project queries (912 lessons / 240 crystals / 1000 insights across the active store):
+
+**Filter on query side.** `memory_smart_search` returns lessons emitted by the upstream `replay.ts` LESSON_PATTERNS regex auto-importer — stamped with `tags: ["auto-import"]` and `confidence: 0.4`. These are regex-extracted fragments from JSONL traces, not crystallized insights; in practice ~9 of 10 top lesson hits on a broad query are auto-import noise. When consuming results, **drop lessons where `tags` contains `"auto-import"` OR `confidence < 0.5`** before treating them as leads. Manual `memory_save` and `crystallize` entries (0.6–0.85 confidence) are the signal layer; everything below that threshold is regex chaff and must not be cited as prior precedent.
+
+**Tag on save side.** When calling `memory_save`, prefix the project slug into the `concepts` string (e.g., `concepts: "x-skills:x-research,<signal>,<topic>"`). The daemon already records the project path automatically as a field on the record, but `concepts` is the keyword-indexed surface used by `memory_smart_search` — prefixing makes future cross-project queries filter-friendly (`memory_smart_search "x-skills:x-research"` then narrows to this project's saves). The prefix is additive; keep the human-readable concept tokens after it.
+
 ### Server tier (gated by `agentmemory.server_up` — extended MCP toolset, proxy-forwarded)
 
 When the agentmemory backend is reachable, the `@agentmemory/mcp` shim enters **proxy mode** (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:354-415`): `tools/list` returns the upstream server's curated tool list, and any unknown tool call is forwarded to `/agentmemory/mcp/call`. The proxy-mode tool list is **NOT a strict superset** of the standalone tools — empirically (against agentmemory v0.9.21 with `AGENTMEMORY_FORCE_PROXY=1`) the shim exposes 8 MCP tools total, three of the standalone seven disappear, and several documented "server-tier" capabilities remain HTTP-only. Direct HTTP routes are listed as the canonical interface for those.

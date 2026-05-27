@@ -56,7 +56,7 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 4. **Cite sources** — attribute each finding to its reviewer (Claude, GPT, Gemini, etc.)
 5. **Mark verified** — indicate which findings were confirmed against actual code
 6. **Tag NEEDS_DIRECTION** — mark any finding that requires user input before fixing (see criteria below)
-7. **Persist lesson** (only when `mcp.agentmemory` pinned): for each CRITICAL or HIGH finding ONLY, one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<finding summary> → <recommendation>", type: "lesson", concepts: "x-review,<severity>,<area>", files: "<files cited in finding>" })` call. Skip MEDIUM and LOW findings. Skip silently when not pinned.
+7. **Persist lesson** (only when `mcp.agentmemory` pinned): for each CRITICAL or HIGH finding ONLY, one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<finding summary> → <recommendation>", type: "lesson", concepts: "<project-slug>:x-review,<severity>,<area>", files: "<files cited in finding>" })` call (project-slug = basename of cwd — see `../../x-shared/mcp-toolbox.md § Consumer rules`). Skip MEDIUM and LOW findings. Skip silently when not pinned.
 
 ## Tag NEEDS_DIRECTION (MANDATORY — narrow criteria)
 

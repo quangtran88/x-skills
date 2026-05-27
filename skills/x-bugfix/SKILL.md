@@ -64,7 +64,7 @@ Classify the bug into ONE mode:
   - **Behavioral bug?** (duplication, wrong output, timing issue — no error/stack trace exists): Capture expected vs. actual behavior as the baseline instead. Document what the user observes and what correct behavior looks like.
 - [ ] Read error messages carefully — don't skip stack traces
 - [ ] Read `gotchas.md` for known failure patterns
-- [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: <symptom keywords + framework>, limit: 5 })` call. If results include prior bug-fix sessions touching the same symptom or files, surface them in the Investigate step as candidate root-cause hypotheses (do not auto-apply — these are leads, not verdicts). When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+- [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: <symptom keywords + framework>, limit: 5 })` call. If results include prior bug-fix sessions touching the same symptom or files, surface them in the Investigate step as candidate root-cause hypotheses (do not auto-apply — these are leads, not verdicts). **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules` — drop hits where `tags` includes `auto-import` OR `confidence < 0.5` before treating them as precedent.** When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 - [ ] `git log --oneline -10 -- <affected-files>` — regression = root cause is in the diff
 
 ## Available Tools
@@ -165,7 +165,7 @@ Append the root cause summary to `debug-log.jsonl` in the skill's state director
 ## Post-Fix Verification (MANDATORY)
 
 In TS/JS projects: `npx tsc --noEmit` + `npx eslint <changed-files>` + full test suite. Fix all errors before claiming done.
-- [ ] **Persist lesson** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<one-sentence root cause> → <one-sentence fix>", type: "lesson", concepts: "x-bugfix,<area>,<symptom-token>", files: <touched paths comma-sep> })` call. Skip silently when not pinned.
+- [ ] **Persist lesson** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<one-sentence root cause> → <one-sentence fix>", type: "lesson", concepts: "<project-slug>:x-bugfix,<area>,<symptom-token>", files: <touched paths comma-sep> })` call (project-slug = basename of cwd — see `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
 
 ## After This Skill
 
