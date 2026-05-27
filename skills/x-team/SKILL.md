@@ -2,6 +2,7 @@
 name: x-team
 description: Use when the user asks for parallel team-style execution of multiple features in one project — orchestrates a team lead + N dev workers, one feature per worktree, each gated on x-qa E2E tests, with blocker escalation to human via SendMessage. Hard requires `plugin.omc` (TeamCreate/SendMessage primitives) and `.x-skills/x-qa/profile.json` (E2E gate).
 role: team-orchestrator
+disable-model-invocation: true
 ---
 
 # x-team — Parallel Feature Team Orchestrator

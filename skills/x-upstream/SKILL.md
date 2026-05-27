@@ -1,6 +1,7 @@
 ---
 name: x-upstream
 description: Use when the user wants to vendor or track an upstream GitHub repo as a research reference inside the current project — adds, updates, lists, or removes `research/<owner>/<repo>` git submodules pinned to the latest stable release (not main/HEAD). Invoked for upstream code reference, dependency mirroring, or research material management.
+disable-model-invocation: true
 triggers:
   - "x-upstream"
   - "add research repo"
