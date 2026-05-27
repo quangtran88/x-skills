@@ -70,6 +70,8 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 
 **Cheapest-viable-first.** Free/instant tools (morph, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
 
+**⚠ Invocation form (literal binaries).** There is NO `omo` binary. The wrappers are standalone CLIs: `gemini-agent --model pro "<prompt>"` and `omo-agent <agent|--model> "<prompt>"` (see `../x-omo/SKILL.md` for the agent catalog). Do NOT prefix with `omo dispatch …`, `omo run …`, or any other verb — that command does not exist and will fail with `command not found: omo`. If a Gemini/OMO lane errors with `command not found`, retry once using the documented form above before declaring the lane unreachable.
+
 **🟢 DEFAULT GEMINI FAN-OUT (Standard Mode):** when `gemini_cli` capability is pinned, `gemini-agent` runs in **parallel with the primary** on every Standard Mode dispatch as an intentional fan-out — NOT "just in case". This is exempt from the hard gate below. Rationale: gemini-agent brings axes the primary cannot (Google Search grounding for stale-library/CVE detection, 1M context for large diffs/docs, multimodal for screenshots). Model selection:
 - Local-code rows (gitnexus/morph primary) → `gemini-agent --model pro --file <key entrypoint or directory>` for an independent reading of the same code.
 - Web/library/architecture/factual rows → `gemini-agent --model pro "<question>"` for Google-grounded second opinion.
