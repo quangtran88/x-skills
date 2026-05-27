@@ -24,6 +24,39 @@ omo-agent --file /path/to/file oracle "<prompt>"
 
 For the full agent catalog, see the [OMO skill](../x-omo/SKILL.md).
 
+## Gemini Agent Invocation
+
+```bash
+# Default model (flash)
+gemini-agent "<prompt>"
+
+# Specific model (pro / flash)
+gemini-agent --model pro "<prompt>"
+
+# Attach files (multimodal / large input)
+gemini-agent --file /abs/path "<prompt>"
+
+# Resume last session
+gemini-agent --resume "<follow-up>"
+```
+
+For the full flag list and gotchas, see the [x-gemini skill](../x-gemini/SKILL.md).
+
+## ⚠ Literal binaries — there is NO `omo` wrapper verb
+
+`gemini-agent` and `omo-agent` are **standalone CLIs** on PATH (installed by `bin/setup` at `~/.local/bin/`). They are NOT subcommands of an `omo` binary — that binary does not exist.
+
+**Do NOT invent these forms** (all fail with `command not found: omo`):
+
+- ❌ `omo dispatch gemini-agent --model pro "..."`
+- ❌ `omo run oracle "..."`
+- ❌ `omo exec --model gpt "..."`
+- ❌ `omo gemini-agent ...`
+
+**Correct forms** — exactly as shown in the two blocks above.
+
+**Recovery rule.** If a lane errors with `command not found: omo` (or any `command not found` on a wrapper name you assembled), this is a Claude-side invocation hallucination, not a missing dependency. **Retry once** with the literal form from this guide before declaring the lane unreachable. Dropping the lane on the first command-not-found is a violation — the failure is recoverable in one retry.
+
 ## MANDATORY: Collect All Background Results Before Final Output
 
 When launching agents with `run_in_background: true`, you **MUST** wait for **ALL** agents to complete and collect **ALL** results before generating any synthesis or final output.

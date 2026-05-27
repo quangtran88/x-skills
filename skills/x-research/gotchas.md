@@ -21,7 +21,7 @@ Known failure patterns specific to x-research. For shared OMO patterns, see `../
 - **Don't `cat` background agent output files to poll.** Auto-notifications arrive on completion; polling risks truncated reads and bypasses `~/.claude/rules/background-agents.md`.
 - **Morph auth errors ≠ insufficient results.** On `invalid username, password or token`, fall back immediately to OMC Explore w/ deepwiki → librarian. Don't retry morph with different params. Direct `mcp__github__get_file_contents` is a supplement after fallback, not a primary replacement for deepwiki.
 - **Type E sequencing violation: firing agents "in parallel with morph, just in case".** Morph-first is a HARD GATE — call morph AND read its output BEFORE dispatching any agent. Parallel dispatch alongside morph defeats the principle.
-- **`omo dispatch` is not a command.** Recurring hallucination: assembling `omo dispatch gemini-agent --model pro …` or `omo run …`. There is no `omo` binary — only `gemini-agent` and `omo-agent` (both standalone, on PATH at `~/.local/bin/`). When a lane errors with `command not found: omo`, retry once using the documented form (`gemini-agent --model pro "<prompt>"` or `omo-agent <agent> "<prompt>"`) before marking the lane unreachable. Dropping a lane on the first command-not-found is a violation — the failure is recoverable in one retry.
+- **`omo dispatch` hallucination.** Canonical entry in `../x-shared/common-gotchas.md`. Heightened relevance here because x-research dispatches gemini/omo lanes the most.
 
 ## Max Mode pitfalls
 
