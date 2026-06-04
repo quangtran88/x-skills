@@ -22,6 +22,7 @@ Before any subcommand:
 3. Read `gotchas.md` for known failure modes.
 4. Resolve repo root: `git rev-parse --show-toplevel`. Refuse outside a git repo.
 5. **Pin runner pair (D10)** — derive `X_QA_SIMPLE_RUNNER` and `X_QA_COMPLEX_RUNNER` from the Capability Routing table below and export them for downstream phases. The runner template in `references/case-runner-prompts.md` reads these env vars rather than hardcoding a tool name.
+   Also pin `X_QA_EXPLORE_MODE` (`team` when team orchestration / `plugin.omc` is pinned, else `bg-fanout`) and `X_QA_EXPLORER` (the exploratory worker subagent) per the Exploratory Team Routing table.
 6. **For `run` only (D9)** — invoke `scripts/doctor.sh` first. Refuse if the doctor fails. Skippable via `--skip-doctor`.
 
 ## Subcommand Surface
@@ -36,7 +37,7 @@ Before any subcommand:
 | `/x-skills:x-qa run [opts]` | Default action. Generate-or-read plan, launch service, dispatch fanout, aggregate, auto-promote KB. |
 | `/x-skills:x-qa kb <subcmd>` | Knowledge-base ops. See "KB Subcommands". |
 
-`run` flags: `--worktree <path>`, `--service <name>`, `--channel <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--no-bg` (force synchronous dispatch), `--staleness-days <N>` (default 7), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`, `--allow-coverage-gaps` (downgrade the coverage gate to a warning).
+`run` flags: `--worktree <path>`, `--service <name>`, `--channel <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--no-bg` (force synchronous dispatch), `--staleness-days <N>` (default 7), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`, `--allow-coverage-gaps` (downgrade the coverage gate to a warning), `--no-explore` (skip the exploratory bug-hunt) / `--explore` (force it even in CI)
 
 ## KB Subcommands
 
@@ -66,6 +67,17 @@ across repos). Tarball export/import was cut as redundant with git.
 
 The bootstrap step pins the runner pair into env vars `X_QA_SIMPLE_RUNNER` and `X_QA_COMPLEX_RUNNER` (read by `case-runner-prompts.md`). Never hardcode an `Agent` subagent_type in the runner template — always reference the pinned env var.
 
+### Exploratory Team Routing (Arc C)
+
+| Pinned | `X_QA_EXPLORE_MODE` | `X_QA_EXPLORER` |
+|---|---|---|
+| team orchestration (`plugin.omc`) | `team` (shared bug-board) | `oh-my-claudecode:qa-tester` (sonnet) |
+| otherwise | `bg-fanout` (background `Agent`) | `Explore` (sonnet) |
+
+Bootstrap pins `X_QA_EXPLORE_MODE` and `X_QA_EXPLORER` for Phase 13.5. See
+`references/explore-team.md` (mode gate, bounded swarm) and
+`references/explorer-prompts.md` (worker prompt).
+
 ## Run Envelope (machine-readable, stable)
 
 Success:
@@ -91,6 +103,11 @@ KB_PROMOTE_STATUS=ok|disabled|error
 COVERAGE_REQUIRED=<n>   # required obligations from scope.json
 COVERAGE_COVERED=<n>    # required obligations satisfied by a case
 COVERAGE_UNCOVERED=<csv> # uncovered required obligation ids ("" when none)
+EXPLORE_RAN=true|false        # false when skipped (CI / --no-explore / no service)
+EXPLORE_FINDINGS=<n>          # unique suspected findings on the bug-board
+EXPLORE_CONFIRMED=<n>         # findings that survived triage
+EXPLORE_CASES_MINTED=<n>      # confirmed findings minted into kb cases
+EXPLORE_OBLIGATIONS_ADDED=<n> # novel obligations minted from "none" findings
 ```
 
 > `QA_VERDICT` is ternary as of v2. `warn` = non-blocking gates failed, no blocking ones did. Consumers branching on `pass|fail` should treat `warn` as `pass` for back-compat OR opt into ternary semantics via `QA_VERDICT_REASON`.
@@ -145,6 +162,7 @@ Refer to:
     **Background-execution gate (CI vs local).** Dispatch is `run_in_background: true` only when the environment looks interactive (`[[ -z "$CI" && -z "$GITHUB_ACTIONS" && -z "$BUILDKITE" && -z "$GITLAB_CI" ]]`). In CI, dispatch synchronously so the runner's stdout/stderr land in the build log and the run does not complete before agents finish. The `--no-bg` flag forces synchronous dispatch unconditionally.
 12. Collect every dispatch terminal state (mandatory per `~/.claude/rules/background-agents.md`). Never `background_cancel(all=true)` before collection.
 13. Retry flaky inline up to `--retry-flaky`.
+13.5. **Exploratory bug-hunt (team)** — *default on a local run; **skipped in CI**; `--no-explore` opts out, `--explore` forces it.* Gate on the Phase-11 CI predicate. Requires the service to be up (skip if Phase 8 was skipped). When `scope.json.obligations[]` is present, partition it into ≤6 clusters (`scripts/explore/cluster-partition.sh --max-workers 6`); otherwise cluster by reachable endpoints (skip if neither). Dispatch one **Exploratory Worker** per cluster (`references/explorer-prompts.md`) via `X_QA_EXPLORE_MODE` (native team + shared bug-board, or background fanout — `references/explore-team.md`), each bounded to a ≤15-probe budget, writing to `<run-dir>/explore/board.jsonl`. Then dedup by signature (`scripts/explore/finding-merge.sh`), **triage** each unique finding independently (`references/triage-verify.md`), and mint a **red repro stub** per `confirmed` finding (`scripts/explore/finding-to-case.sh`) for the `x-bugfix` route + the report. **Do NOT KB-promote these** — the KB is the green corpus and Phase 16 auto-promotes only green cases; a repro stub becomes a regression case only after the fix lands and it goes green (via the existing auto-promote path). Count `EXPLORE_CONFIRMED` from the **triaged** set (this step), NOT from `finding-merge.sh` output (which runs pre-triage, when every finding is still `suspected`). Fold `EXPLORE_*` counters into the envelope.
 14. Teardown via launch entry's `launch.teardown` (skipped if Phase 8 was skipped).
 15. Aggregate via `scripts/aggregate-results.sh` → `QA_REPORT.md`. Propagate `scope.json.open_questions` into the report's notes section. **KB write-back** (skipped on `--no-kb`): update `kb/baselines/<endpoint>.json` for every case, append a run summary line to `kb/.ledger.jsonl`, compute drift signals.
 16. **KB auto-promote** (skipped on `--no-kb` or `--kb-disable-auto-promote`). Invoke `scripts/kb-promote.sh --auto`. Emits `KB_PROMOTED=` / `KB_DEMOTED=` for the envelope.
@@ -167,6 +185,7 @@ every driver.
 If invoked by `x-team`: emit envelope only, x-team consumes via Skill return value.
 If invoked by user: print envelope + path to `QA_REPORT.md` + summary table.
 On `fail`: surface offer to route into `/x-skills:x-bugfix` with the failed cases as input.
+Confirmed exploratory findings (`EXPLORE_CONFIRMED > 0`) are also offered to `/x-skills:x-bugfix`, each carrying its minted case as the reproduction.
 
 - [ ] **Persist test pattern** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<test pattern or flake observation>", type: "lesson", concepts: "x-qa,<framework>,<pattern-kind>,slot:test-plan" })` call. The `slot:` token in `concepts` substitutes for the upstream slot-store API (not present in agentmemory v0.9.21 — convention, not contract; `memory_save` silently drops unknown top-level fields, so a `category` arg would be invisible — verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:104-114`). Skip silently when not pinned.
 
