@@ -51,5 +51,21 @@ expect "literal secret in channel auth fails" 1 bad-secret.json
 jq 'del(.channels[1].base_url_template)' valid.json > bad-url.json
 expect "browser channel missing base_url fails" 1 bad-url.json
 
+# --- update preserves user-edited channels + warns on stale QA_MEMORY.md ---
+UP=$(mktemp -d)
+up_out=$( cd "$UP"; git init -q; mkdir -p .x-skills/x-qa
+  jq '. + {repo_root:"'"$UP"'"}' "$WORK/valid.json" > .x-skills/x-qa/profile.json
+  # reconciled scan drops the dashboard channel; user marked it auto_managed:false
+  jq '.channels[1].auto_managed=false' .x-skills/x-qa/profile.json > .x-skills/x-qa/profile.json.tmp \
+    && mv .x-skills/x-qa/profile.json.tmp .x-skills/x-qa/profile.json
+  jq 'del(.channels[1])' .x-skills/x-qa/profile.json > reconciled.json
+  if "$SKILL_DIR/scripts/update.sh" --reconciled-json reconciled.json >/dev/null 2>&1; then
+    echo "FAIL upd: dropped a user-edited channel without --allow-overwrite-user-edits"
+  else echo "OK upd"; fi
+)
+rm -rf "$UP"
+echo "$up_out"
+grep -q "FAIL upd" <<<"$up_out" && fail=$((fail+1)) || pass=$((pass+1))
+
 echo "channels: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

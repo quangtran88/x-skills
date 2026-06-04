@@ -30,6 +30,14 @@ if [[ "$ALLOW_OVERWRITE" != true ]]; then
       select(\$oe.name == \$ne.name and \$oe.auto_managed == false and
              ((\$oe | $canon) != (\$ne | $canon)))] | length")
   [[ "$user_edited_changed" == "0" ]] || { echo "✗ update FAILED REASON=$user_edited_changed user-edited entries would be overwritten; use --allow-overwrite-user-edits" >&2; exit 3; }
+  channel_edited_changed=$(jq -n \
+    --slurpfile old "$PROFILE_PATH" \
+    --slurpfile new "$RECONCILED" \
+    "[\$old[0].channels[]? | select(.auto_managed == false) |
+      . as \$oc |
+      ((\$new[0].channels[]? | select(.name == \$oc.name)) // null) as \$nc |
+      select(\$nc == null or ((\$oc | $canon) != (\$nc | $canon)))] | length")
+  [[ "$channel_edited_changed" == "0" ]] || { echo "✗ update FAILED REASON=$channel_edited_changed user-edited channels would be changed/removed; use --allow-overwrite-user-edits" >&2; exit 3; }
 fi
 
 # Bump version + timestamps
@@ -37,6 +45,10 @@ final=$(jq --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '. + { generated_at: $ts, generated_by: "x-qa-update", version: ((.version // "1.0.0") | split(".") | .[2] = ((.[2] | tonumber + 1) | tostring) | join(".")) }' "$RECONCILED")
 
 echo "$final" > "$PROFILE_PATH"
+MEM="$(dirname "$PROFILE_PATH")/QA_MEMORY.md"
+if [[ -f "$MEM" ]] && [[ "$PROFILE_PATH" -nt "$MEM" ]]; then
+  echo "WARN=QA_MEMORY.md older than profile; re-run the init interview to refresh narrative memory" >&2
+fi
 echo "✓ x-qa update complete"
 echo "PROFILE_PATH=$PROFILE_PATH"
 echo "VERSION=$(jq -r '.version' "$PROFILE_PATH")"

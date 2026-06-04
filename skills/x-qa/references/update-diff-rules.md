@@ -24,3 +24,12 @@ After reconciliation, smoke-verify changed/added entries only. Existing unchange
 ## Version Bump
 
 Every successful `update` increments `version` (semver) and rewrites `generated_at`. `generated_by: x-qa-update`.
+
+## Channels & QA_MEMORY.md
+
+- `channels[]` reconcile by `name`, same ADDED/MISSING/CHANGED/UNCHANGED rules
+  as entry points. `auto_managed: false` channels are preserved; `update`
+  refuses to change or drop them without `--allow-overwrite-user-edits`.
+- `QA_MEMORY.md` is narrative and not auto-reconciled. `update` emits
+  `WARN=QA_MEMORY.md older than profile…` when the profile is newer, prompting a
+  re-interview. It is never auto-overwritten (it holds human knowledge).
