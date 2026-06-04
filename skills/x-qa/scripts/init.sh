@@ -10,11 +10,13 @@ PROFILE_PATH="$PROFILE_DIR/profile.json"
 README_PATH="$PROFILE_DIR/README.md"
 PROFILE_INPUT=""
 FORCE=false
+MEMORY_INPUT=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile-json) PROFILE_INPUT="$2"; shift 2 ;;
     --force) FORCE=true; shift ;;
+    --memory-md) MEMORY_INPUT="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -61,6 +63,13 @@ fi
 
 mkdir -p "$PROFILE_DIR"
 cp "$PROFILE_INPUT" "$PROFILE_PATH"
+
+# Optional narrative QA memory — git-tracked team knowledge (per-channel env/config,
+# monitoring, db, credentials LOCATION only). Never gitignored.
+if [[ -n "$MEMORY_INPUT" ]]; then
+  [[ -f "$MEMORY_INPUT" ]] || { echo "✗ x-qa init FAILED" >&2; echo "REASON=--memory-md path not found: $MEMORY_INPUT" >&2; exit 2; }
+  cp "$MEMORY_INPUT" "$PROFILE_DIR/QA_MEMORY.md"
+fi
 
 cat > "$README_PATH" <<EOF
 # .x-skills/x-qa/
