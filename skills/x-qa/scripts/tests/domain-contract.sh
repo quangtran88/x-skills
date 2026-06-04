@@ -13,5 +13,11 @@ need references/scout-prompt.md "domain_model"
 need references/scout-prompt.md "obligations"
 need references/scout-prompt.md "code-first"
 
+# --- Task 2: failure-mode-taxonomy.md ---
+need references/failure-mode-taxonomy.md "## A. Failure-Probing Modes"
+need references/failure-mode-taxonomy.md "## B. Semantic Correctness"
+need references/failure-mode-taxonomy.md "false case"
+need references/failure-mode-taxonomy.md "fmode:"
+
 echo "domain-contract: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
