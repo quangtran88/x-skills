@@ -54,10 +54,23 @@ else
   fi
 fi
 
+# Channel selection: whole-input exact channel name, or trailing
+# "via|using|through|on [the] <name>". Profile-scoped; null when no match.
+channel=""
+if [[ -f "$PROFILE" ]]; then
+  if jq -e --arg n "$trim" '.channels[]? | select(.name==$n)' "$PROFILE" >/dev/null 2>&1; then
+    channel="$trim"
+  elif [[ "$trim" =~ (via|using|through|on)[[:space:]]+(the[[:space:]]+)?([A-Za-z0-9_-]+)[[:space:]]*$ ]]; then
+    cand="${BASH_REMATCH[3]}"
+    jq -e --arg n "$cand" '.channels[]? | select(.name==$n)' "$PROFILE" >/dev/null 2>&1 && channel="$cand"
+  fi
+fi
+
 jq -n \
   --arg intent "$intent" --arg raw "$RAW" --arg confidence "$confidence" \
   --arg pr "$pr_number" --arg branch "$branch" --arg service "$service" \
   --arg spec "$spec" --arg artifact "$artifact" --arg prose "$prose" \
+  --arg channel "$channel" \
   '{
      intent: $intent,
      raw: $raw,
@@ -68,7 +81,8 @@ jq -n \
        service_name: (if $service=="" then null else $service end),
        spec_path:    (if $spec=="" then null else $spec end),
        artifact_path:(if $artifact=="" then null else $artifact end),
-       prose:        (if $prose=="" then null else $prose end)
+       prose:        (if $prose=="" then null else $prose end),
+       channel:      (if $channel=="" then null else $channel end)
      },
      candidates: []
    }'

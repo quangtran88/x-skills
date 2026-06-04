@@ -22,6 +22,16 @@ The classifier is pure bash — see `scripts/classify-intent.sh`. No LLM call.
 `--pr <n>` / `--branch <name>` / `--service <name>` force intent and skip
 classification. They exist for CI and x-team where input is structured.
 
+## Channel Selection
+
+`run` can target a specific channel. Two paths, both resolved against
+`profile.json.channels[]`:
+- **Flag:** `--channel <name>` (explicit override; orchestrator-parsed).
+- **Natural language:** trailing `via|using|through|on [the] <name>`, or the
+  whole input equal to a channel name. Emitted as `resolved.channel` (null when
+  no channel matches). Unknown channel names fall through to `null` — the
+  orchestrator then asks which channel, listing `channels[].name`.
+
 ## Output Envelope
 
 The classifier writes `<run-dir>/intent.json`:
