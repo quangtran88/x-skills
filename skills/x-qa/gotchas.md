@@ -26,7 +26,7 @@
 ## v1 limitations
 
 12. **Only `type: http` runs.** v1 `run` skips cli/grpc/graphql/worker/websocket entries with a clear notice. Schema persists them for v2.
-13. **No nested OMC team.** v1 fanout is bg-dispatch only. For >50 concurrent cases, you'll feel the local concurrency cap.
+13. **Exploratory tier uses a native Claude team when available; deterministic fanout stays bg-dispatch.** Phase 13.5 (the exploratory bug-hunt) spawns a **native Claude team + shared bug-board** when team orchestration (`plugin.omc`) is pinned — workers see each other's findings live and avoid duplicate hunting. When team orchestration is absent it degrades to **background `Agent` fanout** (one bg-dispatch per cluster, findings appended to `board.jsonl`). The deterministic case fanout (Phase 11) always uses bg-dispatch regardless of capability. Bootstrap pins `X_QA_EXPLORE_MODE` (`team` or `bg-fanout`) so the orchestrator never has to re-check mid-run.
 
 ## Intent classification & scout
 
@@ -113,3 +113,41 @@ Quality-gate thresholds are static in `TEST_PLAN.yml` or `profile.json.gates.def
 `references/fallback-contract.md` defines `FallbackResponse` NOW for a tier that wires LATER. If the wiring lands and the contract has drifted (new field added without versioning, types changed), runner outputs will silently miscompile. Bump the schema header from `fallback.v0` to `fallback.v1` BEFORE the first wiring PR, and reject runner outputs whose top-level keys don't match.
 
 - **agentmemory two-tier dependency.** When wiring agentmemory calls in this skill, the standalone-vs-proxy mode behavior is canonical in `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` and `../x-shared/mcp-toolbox.md § agentmemory`. Do not duplicate; do not work around the capability gate.
+
+## Channels
+
+(a) **Capture-vs-execute.** Non-`http` drivers (`browser`, `computer-use`) are captured at `init` — they appear in `channels[]` and in `QA_MEMORY.md` — but are **skipped at `run`** until their required MCP capability is wired. `run` emits `CHANNEL_SKIPPED=<name> reason=driver '<driver>' not executable` and continues; it does NOT fall back silently to a different channel. See `references/channel-drivers.md` for the feature-gate table and the follow-on plan order.
+
+(b) **Agentic-driver blast radius.** `browser` and `computer-use` drivers operate a real logged-in session. They carry a large prompt-injection blast radius and can take irreversible actions (send messages, submit forms, spend credits). Always use a **dedicated test account**, never a personal one. `QA_MEMORY.md` records the session bootstrap *location* only — never the secret value (`~/.claude/rules/security.md`).
+
+(c) **`entry_point: "external"` has no launch/teardown.** A channel with `entry_point: "external"` (e.g. a hosted chat bot, a third-party SaaS dashboard) is not started by `run`. `launch.command` and `launch.teardown` do not exist for it. `run` MUST NOT attempt to launch or tear down an external channel; it reaches it via the channel's `base_url_template` / `app` + `target` directly. Doctor check C4 enforces that `entry_point` is either `"external"` or a name in `entry_points[]`.
+
+(d) **`--channel` selecting a non-executable driver yields `CHANNEL_SKIPPED`, not a failure.** Passing `--channel dashboard` when `browser` MCP is absent is not an error — it is an expected capture-only state. The run exits with a clear notice, not a failure verdict. This is intentional: teams can profile all channels upfront and activate drivers incrementally without breaking existing runs.
+
+## Research-Driven Generation
+
+(a) **Code-first domain research.** The scout's Domain Research step reads models, validators, and route handlers first. An external research lane (x-research / web) fires **only when the code does not reveal the rule** — not as a default first step. This is a cost guard: LLM-driven web research on every run is expensive and slow; code is cheaper and more authoritative for your actual deployed constraints.
+
+(b) **Obligations are the gate, not categories.** `coverage-check.sh` enforces **`required` obligation ids** from `scope.json.obligations[]`. A test plan can have a perfectly valid `happy` case and still be refused if a `required` `xtrans:` or `inv:` obligation has no case with a matching `covers:` entry. The coverage gate does not look at case categories (`happy`/`error`/`edge`) — it looks at obligation ids. A category label without a `covers:` tag covers nothing.
+
+(c) **The false case needs an assertion on the success response, not just status.** An `inv:` obligation (invariant) is satisfied only by a case that drives the **success path** AND **asserts the correctness of the result** — re-reading state, checking side effects, verifying the caller only sees their own data. A case that asserts `status == 200` alone does NOT satisfy an `inv:` obligation. The most dangerous production bug is a 200 carrying a wrong result; the coverage gate exists precisely to force cases that catch it.
+
+(d) **`domain_model` is ephemeral in the run-dir.** The researched domain model (`scope.json.domain_model`) lives under the current run directory only — it is **not KB-promoted** in this plan. Each run re-researches. This is intentional for v1 (promoting requires staleness/curation machinery the KB already has; see Roadmap item 4). Do not expect `domain_model` to persist across runs or appear in `kb/`.
+
+(e) **`--allow-coverage-gaps` is for spikes, not defaults.** The flag exists so a team can run QA on a legacy surface that has no `obligations[]` yet, or on a spike branch where coverage is aspirational. Uncovered `required` obligations then surface as `QA_REPORT.md` warnings rather than a blocking exit. Do not make it the default; every surface that has been researched should have its obligations covered before merging.
+
+## Exploratory QA Team
+
+(a) **Default-local, skipped-in-CI.** Phase 13.5 (the exploratory bug-hunt) runs by default on a **local/dev run** but is **skipped in CI** — it reuses the Phase-11 CI predicate (`[[ -z "$CI" && -z "$GITHUB_ACTIONS" && -z "$BUILDKITE" && -z "$GITLAB_CI" ]]`). CI stays deterministic-only. Use `--explore` to force the bug-hunt even in CI; use `--no-explore` to disable it locally. The `EXPLORE_RAN` envelope counter reflects whether the phase actually executed.
+
+(b) **Bounded swarm — cost is capped on purpose.** The exploratory tier runs ≤6 concurrent workers, each with a ≤15-probe budget (`references/explorer-prompts.md`). "Do everything to find bugs" is deliberately budget-capped: open-ended exploration against a live service is expensive and can run indefinitely. Gotcha #7 (Gemini quota throttling) still applies — if workers are hitting 429s, reduce `--max-bg` to 3–4. Workers stop early once they stop finding new behavior.
+
+(c) **Workers never self-confirm.** A worker's finding is `suspected` until the triage gate (`references/triage-verify.md`) independently reproduces it with a fresh verifier instance. The triage verifier defaults to **`rejected` on uncertainty** — a false bug report costs more team trust than a missed minor edge. Only `confirmed` findings are minted into cases and surfaced in `QA_REPORT.md`. Never count `finding-merge.sh` output totals as confirmed; count `EXPLORE_CONFIRMED` from the post-triage set.
+
+(d) **Novel findings grow coverage for the next run.** A worker finding with `obligation: "none"` means the worker broke something the scout's enumeration did not anticipate. `finding-to-case.sh` mints a fresh `fmode:` obligation id for it (printed to stderr as `MINTED_OBLIGATION=…`) and carries it in `covers[]`. On the next run, the coverage gate will enforce that obligation — curiosity-discovered rules close the enumeration gap incrementally. `EXPLORE_OBLIGATIONS_ADDED` in the envelope counts these.
+
+(e) **Needs a live service.** Phase 13.5 requires the service to be up. It is **skipped when Phase 8 (launch) was skipped** — i.e. when `--no-launch` is set or when an external `--service` URL was not provided and the service could not be reached. Do not expect exploratory workers to probe a service that is not running; they will produce only errors, not findings.
+
+(f) **Dedup is by signature.** Two workers can independently discover the same bug — especially on shared invariants or popular endpoints. `finding-merge.sh` collapses all findings with the same `signature` (`<channel>|<endpoint>|<obligation>|<failure_class>`) into one, keeping the **highest-severity** instance. Run `finding-merge.sh` output's `unique` count, not `total`, when reasoning about how many distinct bugs were found.
+
+(g) **Minted cases are RED repro stubs — never auto-promoted.** A confirmed finding is minted into a *currently-failing* repro stub for the `x-bugfix` route. It is NOT added to the green KB corpus (the KB is the proven-passing corpus). The repro earns a **regression slot** only after the fix lands, the case goes green, and the existing Phase-16 auto-promote path picks it up with a green streak. `EXPLORE_CONFIRMED` is counted after triage (post-`finding-merge.sh` + triage pass), not from the pre-triage merge output where every finding is still `suspected`.
