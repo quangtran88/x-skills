@@ -61,6 +61,50 @@ After processing all detected entries:
 
 > **Did we miss any entry point?** List them now (name + type + launch command).
 
+## Channel Enumeration
+
+After entry points are settled, enumerate **channels** — every way QA reaches
+the system. Seed the question with `scan_channels` hints (multiple ports, bot
+SDKs, web-UI configs) AND an x-research semantic pass (see "x-research scan"
+below):
+
+> **How is this system driven for testing?** I detected: <scan_channels hints>.
+> For each surface, confirm: name, driver (`http` / `browser` / `computer-use`),
+> audience (`admin` / `user` / `external` / `system`), and how it's reached.
+
+Per channel, then ask:
+
+> **Reach** — base URL (http/browser), or app + target conversation (chat).
+> **Credentials** — where do THIS channel's creds live? `env:<NAME>` / `file:<path>` / "ask team". **Never paste the secret** — it goes in a git-tracked file.
+> **Env/config** — which `.env` files and which vars are load-bearing here?
+> **Session** (browser/computer-use) — how is the logged-in session bootstrapped (QR/2FA, one-time)?
+
+## Test Setup, Monitoring, Environment, Database
+
+These populate `QA_MEMORY.md` (narrative), not `profile.json`:
+
+> **Test setup** — how do I get the system into a testable state (seed, migrations)?
+> **Monitoring** — where are logs/metrics/traces? How do I watch one request end-to-end?
+> **Environment** — which env files matter; any required secrets (by location)?
+> **Database** — connection, and how to seed / reset / inspect it?
+
+## x-research scan (semantic discovery)
+
+Before the channel question, dispatch a focused x-research pass to enrich the
+deterministic `scan_channels` hints with semantic findings (how tests are set
+up, where monitoring lives, which env/db setup running requires). Borrow
+x-research's dispatch (morph `codebase_search` + a `gemini-agent` reading) —
+do NOT invoke the full `/x-research` router (its bootstrap/classification is
+redundant here). The bash `scan-helpers.sh` output remains the ground truth for
+*entry-point existence* (anti-hallucination, gotcha #4); x-research only adds
+the channel/audience/monitoring/env/db semantic layer.
+
+## QA_MEMORY.md authoring
+
+After the interview, author `QA_MEMORY.md` per `references/qa-memory-schema.md`
+and persist via `init.sh --memory-md <path>`. In `--non-interactive`, write the
+template skeleton with `<!-- TODO: fill -->` markers and `auto_managed: true`.
+
 ## Fixtures
 
 > **Test fixture seed command?** (optional, runs once before first case)
