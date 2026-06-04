@@ -28,5 +28,10 @@ need references/test-plan-schema.md "assert the outcome"
 if [[ "$(yq eval -o=json '[.test_cases[].covers[]?] | length' "$SKILL_DIR/templates/test-plan.example.yml")" -ge 3 ]]; then
   pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL: example test plan has <3 covers[] tags"; fi
 
+# --- Task 5: SKILL.md wiring ---
+need SKILL.md "Domain Research"
+need SKILL.md "coverage-check.sh"
+need SKILL.md "--allow-coverage-gaps"
+
 echo "domain-contract: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

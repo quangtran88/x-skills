@@ -36,7 +36,7 @@ Before any subcommand:
 | `/x-skills:x-qa run [opts]` | Default action. Generate-or-read plan, launch service, dispatch fanout, aggregate, auto-promote KB. |
 | `/x-skills:x-qa kb <subcmd>` | Knowledge-base ops. See "KB Subcommands". |
 
-`run` flags: `--worktree <path>`, `--service <name>`, `--channel <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--no-bg` (force synchronous dispatch), `--staleness-days <N>` (default 7), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`.
+`run` flags: `--worktree <path>`, `--service <name>`, `--channel <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--no-bg` (force synchronous dispatch), `--staleness-days <N>` (default 7), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`, `--allow-coverage-gaps` (downgrade the coverage gate to a warning).
 
 ## KB Subcommands
 
@@ -88,6 +88,9 @@ KB_REUSED=<n>          # cases pulled from corpus (not regenerated)
 KB_GENERATED=<n>       # cases minted this run
 KB_PROMOTED=<n>        # cases auto-promoted to corpus this run
 KB_PROMOTE_STATUS=ok|disabled|error
+COVERAGE_REQUIRED=<n>   # required obligations from scope.json
+COVERAGE_COVERED=<n>    # required obligations satisfied by a case
+COVERAGE_UNCOVERED=<csv> # uncovered required obligation ids ("" when none)
 ```
 
 > `QA_VERDICT` is ternary as of v2. `warn` = non-blocking gates failed, no blocking ones did. Consumers branching on `pass|fail` should treat `warn` as `pass` for back-compat OR opt into ternary semantics via `QA_VERDICT_REASON`.
@@ -129,10 +132,11 @@ Refer to:
        different channel silently.
      - No channel selected → default to the primary entry point's implicit
        `http` channel (back-compat with pre-channels behavior).
-5. **Scout (conditional).** Only when intent ∈ {`spec`, `artifact`, `artifact-dir`, `prose`}: dispatch `$X_QA_SIMPLE_RUNNER` inline per `references/scout-prompt.md`. Persist `<run-dir>/scope.json`. On invalid JSON / timeout, use whole-profile coverage and warn.
+5. **Scout (conditional).** Only when intent ∈ {`spec`, `artifact`, `artifact-dir`, `prose`}: dispatch `$X_QA_SIMPLE_RUNNER` inline per `references/scout-prompt.md`. Persist `<run-dir>/scope.json`. On invalid JSON / timeout, use whole-profile coverage and warn. The scout also performs **Domain Research** (`references/scout-prompt.md § Domain Research`) — code-first modeling of entities/constraints/invariants/transitions — and emits `domain_model` + `obligations[]` into `scope.json`. When intent is not scout-eligible (`branch`/`pr`/`service`), `obligations[]` is absent and Phase 7.5 is a no-op.
 6. **KB consult (skipped on `--no-kb`).** Read `kb/index.json`. For every endpoint in scope (from scout or PR-surface), collect matching `kb/cases/*.yaml` (not `quarantined`) and `kb/flows/*.yaml`. Pass this corpus to the planner.
 6.5. **Gap analyze** (skipped on `--no-kb`). Run `scripts/gap-analyze.sh --scope-file <run-dir>/scope.json` when scout produced a scope (otherwise run without `--scope-file` and analyze the full index). Persist to `<run-dir>/coverage_gaps.json`. Inject as a `## Coverage Gaps` block in the planner prompt per `references/gap-analyzer.md`. Default `--staleness-days 7`; override via `profile.json.gap_analyzer.staleness_days`.
 7. Plan: read `--plan <path>` if given, else generate per `references/test-plan-schema.md § Corpus Reuse` using profile catalog + `scope.json` + KB corpus as ground truth. The planner SHALL prefer corpus IDs over fresh generation when the endpoint+category already has a green case. Cases requiring auth inherit `profile.json.auth_case_id` as a default `precondition_case_id` per `references/kb-schema.md § precondition_case_id` and `references/case-runner-prompts.md § Precondition Chaining`.
+7.5. **Coverage gate** (skipped when `scope.json` has no `obligations[]`, or on `--allow-coverage-gaps`). Run `scripts/coverage-check.sh --scope <run-dir>/scope.json --plan <plan>`. If `verdict == fail`, refuse the plan with `PHASE=plan` and `REASON=uncovered required obligations: <ids>` — the planner must add cases for the named obligations and re-emit. `--allow-coverage-gaps` downgrades the refusal to a warning (uncovered ids surfaced in `QA_REPORT.md` notes). Fold `COVERAGE_REQUIRED` / `COVERAGE_COVERED` / `COVERAGE_UNCOVERED` into the run envelope.
 8. Launch service via `scripts/launch-entry-point.sh` (skipped on `--no-launch` or `--service <ext-url>`).
 9. Health wait via `scripts/health-wait.sh`.
 10. Classify cases per `references/classification-rules.md` (simple vs complex).
