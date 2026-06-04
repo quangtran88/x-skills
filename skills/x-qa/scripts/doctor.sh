@@ -219,12 +219,16 @@ if [[ "$have_channels" -gt 0 ]]; then
   done < <(jq -r '.channels[].entry_point' "$PROFILE_PATH")
   pass
 
-  # C5: channel auth token_source — env: or file: only (no literal secrets; reuses rule 9)
+  # C5: channel auth token_source — env: or file: only (no literal secrets; rejects '..' path traversal, mirrors rule 9)
   attempt
   while IFS= read -r src; do
     [[ -z "$src" || "$src" == "null" ]] && continue
     [[ "$src" =~ ^(env:[A-Za-z0-9_]+|file:[A-Za-z0-9_./-]+)$ ]] \
       || fail C5 "invalid channel auth token_source: $src (env:NAME or file:path; literal secrets rejected)"
+    if [[ "$src" == file:* ]]; then
+      fpath="${src#file:}"
+      [[ "$fpath" != *..* ]] || fail C5 "channel auth token_source contains '..' (path traversal): $src"
+    fi
   done < <(jq -r '.channels[].auth.token_source // empty' "$PROFILE_PATH")
   pass
 

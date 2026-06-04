@@ -51,6 +51,10 @@ expect "literal secret in channel auth fails" 1 bad-secret.json
 jq 'del(.channels[1].base_url_template)' valid.json > bad-url.json
 expect "browser channel missing base_url fails" 1 bad-url.json
 
+# C5 regression: path-traversal in channel auth token_source must be rejected
+jq '.channels[0].auth.token_source="file:../../etc/passwd"' valid.json > bad-traversal.json
+expect "path traversal in channel auth token_source fails" 1 bad-traversal.json
+
 # --- update preserves user-edited channels + warns on stale QA_MEMORY.md ---
 UP=$(mktemp -d)
 up_out=$( cd "$UP"; git init -q; mkdir -p .x-skills/x-qa

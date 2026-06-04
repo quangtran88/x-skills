@@ -11,9 +11,9 @@ while [[ $# -gt 0 ]]; do case "$1" in
 esac; done
 [[ -f "$BOARD" ]] || { echo "MERGE_ERROR=board not found: $BOARD" >&2; exit 2; }
 
-jq -s '
+jq -nR '
   def rank: {"blocker":3,"major":2,"minor":1}[.] // 0;
-  ( map(select(type=="object")) )                           as $all
+  [ inputs | fromjson? | select(type=="object") ] as $all
   | ( $all | group_by(.signature) | map( sort_by(.severity|rank) | last ) ) as $uniq
   | { findings:  $uniq,
       total:     ($all  | length),

@@ -23,5 +23,22 @@ jq -e '.findings[] | select(.signature|endswith("authz-bypass")) | select(.sever
   && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: dedup did not keep highest severity"; }
 [[ "$(jq '.novel'  <<<"$out")" -eq 1 ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: novel != 1"; }
 
+# ── Regression: malformed board lines must not abort the merge ──────────────
+# The board below has: a stray prose line, a ```json fence line, and 2 valid
+# finding objects sharing a signature (should dedup down to 1 unique).
+cat > board-malformed.jsonl <<'JSONL'
+This line is plain prose that is not JSON at all.
+```json
+{"id":"m1","signature":"svc|/foo|none|crash","obligation":"none","failure_class":"crash","severity":"major","status":"confirmed"}
+{"id":"m2","signature":"svc|/foo|none|crash","obligation":"none","failure_class":"crash","severity":"blocker","status":"confirmed"}
+JSONL
+
+merge_rc=0
+merge_out=$("$FM" --board board-malformed.jsonl 2>/dev/null) || merge_rc=$?
+[[ "$merge_rc" -eq 0 ]] \
+  && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: merge aborted on malformed board (exit $merge_rc)"; }
+[[ "$(jq '.unique' <<<"$merge_out" 2>/dev/null)" -eq 1 ]] \
+  && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: malformed board — unique != 1 (got: $merge_out)"; }
+
 echo "finding-merge: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

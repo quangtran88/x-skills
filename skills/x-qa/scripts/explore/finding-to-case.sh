@@ -34,8 +34,8 @@ jq -c --arg covers "$covers" '
     covers:        [$covers],
     failure_class: (.failure_class // "bug"),
     severity:      (.severity // "major"),
-    request:       ((.evidence.request // {}) + { path: (.endpoint // "/") }),  # carry full repro (method/headers/body) from evidence
+    request:       ((.evidence.request | if type=="object" then . else {} end) + { path: (.endpoint // "/") }),  # carry full repro (method/headers/body) from evidence
     assertions:    [ { kind: "note",
-                       expr: ("expected: " + (.evidence.expected // "")
-                              + " | observed: " + (.evidence.observed // "")) } ] }
+                       expr: ("expected: " + ((.evidence.expected // "") | tostring)
+                              + " | observed: " + ((.evidence.observed // "") | tostring)) } ] }
 ' <<<"$src" | yq -p=json -o=yaml '[.]'

@@ -31,5 +31,19 @@ JSON
 minted=$("$MINT" --finding f2.json 2>&1 >/dev/null | grep MINTED_OBLIGATION || true)
 [[ -n "$minted" ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: novel finding did not mint an obligation"; }
 
+# (3) regression: evidence.request as string + evidence.expected/observed as integers must not crash
+cat > f3.json <<'JSON'
+{"id":"f3","endpoint":"/api/login","obligation":"inv:auth-required","failure_class":"authz-bypass","severity":"blocker","status":"confirmed","evidence":{"request":"oops","expected":403,"observed":200}}
+JSON
+mint_rc=0
+mint_out=$("$MINT" --finding f3.json 2>/dev/null) || mint_rc=$?
+[[ "$mint_rc" -eq 0 ]] \
+  && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: mint crashed on non-object request / integer expected+observed (exit $mint_rc)"; }
+[[ -n "$mint_out" ]] \
+  && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: mint produced no YAML output for non-object evidence"; }
+# YAML must contain 'observed' key (sanity check the output is parseable)
+echo "$mint_out" | grep -q "observed" \
+  && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: mint YAML missing 'observed' field"; }
+
 echo "finding-to-case: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
