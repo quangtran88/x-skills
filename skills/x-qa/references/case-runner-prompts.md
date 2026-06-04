@@ -19,6 +19,11 @@ Where `$PROMPT`:
 ```
 You are a single-shot HTTP test runner. Execute exactly ONE HTTP request and check assertions. Output ONLY a JSON document.
 
+You MUST NOT run the repository's own test suites (`npm test`, `test:e2e`,
+`pytest`, `playwright test`, `cypress`, etc.). Drive the live service directly
+(real requests, adjusted mock data) like a manual QA engineer. If you find an
+existing e2e suite, ignore it — your job is to exercise the actual flow.
+
 Base URL: <BASE_URL>
 Case ID: <CASE_ID>
 
@@ -98,6 +103,11 @@ The dispatcher pre-resolves the precondition chain into an ordered list and expo
 
 ```
 You are executing test case {{case.id}}.
+
+You MUST NOT run the repository's own test suites (`npm test`, `test:e2e`,
+`pytest`, `playwright test`, `cypress`, etc.). Drive the live service directly
+(real requests, adjusted mock data) like a manual QA engineer. If you find an
+existing e2e suite, ignore it — your job is to exercise the actual flow.
 
 {{#if X_QA_PRECONDITION_STEPS}}
 ## Preconditions (must succeed before the body)

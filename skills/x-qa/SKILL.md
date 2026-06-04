@@ -36,7 +36,7 @@ Before any subcommand:
 | `/x-skills:x-qa run [opts]` | Default action. Generate-or-read plan, launch service, dispatch fanout, aggregate, auto-promote KB. |
 | `/x-skills:x-qa kb <subcmd>` | Knowledge-base ops. See "KB Subcommands". |
 
-`run` flags: `--worktree <path>`, `--service <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--no-bg` (force synchronous dispatch), `--staleness-days <N>` (default 7), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`.
+`run` flags: `--worktree <path>`, `--service <name>`, `--channel <name>`, `--plan <path>`, `--no-launch`, `--max-bg <N>` (default 8), `--no-bg` (force synchronous dispatch), `--staleness-days <N>` (default 7), `--retry-flaky <N>` (default 2), `--allow-flaky-rate <pct>`, `--verdict-only`, `--skip-doctor`, `--no-profile`, `--pr <num>`, `--branch <name>`, `--no-kb` (skip corpus + baseline + auto-promote), `--kb-promote-after <N>`, `--kb-disable-auto-promote`.
 
 ## KB Subcommands
 
@@ -118,6 +118,17 @@ Refer to:
 2. Auto-doctor (skippable via `--skip-doctor`).
 3. **Classify intent.** Run `scripts/classify-intent.sh "{{ARGUMENTS}}"`, persist to `<run-dir>/intent.json`. If `confidence == "low"` OR multiple candidates surface, ask the user ONE question per `references/intent-detection.md § Ask-When-Ambiguous`, then rewrite intent.json with `confidence: high`.
 4. Resolve target from intent: `service` → entry name; `branch`/`pr` → PR-surface derivation (`references/pr-surface-derivation.md`); `spec`/`artifact`/`artifact-dir`/`prose` → trigger Phase 5 (Scout). Refuse if resolved entry's `type != http` (v1 limitation).
+   - **Channel resolution.** If `intent.json.resolved.channel` (or `--channel`)
+     is set, resolve it against `profile.json.channels[]` and pin
+     `X_QA_CHANNEL` + `X_QA_DRIVER`. Read the driver's feature-gate per
+     `references/channel-drivers.md`:
+     - `http` → execute (Phases 8–15 as today, against the channel's `base_url`).
+     - `browser` / `computer-use` → if the gating capability is absent, emit
+       `CHANNEL_SKIPPED=<name> reason=driver '<driver>' not executable` and stop
+       with a clear notice (capture-only in this release). Do NOT fall back to a
+       different channel silently.
+     - No channel selected → default to the primary entry point's implicit
+       `http` channel (back-compat with pre-channels behavior).
 5. **Scout (conditional).** Only when intent ∈ {`spec`, `artifact`, `artifact-dir`, `prose`}: dispatch `$X_QA_SIMPLE_RUNNER` inline per `references/scout-prompt.md`. Persist `<run-dir>/scope.json`. On invalid JSON / timeout, use whole-profile coverage and warn.
 6. **KB consult (skipped on `--no-kb`).** Read `kb/index.json`. For every endpoint in scope (from scout or PR-surface), collect matching `kb/cases/*.yaml` (not `quarantined`) and `kb/flows/*.yaml`. Pass this corpus to the planner.
 6.5. **Gap analyze** (skipped on `--no-kb`). Run `scripts/gap-analyze.sh --scope-file <run-dir>/scope.json` when scout produced a scope (otherwise run without `--scope-file` and analyze the full index). Persist to `<run-dir>/coverage_gaps.json`. Inject as a `## Coverage Gaps` block in the planner prompt per `references/gap-analyzer.md`. Default `--staleness-days 7`; override via `profile.json.gap_analyzer.staleness_days`.
@@ -134,6 +145,18 @@ Refer to:
 15. Aggregate via `scripts/aggregate-results.sh` → `QA_REPORT.md`. Propagate `scope.json.open_questions` into the report's notes section. **KB write-back** (skipped on `--no-kb`): update `kb/baselines/<endpoint>.json` for every case, append a run summary line to `kb/.ledger.jsonl`, compute drift signals.
 16. **KB auto-promote** (skipped on `--no-kb` or `--kb-disable-auto-promote`). Invoke `scripts/kb-promote.sh --auto`. Emits `KB_PROMOTED=` / `KB_DEMOTED=` for the envelope.
 17. Emit envelope.
+
+## Real-QA Contract (MANDATORY)
+
+`run` tests the system the way a QA engineer drives it —
+it **never executes the repository's own test suites**. The runner MUST NOT
+invoke `npm test`,
+`npm run test:e2e`, `pytest`, `playwright test`, `cypress run`, `go test`,
+`vitest`, or any project test command. Instead it drives the actual channel:
+issue real requests (curl for `http`), adjust fixture/mock data, and mint cases
+from `QA_MEMORY.md` + the KB corpus. `launch.command` starts the *service only*
+(`references/service-launch.md`); it is never a test command. This holds across
+every driver.
 
 ## After This Skill
 
