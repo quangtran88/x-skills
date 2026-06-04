@@ -186,6 +186,64 @@ if [[ "$TEMPLATE_MODE" != true ]]; then
   pass
 fi
 
+# ---- Channel checks (skipped if no channels present) -----------------------
+have_channels=$(jq -r '.channels // [] | length' "$PROFILE_PATH")
+if [[ "$have_channels" -gt 0 ]]; then
+  # C1: channel name slugs valid + unique
+  attempt
+  dupes=$(jq -r '[.channels[].name] | group_by(.) | map(select(length>1)) | length' "$PROFILE_PATH")
+  [[ "$dupes" == "0" ]] || fail C1 "duplicate channel names"
+  while IFS= read -r cname; do
+    [[ "$cname" =~ ^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$ ]] || fail C1 "invalid channel slug: $cname"
+  done < <(jq -r '.channels[].name' "$PROFILE_PATH")
+  pass
+
+  # C2: driver enum
+  attempt
+  bad=$(jq -r '[.channels[] | select(.driver as $d | ["http","browser","computer-use"] | index($d) | not)] | length' "$PROFILE_PATH")
+  [[ "$bad" == "0" ]] || fail C2 "channel driver must be http|browser|computer-use"
+  pass
+
+  # C3: audience enum
+  attempt
+  bad=$(jq -r '[.channels[] | select(.audience as $a | ["admin","user","external","system"] | index($a) | not)] | length' "$PROFILE_PATH")
+  [[ "$bad" == "0" ]] || fail C3 "channel audience must be admin|user|external|system"
+  pass
+
+  # C4: entry_point resolves to an entry, or is "external"
+  attempt
+  while IFS= read -r ref; do
+    [[ "$ref" == "external" ]] && continue
+    jq -e --arg n "$ref" '.entry_points[] | select(.name==$n)' "$PROFILE_PATH" >/dev/null \
+      || fail C4 "channel entry_point '$ref' not in entry_points and != 'external'"
+  done < <(jq -r '.channels[].entry_point' "$PROFILE_PATH")
+  pass
+
+  # C5: channel auth token_source — env: or file: only (no literal secrets; reuses rule 9)
+  attempt
+  while IFS= read -r src; do
+    [[ -z "$src" || "$src" == "null" ]] && continue
+    [[ "$src" =~ ^(env:[A-Za-z0-9_]+|file:[A-Za-z0-9_./-]+)$ ]] \
+      || fail C5 "invalid channel auth token_source: $src (env:NAME or file:path; literal secrets rejected)"
+  done < <(jq -r '.channels[].auth.token_source // empty' "$PROFILE_PATH")
+  pass
+
+  # C6: http/browser drivers require base_url_template + base_url_fallback
+  attempt
+  while IFS= read -r ch; do
+    drv=$(jq -r '.driver' <<<"$ch")
+    if [[ "$drv" == "http" || "$drv" == "browser" ]]; then
+      for f in base_url_template base_url_fallback; do
+        [[ -n "$(jq -r ".$f // empty" <<<"$ch")" ]] || fail C6 "channel driver=$drv missing $f"
+      done
+    fi
+  done < <(jq -c '.channels[]' "$PROFILE_PATH")
+  pass
+
+  # C7: narrative memory presence (warning, not fail)
+  [[ -f "$(dirname "$PROFILE_PATH")/QA_MEMORY.md" ]] || warnings=$((warnings+1))
+fi
+
 # ---- KB integrity checks (skipped if no KB present) ------------------------
 KB_ROOT="$repo_root/.x-skills/x-qa/kb"
 KB_INDEX="$KB_ROOT/index.json"

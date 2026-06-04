@@ -77,6 +77,38 @@ The `fixtures` block itself is optional (top-level). When present, `reset_strate
 | `reset_command` | string | when `reset_strategy != none` | Run between cases per `reset_strategy`. |
 | `reset_strategy` | enum | yes | `per-case` \| `per-category` \| `none`. |
 
+## Channels (`channels[]`, optional)
+
+A **channel** is one way QA *reaches and drives* the system — distinct from an
+`entry_point` (how to *start* a service). One launched service can expose many
+channels (admin API + user API + dashboard); a channel may have no local
+service (`entry_point: "external"`, e.g. a hosted chat bot).
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string (slug) | yes | Unique. Used as `--channel <name>`. |
+| `driver` | enum | yes | `http` \| `browser` \| `computer-use`. Picks the runner; see `references/channel-drivers.md`. |
+| `audience` | enum | yes | `admin` \| `user` \| `external` \| `system`. Drives which credentials apply. |
+| `entry_point` | string | yes | A `entry_points[].name`, or `"external"` for hosted surfaces. |
+| `base_url_template` | string | http/browser | Where to reach it. Supports `${ISOLATE_PORT_<NAME>}`. |
+| `base_url_fallback` | string | http/browser | Used when isolate state absent. |
+| `port` | int | no | Inbound port hint for this surface. |
+| `auth` | Auth | no | Same Auth schema as entry points. `token_source` is **location only** (`env:`/`file:`) — literal secrets rejected by `doctor.sh` (C5). |
+| `app` | string | no | Client identity for browser/computer-use chat (e.g. `telegram-web`, `whatsapp-desktop`). |
+| `target` | string | no | Conversation/contact a chat driver drives (e.g. `@my_test_bot`). |
+| `session` | string | no | Description of the stateful logged-in session (e.g. "QR bootstrap one-time, manual"). **Description only — never a secret.** |
+| `memory_ref` | string | no | Anchor into `QA_MEMORY.md` (e.g. `QA_MEMORY.md#telegram-bot`). |
+
+### Channel Validation Rules (enforced by `doctor.sh`)
+
+- C1 `name` is a unique 1-40 char lowercase slug.
+- C2 `driver` ∈ {`http`,`browser`,`computer-use`}.
+- C3 `audience` ∈ {`admin`,`user`,`external`,`system`}.
+- C4 `entry_point` is `"external"` or matches an `entry_points[].name`.
+- C5 `auth.token_source` matches `^(env:|file:)…$`. **Literal secrets rejected.**
+- C6 `http`/`browser` drivers require `base_url_template` + `base_url_fallback`.
+- C7 (warning) `channels[]` present but no `QA_MEMORY.md` next to the profile.
+
 ## Validation Rules (enforced by `doctor.sh`)
 
 1. `schema == 1`.

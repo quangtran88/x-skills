@@ -69,6 +69,34 @@
       "verified_at": "2026-05-10T10:00:00Z"
     }
   ],
+  "channels": [
+    {
+      "name": "admin-api",
+      "driver": "http",
+      "audience": "admin",
+      "entry_point": "api",
+      "base_url_template": "http://localhost:${ISOLATE_PORT_API}",
+      "base_url_fallback": "http://localhost:3000",
+      "auth": {
+        "kind": "bearer",
+        "token_source": "env:ADMIN_TOKEN"
+      }
+    },
+    {
+      "name": "dashboard",
+      "driver": "browser",
+      "audience": "user",
+      "entry_point": "api",
+      "base_url_template": "http://localhost:${ISOLATE_PORT_API}",
+      "base_url_fallback": "http://localhost:3000"
+    },
+    {
+      "name": "telegram-bot",
+      "driver": "computer-use",
+      "audience": "external",
+      "entry_point": "external"
+    }
+  ],
   "fixtures": {
     "seed_command": "npm run db:seed:test",
     "reset_command": "npm run db:reset:test",
