@@ -8,6 +8,7 @@ qa_strategy:
 test_cases:
   - id: tc-001
     category: happy
+    covers: ["trans:none->active"]
     complexity: simple
     description: "GET /health responds 200"
     request: { method: GET, path: /health }
@@ -16,6 +17,7 @@ test_cases:
 
   - id: tc-002
     category: auth
+    covers: ["fmode:auth:missing-expired"]
     complexity: complex
     description: "POST /auth/login returns token"
     request:
@@ -28,6 +30,7 @@ test_cases:
 
   - id: tc-003
     category: happy
+    covers: ["inv:owner-only", "field:avatar.size:max-2mb"]
     complexity: complex
     description: "Upload avatar with token from tc-002"
     depends_on: [tc-002]
@@ -37,3 +40,4 @@ test_cases:
       headers: { Authorization: "Bearer ${TC_002_TOKEN}" }
     assertions:
       - { kind: status, expr: "", op: eq, value: 201 }
+      - { kind: body-jsonpath, expr: "$.owner_id", op: eq, value: "${FIXTURE_USER}" }

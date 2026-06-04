@@ -19,5 +19,14 @@ need references/failure-mode-taxonomy.md "## B. Semantic Correctness"
 need references/failure-mode-taxonomy.md "false case"
 need references/failure-mode-taxonomy.md "fmode:"
 
+# --- Task 3: test-plan-schema.md covers[] + obligation-gated coverage ---
+need references/test-plan-schema.md "covers"
+need references/test-plan-schema.md "Coverage Obligations"
+need references/test-plan-schema.md "assert the outcome"
+
+# the example plan must carry parseable covers[] tags
+if [[ "$(yq eval -o=json '[.test_cases[].covers[]?] | length' "$SKILL_DIR/templates/test-plan.example.yml")" -ge 3 ]]; then
+  pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL: example test plan has <3 covers[] tags"; fi
+
 echo "domain-contract: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]
