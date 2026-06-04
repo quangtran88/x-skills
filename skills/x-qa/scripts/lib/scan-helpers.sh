@@ -104,3 +104,45 @@ scan_websocket() {
   fi
   echo "$items"
 }
+
+scan_channels() {
+  local root="$1"
+  local items='[]'
+
+  # Multiple exposed compose ports → candidate http channels
+  if [[ -f "$root/docker-compose.yml" ]] || [[ -f "$root/docker-compose.yaml" ]]; then
+    local compose_file
+    compose_file=$([[ -f "$root/docker-compose.yml" ]] && echo "$root/docker-compose.yml" || echo "$root/docker-compose.yaml")
+    local svc
+    svc=$(yq eval -o=json '.' "$compose_file" 2>/dev/null \
+      | jq '.services // {} | to_entries | map(select(.value.ports != null))
+            | map({name: .key, driver:"http", audience:"user", entry_point:.key,
+                   source:"compose-port", confidence:"medium"})' || echo '[]')
+    items=$(jq --argjson s "$svc" '. + $s' <<<"$items")
+  fi
+
+  # Chat-bot SDK imports → candidate computer-use chat channels.
+  # Format: "<grep-alt-pattern>|<channel-name>" (bash 3.2: no assoc arrays).
+  for probe in \
+    'telegraf|node-telegram-bot-api|python-telegram-bot::telegram' \
+    'whatsapp-web|@whiskeysockets/baileys|twilio::whatsapp' \
+    'discord\.js|discord\.py::discord'; do
+    local pats="${probe%%::*}" cname="${probe##*::}"
+    if grep -rqE "($pats)" "$root/src" "$root/app" "$root/package.json" 2>/dev/null; then
+      items=$(jq --arg n "$cname" \
+        '. + [{name:$n, driver:"computer-use", audience:"external",
+               entry_point:"external", source:"bot-sdk", confidence:"low"}]' <<<"$items")
+    fi
+  done
+
+  # Web-UI config → candidate browser dashboard channel
+  for f in next.config.js nuxt.config.js vite.config.ts angular.json; do
+    if [[ -f "$root/$f" ]]; then
+      items=$(jq '. + [{name:"dashboard", driver:"browser", audience:"user",
+             entry_point:"external", source:"web-ui-config", confidence:"low"}]' <<<"$items")
+      break
+    fi
+  done
+
+  echo "$items"
+}
