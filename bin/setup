@@ -662,8 +662,8 @@ if command -v opencode &>/dev/null; then
   OMO_FOUND=false
 
   # Check opencode.json plugin array
-  if [[ -f "$OC_CONFIG" ]] && grep -qE '"oh-my-open(code|agent)"' "$OC_CONFIG" 2>/dev/null; then
-    OMO_PKG=$(grep -oE '"oh-my-open(code|agent)"' "$OC_CONFIG" | head -1 | tr -d '"')
+  if [[ -f "$OC_CONFIG" ]] && grep -qE '"oh-my-open(code|agent)(@[^"]*)?"' "$OC_CONFIG" 2>/dev/null; then
+    OMO_PKG=$(grep -oE '"oh-my-open(code|agent)(@[^"]*)?"' "$OC_CONFIG" | head -1 | tr -d '"')
     ok "oh-my-openagent plugin configured ($OMO_PKG in opencode.json)"
     OMO_FOUND=true
   fi
@@ -680,9 +680,16 @@ if command -v opencode &>/dev/null; then
     done
   fi
 
-  # Check if role agents actually work
+  # Check if role agents actually work.
+  # `opencode agent list` truncates piped output (~64KB) non-deterministically,
+  # so a missing oracle line is inconclusive — fall back to the authoritative
+  # oh-my-openagent.json config (the same file the mode=all audit reads).
   if [[ "$OMO_FOUND" == "true" ]]; then
-    if opencode agent list 2>/dev/null | grep -q "^oracle"; then
+    OC_AGENTS=$(opencode agent list 2>/dev/null || true)
+    OMO_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
+    if grep -qE '^(oracle|explore|librarian|multimodal-looker)[[:space:]]' <<<"$OC_AGENTS" \
+       || { command -v jq &>/dev/null && [[ -f "$OMO_CFG" ]] && \
+            [[ "$(jq -r '[.agents.oracle.mode,.agents.explore.mode,.agents.librarian.mode,.agents["multimodal-looker"].mode] | map(. == "all") | all' "$OMO_CFG" 2>/dev/null)" == "true" ]]; }; then
       ok "Role agents available (oracle, explore, librarian)"
       cap_set omo_plugin true
     else
