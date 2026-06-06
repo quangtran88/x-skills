@@ -46,7 +46,6 @@ def truthy: . == true or . == "partial" or . == "full";
   (.capabilities.mcp.deepwiki         | select(truthy) | "mcp.deepwiki"),
   (.capabilities.mcp.exa              | select(truthy) | "mcp.exa"),
   (.capabilities.mcp.context7         | select(truthy) | "mcp.context7"),
-  (.capabilities.mcp.morph            | select(truthy) | "mcp.morph"),
   (.capabilities.mcp.gitnexus         | select(truthy) | "mcp.gitnexus"),
   (.capabilities.mcp.agentmemory      | select(truthy) | "mcp.agentmemory"),
   (.capabilities.plugins.oh_my_claudecode | select(truthy) | "plugin.omc"),

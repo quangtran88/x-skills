@@ -8,7 +8,7 @@ See `README.md` for the per-skill table, install steps, and dependency list. Thi
 
 Skills auto-detect available dependencies at bootstrap and route accordingly. No dependency is strictly required — skills degrade gracefully.
 
-**Full capability** = opencode + oh-my-claudecode + superpowers + MCP servers (perplexity, deepwiki, exa, context7, morph-mcp) + optional gitnexus (impact / context / rename / route_map; PolyForm Noncommercial license)
+**Full capability** = opencode + oh-my-claudecode + superpowers + MCP servers (perplexity, deepwiki, exa, context7) + optional gitnexus (impact / context / rename / route_map; PolyForm Noncommercial license)
 **Claude-only mode** = works with zero external deps, uses native Claude Code agents and tools
 
 ### Bootstrap Protocol
@@ -112,4 +112,4 @@ This project is indexed by GitNexus as **x-skills** (87923 symbols, 119194 relat
 
 ### GitNexus Fallback
 
-When `mcp.gitnexus` is NOT pinned in the active capability set, the "Always Do" / "Never Do" rules above are best-effort guidance, not enforced gates. The impact-gating in `skills/x-mindful` and the route-map preflight in `skills/x-api-pentest` fall back per the documented Fallback column in `skills/x-shared/mcp-toolbox.md § GitNexus (optional)` (typically `morph-mcp` semantic search or `git diff` + manual analysis). No skill becomes unavailable; gitnexus-grounded checks become best-effort. The MANDATORY language in the auto-managed block above applies only when `mcp.gitnexus` is pinned AND the current repo has a fresh GitNexus index.
+When `mcp.gitnexus` is NOT pinned in the active capability set, the "Always Do" / "Never Do" rules above are best-effort guidance, not enforced gates. The impact-gating in `skills/x-mindful` and the route-map preflight in `skills/x-api-pentest` fall back per the documented Fallback column in `skills/x-shared/mcp-toolbox.md § GitNexus (optional)` (typically native `Grep` or `git diff` + manual analysis). No skill becomes unavailable; gitnexus-grounded checks become best-effort. The MANDATORY language in the auto-managed block above applies only when `mcp.gitnexus` is pinned AND the current repo has a fresh GitNexus index.

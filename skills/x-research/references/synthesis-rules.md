@@ -59,7 +59,7 @@ If background agents were dispatched, the final synthesis MUST attribute what ea
 
 - **Name the agent, name the contribution.** "deepwiki agent confirmed the contract-first architecture and surfaced the RRF fusion detail in hybrid search." Not just "agents confirmed the above."
 - **Banned phrasing:** "No additional information beyond what I already reported" / "findings are already incorporated" / "agents confirmed the same thing." These are red flags that you either (a) didn't actually read the agent output carefully, or (b) dispatched an agent you didn't need. Either case is a finding to note.
-- **If an agent genuinely added nothing new**, say so explicitly AND note that dispatching it was unnecessary — that's a signal to recalibrate depth next time: "deepwiki agent duplicated direct reads; should have tried morph first per Type E ladder."
+- **If an agent genuinely added nothing new**, say so explicitly AND note that dispatching it was unnecessary — that's a signal to recalibrate depth next time: "deepwiki agent duplicated direct reads; should have tried the primary (native `Grep` / `deepwiki`) first per Type E ladder."
 - **Decision rule:** If you can't write a single concrete sentence attributing what an agent contributed, you didn't read its output — go back and read it before presenting synthesis.
 
 ## Include Negative Findings

@@ -14,7 +14,7 @@ Used by `--pr <num>` and `--branch <name>` flags to compute which endpoints a ch
 
 ## Transitive Caller Walk
 
-Use `morph-mcp codebase_search` to find references; cap recursion depth at 2 to bound work. If depth-2 walk yields >50 candidate endpoints, emit a warning and fall back to "all endpoints".
+Use native `Grep` / OMO `explore` to find references; cap recursion depth at 2 to bound work. If depth-2 walk yields >50 candidate endpoints, emit a warning and fall back to "all endpoints".
 
 ## Output
 

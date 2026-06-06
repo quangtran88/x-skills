@@ -19,10 +19,10 @@ Before dispatching anything, load:
 
 ## Hard Sequencing Rule
 
-**⛔ HARD GATE:** for any signal whose primary is `morph` or `deepwiki`, you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate.
+**⛔ HARD GATE:** for any signal whose primary is `deepwiki` (or `gitnexus`), you MUST call the primary AND read its output BEFORE dispatching any agent. Firing agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the output and judged it inadequate.
 **Max Mode is exempt** — its whole purpose is parallel multi-lane fan-out where the user has accepted the cost.
 
-**Parallel only when axes differ:** morph (local code) ∥ perplexity (web) is fine. morph ∥ OMO `explore` "just in case" is waste.
+**Parallel only when axes differ:** OMO `explore` (local code) ∥ perplexity (web) is fine. native `Grep` ∥ OMO `explore` "just in case" is waste.
 
 ---
 
@@ -39,15 +39,15 @@ Before dispatching anything, load:
 
 | Signal | Primary | Escalation |
 |--------|---------|------------|
-| Local code: "how does our X work" | `morph-mcp` → `codebase_search` | OMO `explore` |
-| Local cross-repo (3+ modules) | `morph` + OMO `explore` parallel | — |
-| Public repo internals | `deepwiki` → `ask_question` | `morph` → `github_codebase_search` → OMO `librarian` |
+| Local code: "how does our X work" | OMO `explore` | native `Grep` |
+| Local cross-repo (3+ modules) | OMO `explore` + native `Grep` parallel | — |
+| Public repo internals | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` |
 | Library API usage | `context7` → `query-docs` | `exa` → `get_code_context_exa` |
 | Quick factual lookup | `perplexity_ask` | `gemini-agent` |
 | Fresh news / current events | `gemini-agent` | `perplexity_ask` w/ recency filter |
 | X vs Y tradeoff | `perplexity_reason` | OMO `oracle` |
 | Architecture decision | OMO `oracle` | + `perplexity_reason` |
-| Pre-planning | OMO `oracle` ∥ `morph` ∥ `perplexity_ask` | — |
+| Pre-planning | OMO `oracle` ∥ OMO `explore` ∥ `perplexity_ask` | — |
 | Visual single file | Claude `Read` OR `gemini-agent --file` | OMO `multimodal-looker` |
 | Visual cross-file | OMO `multimodal-looker` | — |
 | Exhaustive audit | `perplexity_research` | + OMO `oracle` |

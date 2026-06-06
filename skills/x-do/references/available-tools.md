@@ -2,13 +2,13 @@
 
 These are the building blocks. Compose them based on the situation — not every task needs every tool. Skip steps that don't add value.
 
-**Morph-MCP tools are the DEFAULT for search and edits — use them before spawning agents:**
+**Native `Edit`/`Grep` are the default for edits/search (use OMO `explore` for semantic search) — before spawning agents:**
 
 | Tool | When It Helps | How |
 |------|--------------|-----|
-| `morph-mcp` → `codebase_search` | **First choice** for exploring code, finding patterns, understanding flow | MCP tool — semantic, no agent overhead |
-| `morph-mcp` → `edit_file` | **Default** for all file edits — partial edits with `// ... existing code ...` | MCP tool |
-| `morph-mcp` → `github_codebase_search` | Understanding external library internals without cloning | MCP tool |
+| OMO `explore` (or native `Grep` for literal patterns) | **First choice** for exploring code, finding patterns, understanding flow | OMO agent — semantic; `Grep` for exact literal tokens |
+| native `Edit` / `Write` | **Default** for all file edits | native tool |
+| `deepwiki` → `ask_question` (or `gh search code`) | Understanding external library internals without cloning | MCP tool / CLI |
 | `superpowers:brainstorming` | Requirements unclear, multiple approaches possible | Skill |
 | `superpowers:writing-plans` | Need structured plan before execution | Skill |
 | `superpowers:systematic-debugging` | Bug with unclear root cause | Skill |

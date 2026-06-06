@@ -86,7 +86,7 @@ When instructions conflict, the higher-priority layer wins. This is the canonica
 | 2 | **Project `CLAUDE.md`** (the working directory the user invoked from) | Per-project rules | Current project |
 | 3 | **Repo `CLAUDE.md`** (this repo's policy, shipped with the skills) | "x-skills are routers; no persistence" | This repo |
 | 4 | **Memory feedback files** (advisory; non-principle) | `feedback_xreview_compliance.md`, `feedback_verify_ts_eslint.md` | Global, advisory |
-| 5 | **`~/.claude/CLAUDE.md`** (user's global) | "always use morph-mcp" | User's defaults across all projects |
+| 5 | **`~/.claude/CLAUDE.md`** (user's global) | "always use ripgrep (`rg`)" | User's defaults across all projects |
 | 6 | **Skill frontmatter** (`role:`, `slots:`, `reactions:`) | e.g., `role: router` on `x-do` | Per-skill |
 | 7 | **Skill body (markdown below the frontmatter)** | The actual skill instructions | Per-skill |
 | 8 | **Claude Code harness + superpowers defaults** | Baseline behavior | Runtime |
@@ -103,9 +103,9 @@ When instructions conflict, the higher-priority layer wins. This is the canonica
 
 Walk the ladder from top (priority 0) to bottom (priority 8). First layer that addresses the conflict wins.
 
-**Example 1 — Global vs skill body.** Skill body says "use native Grep". `~/.claude/CLAUDE.md` says "always use morph-mcp". No project or repo override.
+**Example 1 — Global vs skill body.** Skill body says "use native Grep". `~/.claude/CLAUDE.md` says "always use ripgrep (`rg`)". No project or repo override.
 - Priority 0–4: silent
-- Priority 5: **user global wins** → use morph-mcp
+- Priority 5: **user global wins** → use ripgrep (`rg`)
 - Skill body (priority 7) loses
 
 **Example 2 — User in-prompt beats everything non-principle.** User says "just use whatever's fastest". Repo `CLAUDE.md` says "always post-impl review with x-review".
@@ -123,7 +123,7 @@ All layers contribute instructions. Precedence only matters for *conflicts*. If 
 
 ### Surface conflict resolution to the user
 
-When a higher-priority layer overrides a lower one, say so in the response. Example: "Using native Grep per project `CLAUDE.md` override (user global default is morph-mcp)." Silent overrides are the failure mode this ladder exists to prevent.
+When a higher-priority layer overrides a lower one, say so in the response. Example: "Using native Grep per project `CLAUDE.md` override (user global default is ripgrep `rg`)." Silent overrides are the failure mode this ladder exists to prevent.
 
 ## Orchestration Primitives — Pick One Explicitly
 

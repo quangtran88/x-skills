@@ -154,7 +154,7 @@ omo-agent oracle "Architecture advice for auth system"
 ```
 
 ### MCP Tools
-Direct tool calls for perplexity, exa, deepwiki, context7, morph. Availability gated by capability manifest.
+Direct tool calls for perplexity, exa, deepwiki, context7. Availability gated by capability manifest.
 
 ```
 mcp__perplexity__perplexity_ask(query="what is OAuth2 PKCE?")
@@ -214,7 +214,7 @@ When instructions conflict, the higher-priority layer wins:
 | 2 | Project `CLAUDE.md` | Per-project rules |
 | 3 | Repo `CLAUDE.md` (this repo's policy) | "x-skills are routers; no persistence" |
 | 4 | Memory feedback files (advisory) | `feedback_xreview_compliance.md` |
-| 5 | `~/.claude/CLAUDE.md` (user's global) | "always use morph-mcp" |
+| 5 | `~/.claude/CLAUDE.md` (user's global) | "always use ripgrep (`rg`)" |
 | 6 | Skill frontmatter (`role:`, `slots:`, `reactions:`) | `role: router` on `x-do` |
 | 7 | Skill body (markdown below frontmatter) | The actual skill instructions |
 | 8 | Claude Code harness + superpowers defaults | Baseline behavior |

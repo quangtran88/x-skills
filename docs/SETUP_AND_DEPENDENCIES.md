@@ -45,7 +45,6 @@ The setup script is the canonical entry point for configuring x-skills. It:
 - `deepwiki` — OSS repo documentation
 - `exa` — code context + web crawling
 - `context7` — library API docs
-- `morph` — semantic codebase search + editing
 
 Detection method: grep `settings.json`, `.mcp.json`, and plugin cache `.mcp.json` files.
 
@@ -159,7 +158,7 @@ This bounds trust on the plugin-cache symlink target.
 | oh-my-openagent | Role agents (oracle, explore, librarian) | `opencode plugin oh-my-openagent` |
 | oh-my-claudecode | OMC agents (executor, code-reviewer, debugger) | `/plugin marketplace add Yeachan-Heo/oh-my-claudecode` |
 | superpowers | Workflow skills | `/plugin marketplace add obra/superpowers-marketplace` |
-| MCP servers | perplexity, deepwiki, exa, context7, morph | Configure in `.mcp.json` |
+| MCP servers | perplexity, deepwiki, exa, context7 | Configure in `.mcp.json` |
 | Gemini CLI | Direct Gemini access | `npm install -g @google/gemini-cli` |
 | Security tools | schemathesis, nuclei, sqlmap, spectral | `pip install schemathesis sqlmap` / `brew install nuclei` |
 

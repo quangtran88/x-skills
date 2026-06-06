@@ -57,7 +57,7 @@ Items without evidence get dropped. No speculation without anchor.
 
 ## Cross-Cutting Heuristics
 
-- **"No API change" claims:** any plan that says "internal-only refactor" still gets a BLIND-SPOT pass that explicitly checks for crossed boundaries (public exports, OpenAPI/GraphQL schemas, published events). Confirm or refute with `Grep` / `morph-mcp codebase_search`.
+- **"No API change" claims:** any plan that says "internal-only refactor" still gets a BLIND-SPOT pass that explicitly checks for crossed boundaries (public exports, OpenAPI/GraphQL schemas, published events). Confirm or refute with native `Grep` / OMO `explore`.
 - **"Tiny migration" claims:** schema-changing plans always get a BLIND-SPOT entry (rollback story, dual-write, verification) AND a FUTURE-DEBT entry if the schema becomes load-bearing.
 - **"Just behind a flag" claims:** flag rollouts need a BLIND-SPOT entry if the flagged code path bypasses existing checks (threat model), and a SHAPE entry if the flagged path adds load even at 0% rollout (initialization side effects).
 - **Pattern-name without justification:** any time the plan names a pattern (microservices, event sourcing, CQRS, hexagonal, k8s, Kafka, serverless) without naming the workload property it's buying, emit a TRADEOFF item.

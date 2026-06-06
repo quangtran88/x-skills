@@ -53,7 +53,7 @@ Skills that declare a `role` in their frontmatter have explicit behavioral const
 
 4. **Primitive Discipline**: Every subagent dispatch is either `handoff` (sync, sequential dependency) or `assign` (async fan-out, independent tasks). No ad-hoc patterns.
 
-5. **Cheapest-Viable-First**: Free/instant tools before token-billed before agent-billed. Morph search before OMO agents.
+5. **Cheapest-Viable-First**: Free/instant tools before token-billed before agent-billed. native `Grep` / OMO `explore` before token-billed agents.
 
 6. **Verification-Before-Completion**: Long-running skills must run the completion cascade before claiming done. The single biggest compliance-gap closer.
 

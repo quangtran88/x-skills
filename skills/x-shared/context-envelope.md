@@ -37,7 +37,7 @@ After x-do (Mode B: New Feature):
 
 ## DOCKER CONTEXT block
 
-A separate, formally-specified block prepended to **every** executor / Agent / OMC / OMO / morph dispatch when a worktree was provisioned with `ISOLATE_APPLIED=true`. Distinct from Handoff Context above.
+A separate, formally-specified block prepended to **every** executor / Agent / OMC / OMO dispatch when a worktree was provisioned with `ISOLATE_APPLIED=true`. Distinct from Handoff Context above.
 
 ### When to emit
 

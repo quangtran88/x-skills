@@ -59,7 +59,7 @@ done
 
 ## Dependency Detection
 
-If two features touch the same file (per a quick `morph-mcp codebase_search` for likely files), surface the conflict and ask:
+If two features touch the same file (per a quick native `Grep` / OMO `explore` for likely files), surface the conflict and ask:
 - Run sequentially (one feature first, second after merge)
 - Accept conflict risk and merge with `--no-ff` + manual resolution at end
 - Refactor first to remove shared edits

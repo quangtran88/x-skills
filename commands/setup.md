@@ -12,7 +12,7 @@ Idempotent setup — safe to run any number of times. Each run detects current s
 - gemini CLI installed (`@google/gemini-cli`)
 - opencode CLI + `oh-my-openagent` plugin registration
 - **Role agents in `~/.config/opencode/oh-my-openagent.json` have `"mode": "all"`** — `oracle`, `explore`, `librarian`, `multimodal-looker` default to `mode: "subagent"` in the plugin, so `opencode run --agent <name>` silently fails unless the user config bumps them to `"all"`. The audit seeds the file if it's missing, adds missing entries, and patches wrong-mode entries — writes a timestamped `.bak` before touching an existing file.
-- MCP servers (perplexity, deepwiki, exa, context7, morph)
+- MCP servers (perplexity, deepwiki, exa, context7)
 - Peer plugins (oh-my-claudecode, superpowers)
 - Optional security tools (schemathesis, nuclei, sqlmap, …)
 
@@ -102,7 +102,6 @@ fi
 - **deepwiki**: Free, configure in `.mcp.json` with `npx -y @anthropic-ai/deepwiki-mcp`
 - **exa**: Requires API key from exa.ai, configure in `.mcp.json`
 - **context7**: Free, configure in `.mcp.json` with `npx -y @anthropic-ai/context7-mcp`
-- **morph**: Requires morph account, configure in `.mcp.json`
 
 ## Step 5: Post-install actions
 

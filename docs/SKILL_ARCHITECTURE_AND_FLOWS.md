@@ -108,7 +108,7 @@ reactions:                      # (02) declarative event handlers
 | `workflow-chains.md` | Common cross-skill chain sequences | All skills |
 | `context-envelope.md` | Handoff context block format for chaining | All skills |
 | `completion-cascade.md` | x-verify cascade specification (5 steps: SCOPE GATE → ABORT → EXPLICIT FAILURE → VERIFICATION → MANDATORY FALLBACK → HUMAN-APPROVAL) | x-do, x-verify |
-| `mcp-toolbox.md` | Plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph) | x-research, x-bugfix |
+| `mcp-toolbox.md` | Plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7) | x-research, x-bugfix |
 | `severity-guide.md` | Finding severity scale (CRITICAL/HIGH/MEDIUM/LOW) | x-review, x-bugfix, x-api-pentest |
 | `omo-routing.md` | Signal → OMO agent routing table | x-do, x-research |
 | `slot-schema.md` | Slot-fill schema for skills (v1: `workspace`, `verifier`) | All skills |
@@ -268,15 +268,15 @@ Exceptions:
 
 | Signal | Primary | Escalation |
 |--------|---------|------------|
-| Local code: "how does our X work" | `morph-mcp` → `codebase_search` | OMO `explore` |
-| Local cross-repo (3+ modules) | `morph` + OMO `explore` parallel | — |
-| Public repo internals | `deepwiki` → `ask_question` | `morph` → `github_codebase_search` → OMO `librarian` |
+| Local code: "how does our X work" | OMO `explore` | native `Grep` |
+| Local cross-repo (3+ modules) | OMO `explore` + native `Grep` parallel | — |
+| Public repo internals | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` |
 | Library API usage | `context7` → `query-docs` | `exa` → `get_code_context_exa` |
 | Quick factual lookup | `perplexity_ask` | `gemini-agent` |
 | Fresh news / current events | `gemini-agent` | `perplexity_ask` w/ recency filter |
 | X vs Y tradeoff | `perplexity_reason` | OMO `oracle` |
 | Architecture decision | OMO `oracle` | + `perplexity_reason` |
-| Pre-planning | OMO `oracle` ∥ `morph` ∥ `perplexity_ask` | — |
+| Pre-planning | OMO `oracle` ∥ OMO `explore` ∥ `perplexity_ask` | — |
 | Visual single file | Claude `Read` OR `gemini-agent --file` | OMO `multimodal-looker` |
 | Visual cross-file | OMO `multimodal-looker` | — |
 | Exhaustive audit | `perplexity_research` | + OMO `oracle` |
@@ -423,7 +423,7 @@ Tool: Skill(skill="superpowers:requesting-code-review")
 
 ```
 Investigate
-  ├─ Use morph-mcp codebase_search as FIRST search tool
+  ├─ Use native `Grep` / OMO `explore` as FIRST search tool
   ├─ Fall back to OMO explore only for parallel multi-tool investigation
   ├─ Consult references/backward-tracing.md for deep call stacks
   ├─ Consult references/pattern-catalog.md to narrow search space
@@ -845,7 +845,7 @@ Step 5: Present Report
 ### Applying Fixes
 
 - For `x-*` skills: edit the **source repo** (never plugin cache)
-- Default edit tool: `morph-mcp edit_file`
+- Default edit tool: native `Edit` / `Write`
 - UPDATE SKILL: Make targeted edits (add exceptions, add gotchas, add missing guidance)
 - COMPLIANCE GAP: No skill change; optionally add to gotchas.md as reminder
 

@@ -34,7 +34,7 @@
 
 ```
 Investigate
-  ├─ Use morph-mcp codebase_search as FIRST search tool
+  ├─ Use native `Grep` / OMO `explore` as FIRST search tool
   ├─ Fall back to OMO explore only for parallel multi-tool investigation
   ├─ Consult references/backward-tracing.md for deep call stacks
   ├─ Consult references/pattern-catalog.md to narrow search space

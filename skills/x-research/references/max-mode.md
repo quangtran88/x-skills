@@ -27,12 +27,12 @@ All lanes dispatch with `run_in_background: true`. Wait for ALL terminal states 
 
 | Question Class | Parallel Lanes |
 |---|---|
-| **Codebase (local)** | `morph codebase_search` ∥ OMO `explore` ∥ `gemini-agent --file <key entrypoint>` ∥ OMC Explore agent w/ `deepwiki` for similar OSS patterns |
-| **Public repo / OSS internals** | `morph github_codebase_search` ∥ `deepwiki ask_question` ∥ OMO `librarian` ∥ `gemini-agent` |
+| **Codebase (local)** | native `Grep` ∥ OMO `explore` ∥ `gemini-agent --file <key entrypoint>` ∥ OMC Explore agent w/ `deepwiki` for similar OSS patterns |
+| **Public repo / OSS internals** | `deepwiki ask_question` ∥ `gh search code` ∥ OMO `librarian` ∥ `gemini-agent` |
 | **Web research / fresh facts** | `perplexity_research` ∥ `exa web_search_exa` ∥ `gemini-agent` (Google Search) ∥ OMO `librarian` (TYPE B) |
 | **Library API** | `context7 query-docs` ∥ `exa get_code_context_exa` ∥ `gemini-agent` ∥ OMO `librarian` |
 | **Architecture / X vs Y** | OMO `oracle` ∥ `perplexity_reason` ∥ `gemini-agent --model pro` ∥ OMC Explore w/ `exa get_code_context_exa` |
-| **Pre-planning** | `OMO oracle` ∥ `morph codebase_search` ∥ `OMO explore` ∥ `perplexity_research` ∥ `gemini-agent` |
+| **Pre-planning** | `OMO oracle` ∥ `OMO explore` ∥ native `Grep` ∥ `perplexity_research` ∥ `gemini-agent` |
 | **Visual** | `gemini-agent --file` ∥ OMO `multimodal-looker` ∥ Claude `Read` direct |
 
 Lane invocation lives in the linked skills (`x-omo/SKILL.md`, `x-gemini/SKILL.md`, `x-shared/mcp-toolbox.md`). Do NOT redefine here.
@@ -70,7 +70,7 @@ After all lanes terminal, write the report in this shape:
 - [perplexity] <citations>
 - [gemini] <Google grounding URLs>
 - [librarian] <GitHub permalinks>
-- [morph] <local file:line refs>
+- [local search] <local file:line refs>
 - [deepwiki] <repo + question>
 - [context7] <library + section>
 

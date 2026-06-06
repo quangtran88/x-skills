@@ -168,7 +168,7 @@ To open an *existing* worktree, use `wt switch <branch> --no-cd` directly — ou
 
 ## Caller integration (x-do, x-bugfix, others)
 
-See `references/caller-integration.md` for: `--wt` flag parsing, dispatch shape, **non-negotiable cwd-propagation rules** for Agent / OMC / OMO / morph-mcp dispatches, the `--wt-no-isolate` passthrough, the DOCKER CONTEXT block construction, and verification.
+See `references/caller-integration.md` for: `--wt` flag parsing, dispatch shape, **non-negotiable cwd-propagation rules** for Agent / OMC / OMO dispatches, the `--wt-no-isolate` passthrough, the DOCKER CONTEXT block construction, and verification.
 
 ## Auto-isolation contract
 

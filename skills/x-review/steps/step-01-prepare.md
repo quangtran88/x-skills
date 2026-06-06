@@ -16,7 +16,7 @@ Classify the target from user input:
 | Target | Signals | Action |
 |--------|---------|--------|
 | **A: Plan/Spec** | `.md` in specs/plans/docs, "review the plan" | Read the document fully. **Resolve the plan path to an absolute path** (via `realpath` or equivalent) and persist it for the step-04 plan-mode envelope's `target_path` field — callers re-dispatch on `REQUEST_CHANGES` using this value. |
-| **B: Code/Files** | File paths, "review the code/implementation" | Use `morph-mcp codebase_search` to understand context around the files, then read key files |
+| **B: Code/Files** | File paths, "review the code/implementation" | Use OMO `explore` (or native `Grep`) to understand context around the files, then read key files |
 | **C: Git Diff** | "last commit", "staged", "this PR", "branch diff" | Construct the diff |
 | **D: No Target** | Just says "review" | Auto-detect from git state |
 

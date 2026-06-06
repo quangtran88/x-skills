@@ -57,7 +57,7 @@ Dispatch `Skill: x-skills:x-research` **only** when ANY of these hold:
 - User explicitly asks for research / investigation / understanding
 - Requirements vague AND scope crosses 3+ modules
 
-Otherwise SKIP — research-for-research's-sake adds latency without value. x-research owns its own multi-lane fan-out (`oracle ∥ morph codebase_search ∥ OMO explore`) per `../x-research/references/prompt-templates.md` § Type F. Do NOT re-classify here.
+Otherwise SKIP — research-for-research's-sake adds latency without value. x-research owns its own multi-lane fan-out (`oracle ∥ OMO explore ∥ native Grep`) per `../x-research/references/prompt-templates.md` § Type F. Do NOT re-classify here.
 
 When dispatched:
 

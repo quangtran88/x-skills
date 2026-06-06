@@ -17,7 +17,7 @@ Decide route from the 3 axes pinned in `../SKILL.md § Routing Signals`. There i
 
 | Task count | Walk-away signal | Plan source | Route | Inner executor model |
 |------------|------------------|-------------|-------|----------------------|
-| 1 task, ≤ 10 lines, single file (Mode D) | — | — | Direct edit via `morph-mcp edit_file` | n/a |
+| 1 task, ≤ 10 lines, single file (Mode D) | — | — | Direct edit via native `Edit`/`Write` | n/a |
 | 1-2 tasks, ≤ 5 files, single module | absent | any | OMC `executor` agent | sonnet |
 | 1-2 tasks, crosses 2+ modules OR architectural decision | absent | any | OMC `executor` agent | opus |
 | 3+ tasks, stay in session | absent | superpowers plan (from `writing-plans`) | `superpowers:subagent-driven-development` | per-task: OMC `code-reviewer` (see Per-Task Reviewer below) |
@@ -106,7 +106,7 @@ Skip this gate for 1-2 task routes and Mode D (overhead > value).
    - For ultrawork: `Skill` tool → `oh-my-claudecode:ultrawork` with parallel task graph
    - For subagent-driven: `Skill` tool → `superpowers:subagent-driven-development` with per-task reviewer pinned to OMC `code-reviewer` (see Per-Task Reviewer above)
    - For executor: `Agent` tool → `subagent_type="oh-my-claudecode:executor"`, set `model=sonnet` or `model=opus` per the route table
-   - For direct execution (Mode D / surgical edits): `morph-mcp edit_file` for edits, `morph-mcp codebase_search` to locate targets
+   - For direct execution (Mode D / surgical edits): native `Edit`/`Write` for edits, OMO `explore` (or native `Grep` for literal patterns) to locate targets
 
 4. **Verify** — dispatch the `verifier` slot from `../SKILL.md` (default: `x-verify`). Runs the completion cascade.
 

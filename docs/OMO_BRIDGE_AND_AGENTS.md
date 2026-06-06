@@ -249,4 +249,4 @@ Verified via `opencode mcp list`:
 
 **Built-in tools**: grep, glob, bash, read, write, edit, webfetch, websearch, codesearch.
 
-**Not available in OMO**: deepwiki, morph-mcp, context7, playwright, github MCP, atlassian, shadcn, pm2, webstorm. Use OMC agents (Agent tool) for these.
+**Not available in OMO**: deepwiki, context7, playwright, github MCP, atlassian, shadcn, pm2, webstorm. Use OMC agents (Agent tool) for these.

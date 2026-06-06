@@ -93,7 +93,7 @@ These populate `QA_MEMORY.md` (narrative), not `profile.json`:
 Before the channel question, dispatch a focused x-research pass to enrich the
 deterministic `scan_channels` hints with semantic findings (how tests are set
 up, where monitoring lives, which env/db setup running requires). Borrow
-x-research's dispatch (morph `codebase_search` + a `gemini-agent` reading) —
+x-research's dispatch (OMO `explore` + a `gemini-agent` reading) —
 do NOT invoke the full `/x-research` router (its bootstrap/classification is
 redundant here). The bash `scan-helpers.sh` output remains the ground truth for
 *entry-point existence* (anti-hallucination, gotcha #4); x-research only adds

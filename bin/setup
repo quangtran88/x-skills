@@ -192,9 +192,6 @@ run_install() {
     context7)
       claude mcp add --transport http context7 https://mcp.context7.com/mcp
       ;;
-    morph)
-      claude mcp add morph-mcp -e MORPH_API_KEY="${MORPH_API_KEY:?set MORPH_API_KEY first}" -- npx -y @morph-llm/morph-fast-apply
-      ;;
     ui-ux-pro-max)
       mkdir -p "$HOME/.omc/skills"
       git clone https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$HOME/.omc/skills/ui-ux-pro-max"
@@ -447,7 +444,7 @@ What it does:
   1. Makes bin/omo-agent executable
   2. Creates a symlink at ~/.local/bin/omo-agent (or updates existing)
   3. Verifies opencode CLI is installed and reachable
-  4. Detects available MCP servers (perplexity, deepwiki, exa, context7, morph-mcp)
+  4. Detects available MCP servers (perplexity, deepwiki, exa, context7)
   5. Detects peer plugins (oh-my-claudecode, superpowers)
   6. Detects companion skills (ui-ux-pro-max, x-skill-review) under ~/.omc/skills/ and ~/.claude/skills/
   7. Writes a capability manifest to ~/.config/x-skills/capabilities.json
@@ -741,7 +738,7 @@ check_mcp() {
   local name="$1"
   local desc="$2"
   local install_cmd="$3"
-  # Some MCP servers register under a different name (e.g., "morph-mcp" vs "morph").
+  # Some MCP servers register under a name with an "-mcp" suffix (e.g., "<name>-mcp" vs "<name>").
   # Build a grep pattern that matches both the short name and common variants.
   local grep_pattern="mcp__${name}__\|mcp__${name}-mcp__\|\"$name\"\|\"${name}-mcp\""
   for f in "$CLAUDE_DIR/settings.json" "$CLAUDE_DIR/settings.local.json" ".claude/settings.json" ".claude/settings.local.json"; do
@@ -788,8 +785,6 @@ check_mcp "exa"         "code context + web crawling" \
   "claude mcp add exa -e EXA_API_KEY=YOUR_KEY -- npx -y exa-mcp-server" || true
 check_mcp "context7"    "library API docs" \
   "claude mcp add --transport http context7 https://mcp.context7.com/mcp" || true
-check_mcp "morph"       "semantic codebase search + editing" \
-  "claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_KEY -- npx -y @morph-llm/morph-fast-apply" || true
 check_mcp "gitnexus"    "code knowledge graph (impact / context / rename / route_map)" \
   "npm install -g gitnexus" || true
 check_mcp "agentmemory" "persistent memory + replay (rohitg00/agentmemory)" \
@@ -924,7 +919,6 @@ manifest = {
             "deepwiki":   cap("$(cap_get mcp_deepwiki)"),
             "exa":        cap("$(cap_get mcp_exa)"),
             "context7":   cap("$(cap_get mcp_context7)"),
-            "morph":      cap("$(cap_get mcp_morph)"),
             "gitnexus":   cap("$(cap_get mcp_gitnexus)"),
             "agentmemory": cap("$(cap_get mcp_agentmemory)"),
         },
@@ -987,7 +981,6 @@ report_skill() {
       gemini_cli)     [[ "$(cap_get gemini_cli)" == "true" ]] && met=true ;;
       omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
       superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
-      morph)          [[ "$(cap_get mcp_morph)" == "true" ]] && met=true ;;
       research-mcps)  for m in perplexity deepwiki exa context7; do
                         [[ "$(cap_get "mcp_$m")" == "true" ]] && met=true
                       done ;;
@@ -1008,10 +1001,10 @@ report_skill() {
   fi
 }
 
-report_skill "x-do"           opencode omo_plugin omc superpowers morph
-report_skill "x-research"     opencode omo_plugin research-mcps morph
-report_skill "x-review"       opencode omo_plugin omc superpowers morph
-report_skill "x-bugfix"       opencode omo_plugin omc morph
+report_skill "x-do"           opencode omo_plugin omc superpowers
+report_skill "x-research"     opencode omo_plugin research-mcps
+report_skill "x-review"       opencode omo_plugin omc superpowers
+report_skill "x-bugfix"       opencode omo_plugin omc
 report_skill "x-design"
 report_skill "x-api-pentest"  security-tools
 report_skill "x-omo"          opencode omo_plugin

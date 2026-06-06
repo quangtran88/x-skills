@@ -50,7 +50,7 @@ The wrapper lives at `bin/gemini-agent` (symlinked to `~/.local/bin/gemini-agent
 |---|---|
 | Need GPT/Codex models | `x-omo --model gpt|codex` |
 | Need OMO role agent (oracle, explore, librarian) | `x-omo <agent>` |
-| Need codebase search across repo | `morph-mcp codebase_search` first, then `x-omo explore` |
+| Need codebase search across repo | native `Grep` (or OMO `explore` for semantic) first, then `x-omo explore` |
 | Need to write/edit files | This is a **read-only** advisor; use executor |
 
 ---

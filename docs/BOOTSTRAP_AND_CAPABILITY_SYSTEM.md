@@ -27,8 +27,7 @@ Location: `~/.config/x-skills/capabilities.json`
       "perplexity": true,
       "deepwiki": true,
       "exa": true,
-      "context7": true,
-      "morph": true
+      "context7": true
     },
     "plugins": {
       "oh_my_claudecode": true,
@@ -75,7 +74,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
 The `inject-capabilities.sh` hook reads the manifest and injects a one-line snapshot into the conversation context:
 
 ```
-[x-skills/capabilities] opencode, omo_plugin, gemini_cli, mcp_perplexity, mcp_deepwiki, mcp_exa, mcp_context7, mcp_morph, plugin_oh_my_claudecode, plugin_superpowers
+[x-skills/capabilities] opencode, omo_plugin, gemini_cli, mcp_perplexity, mcp_deepwiki, mcp_exa, mcp_context7, plugin_oh_my_claudecode, plugin_superpowers
 ```
 
 Skills parse this line at bootstrap. If absent, they fall back to reading `~/.config/x-skills/capabilities.json` directly with `jq`.
@@ -120,12 +119,12 @@ Using the pinned capability set, the skill filters its routing tables:
 Example (x-research signal→tool table):
 ```markdown
 | Signal | Primary | Escalation |
-| Local code | `morph-mcp` → `codebase_search` | OMO `explore` |
-| Public repo internals | `deepwiki` → `ask_question` | `morph` → `github_codebase_search` → OMO `librarian` |
+| Local code | OMO `explore` | native `Grep` |
+| Public repo internals | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` |
 | Library API usage | `context7` → `query-docs` | `exa` → `get_code_context_exa` |
 ```
 
-If `mcp_morph` is false, the "Local code" row drops `morph-mcp` and falls back to OMO `explore`.
+If `opencode` is false, the "Local code" row drops OMO `explore` and falls back to native `Grep`.
 
 ### Step 3: Classify and Route
 
@@ -158,7 +157,6 @@ Checks Claude Code settings for:
 - `deepwiki` — OSS repo documentation
 - `exa` — code context + web crawling
 - `context7` — library API docs
-- `morph` — semantic codebase search + editing
 
 Detection method: grep `settings.json`, `.mcp.json`, and plugin cache `.mcp.json` files.
 

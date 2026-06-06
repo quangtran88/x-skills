@@ -71,10 +71,9 @@ Each MCP is independently optional. Skills should check before dispatching:
 | MCP | Used by | Fallback |
 |-----|---------|----------|
 | perplexity | x-research | Skip web search, note limitation |
-| deepwiki | x-research | Use `github_codebase_search` via morph-mcp |
+| deepwiki | x-research | Use `gh search code` or OMO `librarian` |
 | exa | x-research | Skip code context search |
 | context7 | x-research | Skip library docs lookup |
-| morph | x-do, x-research, x-bugfix, x-review | Fall back to native `Grep` + `Edit` |
 
 ## Fallback Priority
 

@@ -70,16 +70,16 @@ When instructions conflict, the higher-priority layer wins. This is the canonica
 | 2 | Project `CLAUDE.md` | Per-project rules | Current project |
 | 3 | Repo `CLAUDE.md` (this repo's policy) | "x-skills are routers; no persistence" | This repo |
 | 4 | Memory feedback files (advisory) | `feedback_xreview_compliance.md` | Global, advisory |
-| 5 | `~/.claude/CLAUDE.md` (user's global) | "always use morph-mcp" | User's defaults |
+| 5 | `~/.claude/CLAUDE.md` (user's global) | "always use ripgrep (`rg`)" | User's defaults |
 | 6 | Skill frontmatter (`role:`, `slots:`, `reactions:`) | `role: router` on `x-do` | Per-skill |
 | 7 | Skill body (markdown below frontmatter) | The actual skill instructions | Per-skill |
 | 8 | Claude Code harness + superpowers defaults | Baseline behavior | Runtime |
 
 **How conflicts resolve**: Walk the ladder from top to bottom. First layer that addresses the conflict wins.
 
-**Example**: Skill body says "use native Grep". `~/.claude/CLAUDE.md` says "always use morph-mcp". No project or repo override.
+**Example**: Skill body says "use native Grep". `~/.claude/CLAUDE.md` says "always use ripgrep (`rg`)". No project or repo override.
 - Priority 0–4: silent
-- Priority 5: **user global wins** → use morph-mcp
+- Priority 5: **user global wins** → use ripgrep (`rg`)
 - Skill body (priority 7) loses
 
 ### Orchestration Primitives
@@ -224,11 +224,11 @@ Plugin-local reference for selecting MCP servers.
 | Exhaustive multi-source audit | `perplexity` → `perplexity_research` | OMO `librarian` ∥ `gemini-agent` |
 | Raw article content | `exa` → `web_search_exa` | `WebFetch` direct |
 | Dense code snippets | `exa` → `get_code_context_exa` | OMO `librarian` |
-| OSS repo internals | `deepwiki` → `ask_question` | `morph-mcp github_codebase_search` → OMO `librarian` |
+| OSS repo internals | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` |
 | Library API docs | `context7` → `resolve-library-id` then `query-docs` | `exa get_code_context_exa` → OMO `librarian` |
-| Local code semantic search | `morph-mcp` → `codebase_search` | native `Grep` → OMO `explore` |
-| Local code edits | `morph-mcp` → `edit_file` | native `Edit` / `Write` |
-| Public GitHub repo search | `morph-mcp` → `github_codebase_search` | `deepwiki ask_question` → `gh search code` |
+| Local code semantic search | OMO `explore` | native `Grep` |
+| Local code edits | native `Edit` / `Write` | — |
+| Public GitHub repo search | `deepwiki` → `ask_question` | `gh search code` |
 
 ### Disambiguations
 

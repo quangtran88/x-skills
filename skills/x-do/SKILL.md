@@ -52,9 +52,9 @@ reactions:
 - Call `Edit` or `Write` directly — dispatch to an executor subagent via `Agent` tool or `ralph`
 - Call `Bash` to run mutating commands on project files — dispatch to a verifier/executor
 
-**Mode D exception:** Quick tasks (single file, <10 lines, no ambiguity) may use `Edit`/`Write`/`morph-mcp edit_file` directly. Mode D was designed for this — spawning an executor for `s/foo/bar/` adds 30-60s overhead for zero benefit. The forbid applies to complex work, not trivial edits.
+**Mode D exception:** Quick tasks (single file, <10 lines, no ambiguity) may use `Edit`/`Write` directly. Mode D was designed for this — spawning an executor for `s/foo/bar/` adds 30-60s overhead for zero benefit. The forbid applies to complex work, not trivial edits.
 
-**Post-execution correction exception:** After an executor completes and the user provides a targeted correction (≤ 3 files, clear instructions, no investigation needed), x-do may apply corrections directly using `Edit`/`morph-mcp edit_file`. For corrections spanning 4+ files or requiring investigation, dispatch a new executor.
+**Post-execution correction exception:** After an executor completes and the user provides a targeted correction (≤ 3 files, clear instructions, no investigation needed), x-do may apply corrections directly using `Edit`/`Write`. For corrections spanning 4+ files or requiring investigation, dispatch a new executor.
 
 **Always allowed:**
 - `Read` for loading gotchas, config, referenced files
@@ -147,9 +147,9 @@ Before starting any mode, complete ALL of these checks:
   1. Strip the entire `--wt …` segment AND any `--wt-no-isolate` token from the prompt — mode classification must NOT see them.
   2. Dispatch via `Skill: x-skills:x-worktree` with the parsed args (empty string if a slot was omitted). Append `--no-isolate` to the inner args when `--wt-no-isolate` was set.
   3. Parse the returned envelope. Pin `WORKTREE_PATH` for the rest of this task.
-  4. From this point, **every** mutating Bash / Agent / OMC executor / OMO / morph-mcp dispatch MUST run inside `WORKTREE_PATH` per the cwd-propagation rules in `../x-worktree/SKILL.md` § "CWD propagation". Forward `WORKTREE_PATH` in any handoff envelope (e.g., x-do → x-bugfix).
+  4. From this point, **every** mutating Bash / Agent / OMC executor / OMO dispatch MUST run inside `WORKTREE_PATH` per the cwd-propagation rules in `../x-worktree/SKILL.md` § "CWD propagation". Forward `WORKTREE_PATH` in any handoff envelope (e.g., x-do → x-bugfix).
   5. **Parse `ISOLATE_APPLIED` and act on it** (see `../x-worktree/references/auto-isolation.md` for the full contract):
-     - `ISOLATE_APPLIED=true` → Read `$WORKTREE_PATH/.worktree-isolate/state.local.json`, validate `schema == 1` (refuse on mismatch), build the DOCKER CONTEXT block per `../x-worktree/references/caller-integration.md` § "DOCKER CONTEXT propagation". Prepend that block to **every** subsequent executor / Agent / OMC / OMO / morph dispatch for the rest of the task. Reconstruct `Launch:` line at every dispatch from `[ -f $WORKTREE_PATH/.env ]` — never cache the rendered block.
+     - `ISOLATE_APPLIED=true` → Read `$WORKTREE_PATH/.worktree-isolate/state.local.json`, validate `schema == 1` (refuse on mismatch), build the DOCKER CONTEXT block per `../x-worktree/references/caller-integration.md` § "DOCKER CONTEXT propagation". Prepend that block to **every** subsequent executor / Agent / OMC / OMO dispatch for the rest of the task. Reconstruct `Launch:` line at every dispatch from `[ -f $WORKTREE_PATH/.env ]` — never cache the rendered block.
      - `ISOLATE_APPLIED=false` → Surface `ISOLATE_REASON` + `ISOLATE_HINT` to the user via AskUserQuestion (2 options, default abort): `(1) abort and let me retry isolate manually` / `(2) proceed without isolation, I accept docker collisions with my other worktrees`. Default = abort.
      - `ISOLATE_APPLIED=skipped` → Proceed normally. No DOCKER CONTEXT block.
      - `ISOLATE_APPLIED` line absent (because `--no-isolate` / `--wt-no-isolate` was set) → Proceed normally. No DOCKER CONTEXT block.
@@ -172,7 +172,7 @@ That's the entire routing surface. Depth scoring (Light / Standard / Heavy) and 
 
 ## Available Tools
 
-See `references/available-tools.md` for the full tool table (MCP tools, skills, agents). Key rule: **morph-mcp tools are the DEFAULT** for search and edits — use them before spawning agents.
+See `references/available-tools.md` for the full tool table (MCP tools, skills, agents). Key rule: **native `Edit`/`Grep` are the default for edits/search (use OMO `explore` for semantic search)** — before spawning agents.
 
 ## Proactive OMO Delegation
 
@@ -191,7 +191,7 @@ See `references/mode-guidance.md` for detailed per-mode instructions. Key rules:
 - **A/B: Post-Implementation Review** mandatory before claiming done — dispatch `Skill: x-skills:x-review` on the diff.
 - **B: Brainstorming gate** — when no plan/spec ref provided, dispatch `superpowers:brainstorming` FIRST (creates `design.md` per project convention), then `superpowers:writing-plans`. Run `explore` in parallel to detect the convention. See `steps/step-01-gather.md`.
 - **C: Delegate to `/x-bugfix`** — uses `systematic-debugging` gate + `debugger` agent + TDD failing test before fix.
-- **D: Direct execution** via `morph-mcp edit_file`, still verify.
+- **D: Direct execution** via native `Edit`/`Write`, still verify.
 
 ## Complexity Scaling
 

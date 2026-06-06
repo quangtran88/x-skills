@@ -1,6 +1,6 @@
 ---
 name: x-research
-description: Use when the user asks to research, investigate, look up, or understand something — orchestrates morph, MCP servers (perplexity/exa/deepwiki/context7), gemini-agent, and OMO agents (explore/librarian/oracle/multimodal-looker) with optional Max Mode for parallel multi-lane synthesis
+description: Use when the user asks to research, investigate, look up, or understand something — orchestrates MCP servers (perplexity/exa/deepwiki/context7), gemini-agent, and OMO agents (explore/librarian/oracle/multimodal-looker) with optional Max Mode for parallel multi-lane synthesis
 ---
 
 # x-research — Universal Research Orchestrator
@@ -15,7 +15,7 @@ Before dispatching anything, load:
 0a. If `mcp.gitnexus` is pinned, consume the shared gitnexus indexed+fresh probe per `../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe" (session-pinned, derived once — do NOT run a per-skill `gitnexus list`).
 1. `../x-omo/SKILL.md` — OMO agent catalog + Bash invocation patterns. **For the unavailable-agent list and replacement model-routing (`--model codex`, `--model gpt`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
 2. `../x-gemini/SKILL.md` — direct Gemini CLI bridge (Google Search grounding, gemini-3.x, `--file`, `--resume`). **Load only if `gemini_cli` capability is pinned**; if not pinned, drop gemini-agent rows from the routing table and pick the escalation column instead.
-3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph).
+3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7).
 4. `gotchas.md` — known failure patterns.
 5. **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: <topic + signal keywords>, limit: 5 })` call. Surface any prior research sessions on the same topic as supplementary context for the synthesis — leads, not verdicts. **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules` — drop hits where `tags` includes `auto-import` OR `confidence < 0.5` before treating them as precedent.** When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 
@@ -48,11 +48,11 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 
 | Signal | Primary | Escalation |
 |---|---|---|
-| Local code: "how does our X work" (target repo indexed) | `gitnexus` → `query` (process-grouped) | `morph-mcp` → `codebase_search` → OMO `explore` |
-| Symbol callers+callees+flows (target repo indexed) | `gitnexus` → `context` | 2× `morph-mcp codebase_search` (callers, then callees) |
-| Local code: "how does our X work" | `morph-mcp` → `codebase_search` | OMO `explore` |
-| Local cross-repo (3+ modules tangled) | `morph` + OMO `explore` parallel | — |
-| Public repo internals: "how does repo X do Y" | `deepwiki` → `ask_question` | `morph` → `github_codebase_search` → OMO `librarian` |
+| Local code: "how does our X work" (target repo indexed) | `gitnexus` → `query` (process-grouped) | native `Grep` → OMO `explore` |
+| Symbol callers+callees+flows (target repo indexed) | `gitnexus` → `context` | 2× native `Grep` (callers, then callees) → OMO `explore` |
+| Local code: "how does our X work" | OMO `explore` | native `Grep` |
+| Local cross-repo (3+ modules tangled) | OMO `explore` + native `Grep` parallel | — |
+| Public repo internals: "how does repo X do Y" | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` |
 | Library API usage: "how to call X" | `context7` → `query-docs` | `exa` → `get_code_context_exa` |
 | Library current state ("still maintained?", recent changes) | `gemini-agent` (Google Search) | `perplexity_ask` |
 | Quick factual lookup: "what is X" | `gemini-agent` (Google Search grounding) | `perplexity_ask` |
@@ -61,28 +61,28 @@ Pick by **what kind of source** answers the question. Escalation = next column o
 | Visual cross-file vision reasoning (screenshots, mockups, multi-image) | `gemini-agent --file` (multimodal pro) | OMO `multimodal-looker` |
 | X vs Y tradeoff (web-grounded) | `perplexity_reason` | OMO `oracle` for arch depth |
 | Architecture decision (no web needed) | OMO `oracle` (GPT-5) | + `perplexity_reason` |
-| Pre-planning (requirements + risks + code) | `OMO oracle` ∥ `morph codebase_search` ∥ `OMO explore` | + `perplexity_ask` (web-grounded escalation; Max Mode adds `perplexity_research` + `gemini-agent`) |
+| Pre-planning (requirements + risks + code) | `OMO oracle` ∥ `OMO explore` ∥ native `Grep` | + `perplexity_ask` (web-grounded escalation; Max Mode adds `perplexity_research` + `gemini-agent`) |
 | Visual single file (image/PDF/screenshot) | Claude `Read` (small) OR `gemini-agent --file` | OMO `multimodal-looker` |
 | Exhaustive audit (security / architecture review) | `perplexity_research` | + OMO `oracle` |
 | Dense code examples from web | `exa` → `get_code_context_exa` | OMO `librarian` |
 
-**GitNexus rows — graceful degradation (C3, advisory class).** The two `gitnexus` Detection rows apply ONLY when `mcp.gitnexus` is pinned AND the target repo is in the shared probe's indexed-path set (step 0a). **Not pinned OR not indexed → the row collapses to the existing `morph-mcp codebase_search` behavior — zero behavior change for unindexed repos.** Indexed but stale (`staleness.commitsBehind > 0`) → still use `gitnexus` (`query`/`context` are advisory-class per `../x-shared/mcp-toolbox.md` use-class index) and append `(index N commits stale — results may lag HEAD)` to the synthesis. The morph rows below them are the fallback path — never delete them.
+**GitNexus rows — graceful degradation (C3, advisory class).** The two `gitnexus` Detection rows apply ONLY when `mcp.gitnexus` is pinned AND the target repo is in the shared probe's indexed-path set (step 0a). **Not pinned OR not indexed → the row collapses to the existing native `Grep` / OMO `explore` behavior — zero behavior change for unindexed repos.** Indexed but stale (`staleness.commitsBehind > 0`) → still use `gitnexus` (`query`/`context` are advisory-class per `../x-shared/mcp-toolbox.md` use-class index) and append `(index N commits stale — results may lag HEAD)` to the synthesis. The native `Grep` / OMO `explore` rows below them are the fallback path — never delete them.
 
-**Cheapest-viable-first.** Free/instant tools (morph, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
+**Cheapest-viable-first.** Free/instant tools (native `Grep`, deepwiki, context7) before token-billed (perplexity, exa) before agent-billed (omo, gemini).
 
 **⚠ Invocation form.** Wrappers are standalone CLIs (`gemini-agent`, `omo-agent`). There is no `omo` binary, no `omo dispatch …`. On `command not found: omo`, retry once with the documented form. Canonical rule + forms: `../x-shared/invocation-guide.md` § Literal binaries.
 
 **🟢 DEFAULT GEMINI FAN-OUT (Standard Mode):** when `gemini_cli` capability is pinned, `gemini-agent` runs in **parallel with the primary** on every Standard Mode dispatch as an intentional fan-out — NOT "just in case". This is exempt from the hard gate below. Rationale: gemini-agent brings axes the primary cannot (Google Search grounding for stale-library/CVE detection, 1M context for large diffs/docs, multimodal for screenshots). Model selection:
-- Local-code rows (gitnexus/morph primary) → `gemini-agent --model pro --file <key entrypoint or directory>` for an independent reading of the same code.
+- Local-code rows (gitnexus / native-search primary) → `gemini-agent --model pro --file <key entrypoint or directory>` for an independent reading of the same code.
 - Web/library/architecture/factual rows → `gemini-agent --model pro "<question>"` for Google-grounded second opinion.
 - Visual/large-input rows where gemini is already primary → no extra lane needed (already running).
 - Pure symbol-graph rows (`gitnexus context`) → SKIP gemini lane (call-graph data, nothing for gemini to add).
 
 Note the lane skip in synthesis when applicable; reconcile per `references/synthesis-rules.md`.
 
-**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is morph or deepwiki, you MUST call the primary AND read its output BEFORE dispatching any **OMO agent** (oracle/explore/librarian/multimodal-looker). Firing OMO agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the primary output and judged it inadequate. **Exempt from this gate:** (a) Max Mode (parallel multi-lane fan-out is the point); (b) Pre-planning Type F — the three lanes (`oracle`, `morph codebase_search`, `OMO explore`) cover orthogonal axes; (c) the Default Gemini Fan-Out above — gemini-agent is intentionally parallel when pinned. See `references/prompt-templates.md` § Type F for the canonical fan-out.
+**⛔ HARD GATE — sequencing matters (Standard Mode):** for any signal whose primary is `deepwiki` (or `gitnexus`), you MUST call the primary AND read its output BEFORE dispatching any **OMO agent** (oracle/explore/librarian/multimodal-looker). Firing OMO agents "in parallel with the primary, just in case" is a violation. "Insufficient" means you READ the primary output and judged it inadequate. **Exempt from this gate:** (a) Max Mode (parallel multi-lane fan-out is the point); (b) Pre-planning Type F — the three lanes (`oracle`, `OMO explore`, native `Grep`) cover orthogonal axes; (c) the Default Gemini Fan-Out above — gemini-agent is intentionally parallel when pinned. See `references/prompt-templates.md` § Type F for the canonical fan-out.
 
-**Parallel only when axes differ:** morph (local code) ∥ perplexity (web) is fine. morph ∥ OMO `explore` "just in case" is waste.
+**Parallel only when axes differ:** OMO `explore` (local code) ∥ perplexity (web) is fine. native `Grep` ∥ OMO `explore` "just in case" is waste.
 
 For prompt templates per tool, see `references/prompt-templates.md`.
 For Type A variants (multi-repo, comparison, version upgrade), see `references/type-a-notes.md`.

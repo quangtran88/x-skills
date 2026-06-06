@@ -14,7 +14,7 @@
 | `workflow-chains.md` | Common cross-skill chain sequences | All skills |
 | `context-envelope.md` | Handoff context block format for chaining | All skills |
 | `completion-cascade.md` | x-verify cascade specification (5 steps: SCOPE GATE → ABORT → EXPLICIT FAILURE → VERIFICATION → MANDATORY FALLBACK → HUMAN-APPROVAL) | x-do, x-verify |
-| `mcp-toolbox.md` | Plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7 / morph) | x-research, x-bugfix |
+| `mcp-toolbox.md` | Plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7) | x-research, x-bugfix |
 | `severity-guide.md` | Finding severity scale (CRITICAL/HIGH/MEDIUM/LOW) | x-review, x-bugfix, x-api-pentest |
 | `omo-routing.md` | Signal → OMO agent routing table | x-do, x-research |
 | `slot-schema.md` | Slot-fill schema for skills (v1: `workspace`, `verifier`) | All skills |

@@ -76,8 +76,8 @@ After x-bugfix completes:
 ### Mode D: Quick Task
 
 1. Execute directly — no agent spawn for trivial changes
-   - Use `morph-mcp edit_file` as default edit tool
-   - Use `morph-mcp codebase_search` to locate target code
+   - Use native `Edit` / `Write` as default edit tool
+   - Use native `Grep` / OMO `explore` to locate target code
    - Spawn OMC `executor` only if task benefits from isolation
 2. Still verify — even quick tasks need evidence (tsc + eslint)
 
@@ -111,16 +111,16 @@ x-research classifies questions by **information-source signal** and picks the b
 
 | Signal | Primary | Escalation |
 |--------|---------|------------|
-| Local code: "how does our X work" | `morph-mcp` → `codebase_search` | OMO `explore` |
-| Local cross-repo (3+ modules) | `morph` + OMO `explore` parallel | — |
-| Public repo internals | `deepwiki` → `ask_question` | `morph` → `github_codebase_search` → OMO `librarian` |
+| Local code: "how does our X work" | OMO `explore` | native `Grep` |
+| Local cross-repo (3+ modules) | OMO `explore` + native `Grep` parallel | — |
+| Public repo internals | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` |
 | Library API usage | `context7` → `query-docs` | `exa` → `get_code_context_exa` |
 | Library current state | `gemini-agent` (Google Search) | `perplexity_ask` |
 | Quick factual lookup | `perplexity_ask` | `gemini-agent` |
 | Fresh news / current events | `gemini-agent` | `perplexity_ask` w/ recency filter |
 | X vs Y tradeoff | `perplexity_reason` | OMO `oracle` |
 | Architecture decision | OMO `oracle` | + `perplexity_reason` |
-| Pre-planning | OMO `oracle` ∥ `morph` ∥ `perplexity_ask` | — |
+| Pre-planning | OMO `oracle` ∥ OMO `explore` ∥ `perplexity_ask` | — |
 | Visual single file | Claude `Read` or `gemini-agent --file` | OMO `multimodal-looker` |
 | Visual cross-file | OMO `multimodal-looker` | — |
 | Exhaustive audit | `perplexity_research` | + OMO `oracle` |
@@ -128,7 +128,7 @@ x-research classifies questions by **information-source signal** and picks the b
 
 ### Hard Gate — Sequencing Matters
 
-For any signal whose primary is `morph` or `deepwiki`:
+For any signal whose primary is `deepwiki` (or `gitnexus`):
 - **MUST** call the primary AND read its output BEFORE dispatching any agent
 - Firing agents "in parallel with the primary, just in case" is a violation
 - "Insufficient" means you READ the output and judged it inadequate
@@ -170,7 +170,7 @@ x-bugfix classifies bugs into four modes:
    - Reproduce the bug
    - Check recent changes (`git log --oneline -10 -- <affected-files>`)
    - Trace data flow backward from symptom to source
-   - Use `morph-mcp codebase_search` as first search tool
+   - Use native `Grep` / OMO `explore` as first search tool
    - Consult `references/pattern-catalog.md` to narrow search space
    - Output: a **root cause hypothesis** — specific and testable
 

@@ -118,7 +118,7 @@ All findings use the [shared severity scale](../x-shared/severity-guide.md):
 When the user chooses to apply:
 
 - **Resolve edit target:** For `x-*` skills, always edit the **source repo** (resolved per the precedence in step 2: `$X_SKILLS_PLUGIN_ROOT`, then a local x-skills git checkout). Never edit the plugin cache (`~/.claude/plugins/cache/`) or installed copy. For standalone skills, edit `~/.claude/skills/<name>/`.
-- **Default edit tool:** Use `morph-mcp edit_file` for all skill edits — partial edits with `// ... existing code ...` markers are faster and preserve context better than full rewrites. Fall back to native `Edit` only if `edit_file` errors.
+- **Default edit tool:** native `Edit` / `Write` for all skill edits — surgical partial edits.
 - **UPDATE SKILL findings:** Make targeted edits to the skill files. Prefer:
   - Adding exceptions to existing rules (not rewriting them)
   - Adding items to gotchas.md for newly discovered pitfalls

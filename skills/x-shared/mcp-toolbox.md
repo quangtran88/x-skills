@@ -12,11 +12,11 @@ Availability is gated by the user's MCP setup; skills should fall back gracefull
 | Exhaustive multi-source audit | `perplexity` → `perplexity_research` | OMO `librarian` (TYPE B) parallel with `gemini-agent` | 46+ citations, 5000+ words, 60-120s. Use sparingly. |
 | Raw article content (no synthesis) | `exa` → `web_search_exa` | `WebFetch` direct on user-supplied URL | Frame queries as descriptions, not keywords |
 | Dense code snippets from web/GitHub | `exa` → `get_code_context_exa` | OMO `librarian` (clones + greps) | Up to 50k tokens of code |
-| OSS repo internals "how does it work" | `deepwiki` → `ask_question` | `morph-mcp github_codebase_search` → OMO `librarian` | 90% of deepwiki use; `read_wiki_contents` is last resort |
+| OSS repo internals "how does it work" | `deepwiki` → `ask_question` | `gh search code` → OMO `librarian` | 90% of deepwiki use; `read_wiki_contents` is last resort |
 | Library API docs / usage / migration | `context7` → `resolve-library-id` then `query-docs` | `exa get_code_context_exa` → OMO `librarian` | Resolve ID first; be specific |
-| Local code semantic search | `morph-mcp` → `codebase_search` | native `Grep` (literal patterns only) → OMO `explore` | Default for exploratory codebase questions |
-| Local code edits | `morph-mcp` → `edit_file` | native `Edit` / `Write` | Prefer over native Edit for non-trivial changes |
-| Public GitHub repo semantic search | `morph-mcp` → `github_codebase_search` | `deepwiki ask_question` → `gh search code` | No clone needed |
+| Local code semantic search | OMO `explore` (semantic) | native `Grep` (literal patterns only) | Default for exploratory codebase questions |
+| Local code edits | native `Edit` / `Write` | — | Surgical partial edits; no MCP needed |
+| Public GitHub repo semantic search | `deepwiki` → `ask_question` | `gh search code` | No clone needed |
 
 ## Disambiguations
 
@@ -36,13 +36,13 @@ Code-intelligence MCP server (`npm install -g gitnexus`). Provides precomputed c
 | Need | Primary (when `mcp.gitnexus` pinned) | Fallback (when not pinned) |
 |---|---|---|
 | Blast radius before edits | `gitnexus` → `impact` (with `direction: upstream`, `minConfidence`) | OMO `oracle` qualitative scan; otherwise treat as warn-only |
-| 360° symbol context (callers + callees + processes) | `gitnexus` → `context` | Two `morph-mcp codebase_search` calls (callers, then callees) |
+| 360° symbol context (callers + callees + processes) | `gitnexus` → `context` | Two native `Grep` passes (callers, then callees) → OMO `explore` |
 | Pre-commit / pre-PR scope check | `gitnexus` → `detect_changes` | `git diff` + manual analysis |
-| Multi-file rename | `gitnexus` → `rename` (always `dry_run: true` first) | `morph-mcp edit_file` per file |
-| Execution-flow-grouped search | `gitnexus` → `query` | `morph-mcp codebase_search` (loses process grouping) |
+| Multi-file rename | `gitnexus` → `rename` (always `dry_run: true` first) | native `Edit` per file (after `git grep` for call sites) |
+| Execution-flow-grouped search | `gitnexus` → `query` | native `Grep` / OMO `explore` (loses process grouping) |
 | API route → handler → consumer mapping | `gitnexus` → `route_map` / `api_impact` / `shape_check` | Manual OpenAPI spec parse |
-| Local structural / "how does X work" (advisory, indexed+any-freshness) | `gitnexus` → `query` (process-grouped) | `morph-mcp codebase_search` |
-| Symbol 360° (callers+callees+flows, advisory) | `gitnexus` → `context` | Two `morph-mcp codebase_search` calls (callers, then callees) |
+| Local structural / "how does X work" (advisory, indexed+any-freshness) | `gitnexus` → `query` (process-grouped) | native `Grep` / OMO `explore` |
+| Symbol 360° (callers+callees+flows, advisory) | `gitnexus` → `context` | Two native `Grep` passes (callers, then callees) |
 | Ceremony/severity grounding (correctness-sensitive, indexed+fresh) | `gitnexus` → `impact` — **counts only, never the risk label (C1)** | heuristic depth calibration / qualitative scan |
 | Pre-commit scope + flow check (correctness-sensitive, indexed+fresh) | `gitnexus` → `detect_changes` (changed symbols + affected processes) | `git diff` (no flow membership) |
 

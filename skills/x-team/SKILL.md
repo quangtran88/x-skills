@@ -40,7 +40,7 @@ Before any phase:
 Per `references/decomposition-rules.md`:
 
 1. Read user request.
-2. If `--features <N>` not given: use morph-mcp to scan project, propose feature split, ask user via `AskUserQuestion` (header: "Feature split"). Allow edit/cancel.
+2. If `--features <N>` not given: use native `Grep` / OMO `explore` to scan project, propose feature split, ask user via `AskUserQuestion` (header: "Feature split"). Allow edit/cancel.
 3. For each feature, generate:
    - `name` (short slug)
    - `spec` (full description)

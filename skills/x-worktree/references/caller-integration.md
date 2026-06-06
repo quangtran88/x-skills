@@ -30,7 +30,7 @@ Wait for the `WORKTREE_PATH=` line in the success envelope. If the skill returns
 
 After x-worktree returns successfully, **every** downstream mutating dispatch from the caller MUST run in the worktree.
 
-x-worktree itself runs a final `cd "$WORKTREE_PATH"` before exiting, so the **Bash tool's session cwd is already inside the worktree** — plain Bash calls inherit it. But Agent / OMC executor / OMO / morph-mcp dispatches **do NOT** inherit Bash cwd; they need explicit instruction. Apply ALL of:
+x-worktree itself runs a final `cd "$WORKTREE_PATH"` before exiting, so the **Bash tool's session cwd is already inside the worktree** — plain Bash calls inherit it. But Agent / OMC executor / OMO dispatches **do NOT** inherit Bash cwd; they need explicit instruction. Apply ALL of:
 
 1. **Bash dispatches:** session cwd is already the worktree (set by x-worktree). Plain `npm test`, `git status`, etc. work as-is. Defensive callers MAY still prefix with `git -C "$WORKTREE_PATH" …` or `cd "$WORKTREE_PATH" && …` for safety in long sessions where another Bash call may have `cd`-ed elsewhere.
 2. **Agent / OMC executor / OMO `omo-agent` dispatches:** include this header verbatim at the top of the prompt:
@@ -40,13 +40,13 @@ x-worktree itself runs a final `cd "$WORKTREE_PATH"` before exiting, so the **Ba
    Use absolute paths or `cd <WORKTREE_PATH> && …` for every shell command.
    Do NOT touch files outside this directory.
    ```
-3. **morph-mcp `edit_file`:** pass absolute paths under `<WORKTREE_PATH>`. Never pass paths from the original repo root.
+3. **native `Edit`/`Write`:** pass absolute paths under `<WORKTREE_PATH>`. Never pass paths from the original repo root.
 
 The caller is responsible for keeping `WORKTREE_PATH` in scope across the whole task. If a sub-handoff happens (e.g., x-do → x-bugfix mid-task), forward `WORKTREE_PATH` in the [handoff context envelope](../../x-shared/context-envelope.md).
 
 ## DOCKER CONTEXT propagation
 
-When x-worktree's envelope includes `ISOLATE_APPLIED=true`, the caller MUST read `state.local.json` and prepend a DOCKER CONTEXT block to every executor / Agent / OMC / OMO / morph dispatch made for the rest of the task. This block tells downstream workers how to talk to docker without trampling the user's other worktrees' containers.
+When x-worktree's envelope includes `ISOLATE_APPLIED=true`, the caller MUST read `state.local.json` and prepend a DOCKER CONTEXT block to every executor / Agent / OMC / OMO dispatch made for the rest of the task. This block tells downstream workers how to talk to docker without trampling the user's other worktrees' containers.
 
 ### When to build the block
 

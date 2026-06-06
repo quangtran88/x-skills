@@ -26,7 +26,7 @@ Repo root: <REPO_ROOT>
 Procedure:
 1. Read the source-of-truth for this intent:
    - spec         → read the spec file
-   - artifact     → read the file, then walk references (morph codebase_search up to depth 2)
+   - artifact     → read the file, then walk references (native `Grep` / OMO `explore` up to depth 2)
    - artifact-dir → list files in the dir, read key ones
    - prose        → grep the repo for related identifiers
 2. Identify reachable endpoints/behaviors that should be tested.
@@ -86,7 +86,7 @@ Before enumerating obligations, model the domain — **code-first**:
 1. **Read the code** that defines the rules: data models / ORM entities,
    migrations, validators / schema files (zod, pydantic, JSON-Schema, DTOs),
    enum/state definitions, and the handler for each touched endpoint. Use
-   `morph codebase_search` for "where is <entity> validated / its state
+   OMO `explore` (or native `Grep`) for "where is <entity> validated / its state
    machine" and read the hits. This is the source of truth for field
    constraints, invariants, and transitions.
 2. **Only if the code does not reveal a rule** (e.g. an external/business

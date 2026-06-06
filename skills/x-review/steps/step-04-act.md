@@ -147,7 +147,7 @@ When the reviewer is posting findings to a PR they don't own — not fixing loca
 
 #### Fix Mode (own code or user requests fixes)
 
-**Default edit tool:** Use `morph-mcp edit_file` for all fix application — partial edits with `// ... existing code ...` markers are faster and preserve context better than full rewrites. Use `morph-mcp codebase_search` to locate targets before editing. Fall back to native `Edit` only if `edit_file` errors.
+**Default edit tool:** native `Edit` / `Write` for fix application — surgical partial edits. Use OMO `explore` (or native `Grep`) to locate targets before editing.
 
 **Checklist (ALL required before marking complete):**
 

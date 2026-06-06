@@ -81,7 +81,7 @@ If deepwiki returns an error (repo not indexed), report that clearly so we can f
 
 ## Type F: Pre-Planning Analysis
 
-**Canonical fan-out (Standard Mode):** `OMO oracle ∥ morph codebase_search ∥ OMO explore` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + `gemini-agent` for external context.
+**Canonical fan-out (Standard Mode):** `OMO oracle ∥ OMO explore ∥ native Grep` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + `gemini-agent` for external context.
 
 For `oracle` (pre-planning consult — replaces UNAVAILABLE `metis`):
 ```
@@ -90,14 +90,14 @@ Current codebase context: {{relevant files, stack, constraints}}.
 What hidden requirements, scope risks, and AI-slop patterns should we address?
 ```
 
-For `morph codebase_search` (semantic local-code lane):
+For `OMO explore` (semantic local-code lane):
 ```
 Find {{feature concept}} in the codebase. Return file:line refs with brief
 descriptions. Focus on entry points, shared interfaces, and any existing
 implementations that overlap with the requested scope.
 ```
 
-For `OMO explore` (pattern/path lane — grep/glob/ast_grep):
+For native `Grep` (literal pattern/path lane — grep/glob/ast_grep):
 ```
 [CONTEXT]: Pre-planning for {{feature}}.
 [GOAL]: Find existing patterns.
@@ -113,7 +113,7 @@ Always use `--file /path/to/file` flag with `multimodal-looker`.
 
 ## Type H: Local Structural (GitNexus, advisory)
 
-Only when `mcp.gitnexus` is pinned AND the target repo is in the shared probe's indexed-path set (Bootstrap step 0a / `../../x-shared/capability-loading.md`). Not pinned OR not indexed → use the Type A codebase template against `morph-mcp codebase_search` instead (zero behavior change).
+Only when `mcp.gitnexus` is pinned AND the target repo is in the shared probe's indexed-path set (Bootstrap step 0a / `../../x-shared/capability-loading.md`). Not pinned OR not indexed → use the Type A codebase template against `OMO explore` / native `Grep` instead (zero behavior change).
 
 **"How does our X work" (process-grouped) — `gitnexus query`:**
 ```

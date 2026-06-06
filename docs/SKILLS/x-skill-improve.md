@@ -46,7 +46,7 @@ Step 5: Present Report
 ## Applying Fixes
 
 - For `x-*` skills: edit the **source repo** (never plugin cache)
-- Default edit tool: `morph-mcp edit_file`
+- Default edit tool: native `Edit` / `Write`
 - UPDATE SKILL: Make targeted edits (add exceptions, add gotchas, add missing guidance)
 - COMPLIANCE GAP: No skill change; optionally add to gotchas.md as reminder
 

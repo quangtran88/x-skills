@@ -91,7 +91,7 @@ Your feature branch is: {FEATURE_BRANCH}
 
 ALLOWED:
 - Skill tool (essential — x-do, x-qa, x-bugfix, x-verify all work via Skill)
-- Read, Edit, Write, Bash, morph-mcp tools
+- Read, Edit, Write, Bash
 - TaskUpdate, TaskList, TaskGet, SendMessage (team primitives)
 - Agent tool (executor / debugger / verifier dispatch from inside x-do — necessary for x-do)
 

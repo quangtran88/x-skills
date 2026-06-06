@@ -43,8 +43,8 @@ After x-bugfix completes:
 
 ## D: Quick Task
 
-1. Execute directly — no agent spawn needed for trivial changes (rename, config edit, single-line fix). Use `morph-mcp edit_file` as the default edit tool; fall back to Edit/Write only if `edit_file` errors.
-   - Use `morph-mcp codebase_search` if you need to locate the target code first
+1. Execute directly — no agent spawn needed for trivial changes (rename, config edit, single-line fix). Use native `Edit`/`Write` as the default edit tool.
+   - Use OMO `explore` (or native `Grep` for literal patterns) if you need to locate the target code first
    - Only spawn OMC `executor` if the quick task still benefits from isolation (e.g., touches multiple files or needs exploration first)
 2. Still verify — even quick tasks need evidence
 
