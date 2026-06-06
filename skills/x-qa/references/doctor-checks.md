@@ -35,6 +35,12 @@
 
 15. **Precondition cycle check.** Build a directed graph of `precondition_case_id` edges across all cases in `kb/index.json`. Refuse if the graph contains a cycle (Tarjan SCC). Refuse if any `precondition_case_id` points at a missing case.
 
+## Channel stateful-awareness
+
+C8. When a channel sets `singleton_id` AND `<repo_root>/.worktree-isolate/profile.json` exists with a non-empty `singletons[]`, the id MUST resolve to a `singletons[].id`. A dangling ref increments `warnings` (and prints `warn=...` on stderr) — never a hard fail, because isolate is optional. No-op when no isolate profile / no `singletons[]` (survives `--template-mode`).
+
+Info-nudge. When `channels[]` is present but **no channel declares the `singleton_id` key at all** (the not-migrated case — detected with `has("singleton_id")`, NOT `!= null`, so a migrated stateless profile that writes `singleton_id: null` explicitly does NOT keep firing the nudge), doctor prints an `info=channels present but none carry singleton_id — run 'x-qa update' for stateful-aware selection` line on the PASS path. Info-level, distinct from `warnings` — never affects exit code.
+
 ## Reporting
 
 Output format:

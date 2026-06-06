@@ -2,7 +2,7 @@
   "schema": 1,
   "auth_case_id": "tc-login-bearer-default",
   "public_endpoints": ["GET /health"],
-  "version": "1.2.0",
+  "version": "1.3.0",
   "generated_at": "2026-05-10T10:00:00Z",
   "generated_by": "x-qa-init",
   "repo_root": "/path/to/repo",
@@ -75,6 +75,7 @@
       "driver": "http",
       "audience": "admin",
       "entry_point": "api",
+      "singleton_id": null,
       "base_url_template": "http://localhost:${ISOLATE_PORT_API}",
       "base_url_fallback": "http://localhost:3000",
       "auth": {
@@ -83,10 +84,24 @@
       }
     },
     {
+      "name": "webhook-receiver",
+      "driver": "http",
+      "audience": "system",
+      "entry_point": "api",
+      "singleton_id": "github-webhook",
+      "base_url_template": "http://localhost:${ISOLATE_PORT_API}/webhooks",
+      "base_url_fallback": "http://localhost:3000/webhooks",
+      "auth": {
+        "kind": "api-key",
+        "token_source": "env:WEBHOOK_SECRET"
+      }
+    },
+    {
       "name": "dashboard",
       "driver": "browser",
       "audience": "user",
       "entry_point": "api",
+      "singleton_id": null,
       "base_url_template": "http://localhost:${ISOLATE_PORT_API}",
       "base_url_fallback": "http://localhost:3000"
     },
@@ -94,7 +109,8 @@
       "name": "telegram-bot",
       "driver": "computer-use",
       "audience": "external",
-      "entry_point": "external"
+      "entry_point": "external",
+      "singleton_id": "telegram-bot"
     }
   ],
   "fixtures": {

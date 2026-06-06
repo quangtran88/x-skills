@@ -19,6 +19,7 @@ repo_root=$(git rev-parse --show-toplevel)
 checks_attempted=0
 checks_passed=0
 warnings=0
+info_nudge=""
 
 fail() {
   echo "✗ doctor FAIL"
@@ -246,6 +247,27 @@ if [[ "$have_channels" -gt 0 ]]; then
 
   # C7: narrative memory presence (warning, not fail)
   [[ -f "$(dirname "$PROFILE_PATH")/QA_MEMORY.md" ]] || warnings=$((warnings+1))
+
+  # C8: singleton_id resolves against the isolate profile when present (warning on
+  # dangling, never hard-fail — isolate is optional). No-op when no isolate profile
+  # or no singletons[] (survives --template-mode in a fresh repo root).
+  iso_profile="$repo_root/.worktree-isolate/profile.json"
+  if [[ -f "$iso_profile" ]] && [[ "$(jq -r '.singletons // [] | length' "$iso_profile" 2>/dev/null || echo 0)" -gt 0 ]]; then
+    while IFS= read -r sid; do
+      [[ -z "$sid" || "$sid" == "null" ]] && continue
+      resolves=$(jq -r --arg id "$sid" '[.singletons[]? | select(.id == $id)] | length' "$iso_profile" 2>/dev/null || echo 0)
+      [[ "$resolves" -ge 1 ]] || { warnings=$((warnings+1)); echo "warn=channel singleton_id '$sid' not found in isolate singletons[]" >&2; }
+    done < <(jq -r '.channels[].singleton_id // empty' "$PROFILE_PATH")
+  fi
+
+  # Info-nudge: channels present but NONE declare the singleton_id key (not migrated).
+  # Use has("singleton_id") — NOT `!= null` — so a fully-migrated stateless profile that
+  # writes `singleton_id: null` explicitly counts as migrated and the nudge does NOT fire
+  # forever. Distinguishes "key present (migrated, even if null)" from "key absent (not migrated)".
+  with_sid=$(jq -r '[.channels[] | select(has("singleton_id"))] | length' "$PROFILE_PATH")
+  if [[ "$with_sid" -eq 0 ]]; then
+    info_nudge="channels present but none carry singleton_id — run 'x-qa update' for stateful-aware selection"
+  fi
 fi
 
 # ---- KB integrity checks (skipped if no KB present) ------------------------
@@ -310,3 +332,4 @@ echo "✓ doctor PASS"
 echo "checks_attempted=$checks_attempted"
 echo "checks_passed=$checks_passed"
 echo "warnings=$warnings"
+if [[ -n "$info_nudge" ]]; then echo "info=$info_nudge"; fi

@@ -79,6 +79,29 @@ Per channel, then ask:
 > **Env/config** — which `.env` files and which vars are load-bearing here?
 > **Session** (browser/computer-use) — how is the logged-in session bootstrapped (QR/2FA, one-time)?
 
+## Stateful channel mapping (isolate-aware)
+
+When `<repo_root>/.worktree-isolate/profile.json` exists, after each channel is
+confirmed, offer to link stateful-looking channels (bots, webhook receivers,
+schedulers) to an isolate singleton:
+
+> **Is `<channel-name>` a stateful singleton** (one live listener per platform —
+> Slack/Telegram/WhatsApp bot, webhook receiver)? If so, which isolate singleton
+> gates it? I see: `<singletons[].id list>`.
+> - Pick one → sets `channels[].singleton_id` (the channel is then **skipped**
+>   unless this worktree owns the singleton; an owned **http** channel is driven).
+> - "stateless" → sets `singleton_id: null` (default QA target, port-isolated).
+
+The enabling env var is **not** copied into the profile — it is looked up via the
+singleton (`singleton_id → singletons[].suggested_env_var`) so the two profiles
+cannot drift. `singleton_id` is optional: existing profiles without it keep working
+(absence = stateless).
+
+`x-qa update` runs the **same** mapping over channels that lack a `singleton_id`,
+cross-referencing the isolate profile. Channels already carrying `singleton_id`
+are left untouched. This is the x-qa half of the spec's §4c committed-profile
+migration — additive, never a hard gate.
+
 ## Test Setup, Monitoring, Environment, Database
 
 These populate `QA_MEMORY.md` (narrative), not `profile.json`:
