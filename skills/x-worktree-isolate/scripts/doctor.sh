@@ -100,6 +100,30 @@ PY
   fi
 fi
 
+# 4b. Singleton owner liveness: heal + flag any owner whose worktree_path is gone.
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  xwi_acquire_lock 2>/dev/null && { xwi_heal_registry; xwi_release_lock; } || true
+fi
+if [[ -n "$REG" && -f "$REG" ]]; then
+  DEAD_OWNERS="$(python3 - "$REG" <<'PY'
+import json, os, sys
+d = json.load(open(sys.argv[1]))
+dead = []
+for sid, o in (d.get("singleton_owners") or {}).items():
+    if isinstance(o, dict) and not os.path.isdir(o.get("worktree_path","")):
+        dead.append(f"{sid} (owner gone: {o.get('worktree_path','')})")
+print("\n".join(dead))
+PY
+)"
+  if [[ -z "$DEAD_OWNERS" ]]; then
+    ok "no dead singleton locks"
+  else
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && warn "dead singleton lock: $line — clear with: x-worktree-isolate migrate"
+    done <<<"$DEAD_OWNERS"
+  fi
+fi
+
 # 5. .env.worktree present + ports free OR bound by us
 ENV_WT="$REPO_ROOT/.env.worktree"
 if [[ -f "$ENV_WT" ]]; then

@@ -14,7 +14,7 @@ SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 export XWI_SKILL_DIR="$SKILL_DIR"
 export XWI_SCRIPT_DIR="$SCRIPT_DIR"
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 usage() {
   cat <<'EOF'
@@ -26,15 +26,16 @@ Usage:
 Subcommands:
   init [--rescan|--dry-run]         Phase 1: inspect repo, write profile.json
                                     (default writes; --dry-run prints to stdout).
-  apply [--quiet|--if-profile-exists|--ignore-warnings|--dry-run]
+  apply [--quiet|--if-profile-exists|--ignore-warnings|--dry-run|--force]
                                     Phase 2: write override + .env.worktree.
   release [--quiet]                 Free this worktree's registry slot.
   doctor                            Run validation suite.
   list                              Show all claimed slots from registry.
   features                          List profiled singletons + per-worktree state.
-  enable <id>                       Mark singleton as enabled in this worktree.
+  enable <id> [--force]             Mark singleton enabled (claim the lock; --force steals).
   disable <id>                      Mark singleton as disabled (default).
   ack-host-singletons               Acknowledge all host-tier singletons (per worktree).
+  migrate                           Heal registry + report pre-existing conflicts + upgrade pointers.
   version                           Print version.
 
 See SKILL.md for full documentation.
@@ -64,6 +65,9 @@ case "$cmd" in
     ;;
   features|enable|disable|ack-host-singletons)
     exec bash "$SCRIPT_DIR/feature-overrides.sh" "$cmd" "$@"
+    ;;
+  migrate)
+    exec bash "$SCRIPT_DIR/migrate.sh" "$@"
     ;;
   version|--version|-v)
     echo "x-worktree-isolate $VERSION"

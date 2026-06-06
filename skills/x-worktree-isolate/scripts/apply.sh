@@ -12,12 +12,14 @@ QUIET=0
 IF_PROFILE_EXISTS=0
 IGNORE_WARNINGS=0
 DRY_RUN=0
+FORCE=0
 for arg in "$@"; do
   case "$arg" in
     --quiet)              QUIET=1 ;;
     --if-profile-exists)  IF_PROFILE_EXISTS=1 ;;
     --ignore-warnings)    IGNORE_WARNINGS=1 ;;
     --dry-run)            DRY_RUN=1 ;;
+    --force|--steal)      FORCE=1 ;;
     --help|-h)
       cat <<'EOF'
 apply.sh — Phase 2: write override + .env.worktree.
@@ -25,6 +27,7 @@ apply.sh — Phase 2: write override + .env.worktree.
   --if-profile-exists    exit 0 silently when no profile.json
   --ignore-warnings      bypass severity:blocker gate (explicit footgun ack)
   --dry-run              preview without writing
+  --force, --steal       steal a live singleton lock from another worktree
 EOF
       exit 0 ;;
     *) echo "apply.sh: unknown flag: $arg" >&2; exit 1 ;;
@@ -141,7 +144,14 @@ EOF
   exit 1
 fi
 
-# --- Compute project name + branch ---
+# --- Acquire lock + allocate ---
+xwi_acquire_lock || exit 1
+trap 'xwi_release_lock' EXIT
+
+# Self-heal the registry on every apply (idempotent; we hold the lock).
+xwi_heal_registry
+
+# Compute project name early (needed for both the claim and the render below).
 BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
 sanitize() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]_-' '-' | sed 's/-\{2,\}/-/g; s/^-//; s/-$//'; }
 REPO_NAME="$(basename "$(dirname "$ABS_COMMON")")"
@@ -149,9 +159,62 @@ REPO_SLUG="$(sanitize "$REPO_NAME")"
 BRANCH_SLUG="$(sanitize "$BRANCH")"
 PROJECT_NAME="${REPO_SLUG}-${BRANCH_SLUG}"
 
-# --- Acquire lock + allocate ---
-xwi_acquire_lock || exit 1
-trap 'xwi_release_lock' EXIT
+# Enforced singleton claim BEFORE any file write — a refusal leaves the worktree untouched.
+CLAIM_PLAN="$(python3 - "$PROFILE" "$OVERRIDES_FILE" "$PROJECT_NAME" <<'PY'
+import json, os, sys
+prof = json.load(open(sys.argv[1]))
+ov_path, proj = sys.argv[2], sys.argv[3]
+overrides = {}
+if os.path.isfile(ov_path):
+    try: overrides = {o["id"]: o["state"] for o in json.load(open(ov_path)).get("overrides", []) if isinstance(o, dict) and "id" in o and "state" in o}
+    except (OSError, json.JSONDecodeError): pass
+ids, tiers = [], {}
+for s in prof.get("singletons", []) or []:
+    sid = s["id"]
+    state = overrides.get(sid, s.get("default_in_worktree", "disabled"))
+    if state != "enabled": continue
+    if sid not in ids: ids.append(sid)
+    # compose-tier liveness needs the owning worktree COMPOSE_PROJECT_NAME.
+    tiers[sid] = {"tier": s.get("kind", ""), "proj": proj if s.get("kind") == "compose-service" else ""}
+print(json.dumps({"ids": ids, "tiers": tiers}))
+PY
+)"
+ENABLED_IDS="$(printf '%s' "$CLAIM_PLAN" | python3 -c 'import json,sys; print(",".join(json.load(sys.stdin)["ids"]))')"
+TIERS_JSON="$(printf '%s' "$CLAIM_PLAN" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["tiers"]))')"
+if ! xwi_sync_singleton_owners "$ENABLED_IDS" "$REPO_ROOT" "$BRANCH" "$TIERS_JSON" "$FORCE"; then
+  echo "x-worktree-isolate apply: refused to claim one or more singletons (see notice above)." >&2
+  echo "  Re-run with --force to steal a live lock, or disable the conflicting singleton." >&2
+  exit 2
+fi
+
+# Materialize the claimed (enabled) set into feature-overrides.local.json so the override
+# file is the single ground truth (heal + x-qa read only this file). This closes the gap
+# where a singleton with default_in_worktree:"enabled" is claimed via the profile default
+# but has no override entry, so heal would otherwise drop it. Idempotent: only writes when
+# it adds a missing entry; preserves existing disabled/acknowledged entries verbatim.
+python3 - "$ENABLED_IDS" "$OVERRIDES_FILE" <<'PY'
+import json, os, sys, time
+ids = [i for i in sys.argv[1].split(",") if i]
+ov_path = sys.argv[2]
+existing = {"schema": 1, "overrides": []}
+if os.path.isfile(ov_path):
+    try: existing = json.load(open(ov_path))
+    except (OSError, json.JSONDecodeError): existing = {"schema": 1, "overrides": []}
+overrides = {o["id"]: o["state"] for o in existing.get("overrides", [])
+             if isinstance(o, dict) and "id" in o and "state" in o}
+changed = False
+for sid in ids:
+    if overrides.get(sid) != "enabled":
+        overrides[sid] = "enabled"; changed = True
+if changed:
+    out = {"schema": 1,
+           "overrides": [{"id": k, "state": v} for k, v in sorted(overrides.items())],
+           "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    os.makedirs(os.path.dirname(ov_path), exist_ok=True)
+    tmp = ov_path + ".tmp"
+    with open(tmp, "w") as fh: json.dump(out, fh, indent=2)
+    os.replace(tmp, ov_path)
+PY
 
 SLOT="$(xwi_allocate_slot "$REPO_ROOT")"
 
@@ -472,26 +535,6 @@ done
 
 # --- Claim registry slot ---
 xwi_claim_slot "$SLOT" "$REPO_ROOT" "$BRANCH" "$PORTS_MAP_JSON" "$DATA_PATH"
-
-# Singleton ownership bookkeeping (declarative; not a runtime lock).
-ENABLED_IDS="$(python3 - "$PROFILE" "$OVERRIDES_FILE" <<'PY'
-import json, os, sys
-prof = json.load(open(sys.argv[1]))
-ov_path = sys.argv[2]
-overrides = {}
-if os.path.isfile(ov_path):
-    try: overrides = {o["id"]: o["state"] for o in json.load(open(ov_path)).get("overrides", []) if isinstance(o, dict) and "id" in o and "state" in o}
-    except (OSError, json.JSONDecodeError): pass
-out=[]
-for s in prof.get("singletons", []) or []:
-    sid = s["id"]
-    state = overrides.get(sid, s.get("default_in_worktree","disabled"))
-    if state == "enabled":
-        out.append(sid)
-print(",".join(out))
-PY
-)"
-xwi_set_singleton_owners "$REPO_ROOT" "$ENABLED_IDS"
 
 # --- Print Next Steps ---
 if [[ "$QUIET" -eq 0 ]]; then
