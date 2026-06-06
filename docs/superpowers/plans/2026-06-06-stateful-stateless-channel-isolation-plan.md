@@ -14,6 +14,10 @@
 
 **Part 1 (Tasks 1–10, x-worktree-isolate) MUST complete and stay green before Part 2 (Tasks 11–18, x-qa).** Part 2's ownership read depends on Part 1's `enabled ⇒ owned` enforcement guarantee. Within each part, tasks are ordered so every commit leaves the skill working and its tests green.
 
+> **Green-at-every-commit note (`test_23`):** `tests/integration/test_23_registry_lazy_migration.sh` is **authored** in Task 1 (Steps 1–5, as the TDD red test) but only goes **green once Task 3** wires `xwi_heal_registry` into `apply.sh`. To preserve the green-at-every-commit invariant, `test_23` is **committed in Task 3 Step 7**, NOT in Task 1 Step 6 (Task 1 commits `allocate-ports.sh` alone). See Task 1 Step 6 and Task 3 Step 7.
+
+> **⚠ ANCHOR NOTE — line numbers are pre-Task-1 anchors.** All line numbers in this plan are anchors against the **pre-Task-1 file state**. Tasks 1–3 insert ~140 lines into `allocate-ports.sh` and ~70 into `apply.sh`, so later same-file line-number anchors (e.g. Task 9's `xwi_list_slots` "lines 274–289") are **stale** by the time those tasks run. For any task that edits `allocate-ports.sh` or `apply.sh`, **RE-LOCATE the insertion point by the named symbol or comment** (e.g. `xwi_list_slots`, `# --- Singleton ownership`), **NOT the literal line number**. Run a `grep -n '<symbol>'` before each insertion.
+
 ---
 
 ## Test harness conventions
@@ -278,17 +282,18 @@ PY
 # EXPECTED: loaded ok {'x': '/gone'}  (confirms the inline python parses; full heal verified by test 23)
 ```
 
-- [ ] **Step 6: Commit.**
+- [ ] **Step 6: Commit (`allocate-ports.sh` ONLY — NOT test_23).** `test_23` is authored and run as the TDD red test in Steps 1–5 above, but it only goes **green after Task 3** wires `xwi_heal_registry` into `apply.sh`. To keep "every commit leaves the skill green" (the Execution-order invariant), do NOT commit `test_23` here — it is committed in **Task 3 Step 7** once green. Commit only the helper code:
 ```
-git add skills/x-worktree-isolate/scripts/allocate-ports.sh skills/x-worktree-isolate/tests/integration/test_23_registry_lazy_migration.sh
+git add skills/x-worktree-isolate/scripts/allocate-ports.sh
 git commit -m "feat(x-worktree-isolate): enriched singleton_owners + lazy registry heal (registry_schema:2)"
 ```
+> Leave `tests/integration/test_23_registry_lazy_migration.sh` in the working tree (unstaged). Task 3 Step 7 stages and commits it after Step 5 confirms it passes.
 
 ---
 
 ### Task 2: Liveness check + enforced claim (`xwi_owner_alive`, `xwi_claim_singleton`, `xwi_sync_singleton_owners`)
 
-Adds the tier-aware liveness rule and the claim primitive that refuses live owners (unless `--force`), auto-steals dead ones, and refuses pre-existing-conflict ids. Also the SYNC primitive (set this worktree's owned set to exactly the enabled ids — not additive). Pure helpers here; wiring into `apply`/`enable` is Tasks 3–4. All run lock-free (caller holds the lock).
+Adds the tier-aware liveness rule and the claim primitive that refuses live owners (unless `--force`), auto-steals dead ones, and refuses pre-existing-conflict ids. Also the SYNC primitive (set this worktree's owned set to exactly the enabled ids — not additive). Pure helpers here; wiring into `apply`/`enable` is Tasks 3–4. All run lock-free (caller holds the lock). Note: `xwi_claim_singleton` with `--force` clears the OTHER claimants' `feature-overrides.local.json` entries (via the new `xwi_force_release_others` helper) so the heal's ground-truth rebuild durably elects the forcing worktree — stealing the registry slot alone is not enough, because heal rebuilds owners from the override files.
 
 **Files:**
 - Modify: `skills/x-worktree-isolate/scripts/allocate-ports.sh` (add after the Task-1 readers; rewrite `xwi_clear_singleton_owners_for`; delete `xwi_set_singleton_owners`)
@@ -330,8 +335,41 @@ PY
 }
 ```
 
-- [ ] **Step 2: Add `xwi_claim_singleton`.** Insert after `xwi_owner_alive`. This is the enforced replacement for the old declarative write. It claims ONE id; callers loop over ids. Tier + compose-project are passed by the caller (derived from the profile + COMPOSE_PROJECT_NAME). Emits notices; returns 0 = claimed, 2 = refused (live or pre-existing).
+- [ ] **Step 2: Add `xwi_force_release_others` + `xwi_claim_singleton`.** Insert after `xwi_owner_alive`. First the force-release helper (used by the `--force`/`--steal` path of the claim to clear the loser worktrees' overrides), then the claim primitive itself. `xwi_claim_singleton` is the enforced replacement for the old declarative write. It claims ONE id; callers loop over ids. Tier + compose-project are passed by the caller (derived from the profile + COMPOSE_PROJECT_NAME). Emits notices; returns 0 = claimed, 2 = refused (live or pre-existing). With `--force` it ALSO clears the OTHER claimants' `feature-overrides.local.json` entries (via `xwi_force_release_others`) so the heal's ground-truth rebuild durably elects the forcing worktree.
 ```bash
+# Disable singleton $sid in EVERY live worktree's feature-overrides EXCEPT $keep,
+# so the next heal elects $keep as the sole owner. Used by --force/--steal to make a
+# live-owner / pre-existing-conflict steal durable (heal rebuilds from ground truth, so
+# stealing the registry slot alone is not enough — the loser's override must be cleared).
+# ASSUMES caller holds the registry lock.
+xwi_force_release_others() {
+  local sid="$1" keep="$2"
+  python3 - "$sid" "$keep" "$(xwi_registry_file)" <<'PY'
+import json, os, sys, time
+sid, keep, reg = sys.argv[1], sys.argv[2], sys.argv[3]
+if not os.path.isfile(reg): sys.exit(0)
+try: data = json.load(open(reg))
+except json.JSONDecodeError: sys.exit(0)
+now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+for s in data.get("slots", []) or []:
+    wt = s.get("worktree_path") or ""
+    if not wt or wt == keep or not os.path.isdir(wt): continue
+    ov = os.path.join(wt, ".worktree-isolate", "feature-overrides.local.json")
+    if not os.path.isfile(ov): continue
+    try: o = json.load(open(ov))
+    except (OSError, json.JSONDecodeError): continue
+    changed = False
+    for e in o.get("overrides", []):
+        if isinstance(e, dict) and e.get("id") == sid and e.get("state") == "enabled":
+            e["state"] = "disabled"; changed = True
+    if changed:
+        o["updated_at"] = now
+        tmp = ov + ".tmp"
+        with open(tmp, "w") as fh: json.dump(o, fh, indent=2)
+        os.replace(tmp, ov)
+PY
+}
+
 # Claim ONE singleton id for this worktree. ASSUMES caller holds the registry lock
 # AND has already run xwi_heal_registry.
 # Args: id worktree_path branch tier compose_project force(0|1)
@@ -339,14 +377,20 @@ PY
 xwi_claim_singleton() {
   local sid="$1" wpath="$2" branch="$3" tier="$4" proj="$5" force="${6:-0}"
 
-  # Pre-existing conflict: id enabled by 2+ live slots → unowned by heal → refuse.
+  # Pre-existing conflict: id enabled by 2+ live slots → unowned by heal.
+  # --force resolves it in our favor by clearing the other claimants' overrides.
   local pre
   pre="$(xwi_preexisting_conflicts | grep -F "${sid}|" || true)"
   if [[ -n "$pre" ]]; then
-    local owners="${pre#*|}"
-    echo "SINGLETON_CONFLICT_PREEXISTING=${sid} owners=${owners}" >&2
-    echo "  Resolve: run 'x-worktree-isolate disable ${sid}' in the loser worktree, then retry." >&2
-    return 2
+    if [[ "$force" -eq 1 ]]; then
+      xwi_force_release_others "$sid" "$wpath"
+      echo "SINGLETON_LOCK_STOLEN=${sid} from=preexisting" >&2
+    else
+      local owners="${pre#*|}"
+      echo "SINGLETON_CONFLICT_PREEXISTING=${sid} owners=${owners}" >&2
+      echo "  Resolve: run 'x-worktree-isolate disable ${sid}' in the loser worktree, then retry (or pass --force)." >&2
+      return 2
+    fi
   fi
 
   local owner_json owner_path owner_branch
@@ -358,6 +402,7 @@ xwi_claim_singleton() {
       :  # owned by self → re-claim (refresh claimed_at below).
     elif xwi_owner_alive "$owner_json" "$tier" "$proj"; then
       if [[ "$force" -eq 1 ]]; then
+        xwi_force_release_others "$sid" "$wpath"   # clear the live owner's override so heal won't re-conflict
         echo "SINGLETON_LOCK_STOLEN=${sid} from=${owner_branch}" >&2
       else
         echo "SINGLETON_CONFLICT=${sid} owner=${owner_branch}@${owner_path}" >&2
@@ -550,6 +595,43 @@ if ! xwi_sync_singleton_owners "$ENABLED_IDS" "$REPO_ROOT" "$BRANCH" "$TIERS_JSO
 fi
 ```
 
+- [ ] **Step 3b: Materialize the claimed (enabled) set into `feature-overrides.local.json`.** This runs **only after the claim above succeeded** (the claim is the gate; a refusal exits 2 at Step 3 and leaves the worktree untouched, never reaching here). It closes the F2 gap where a singleton with `default_in_worktree:"enabled"` is claimed via the profile default but has **no override entry**, so the next heal would otherwise drop it (heal reads owners only from `feature-overrides.local.json`). Materializing keeps that file as the single ground truth — heal and x-qa (Part 2) need no change, and Appendix A's "enabled in feature-overrides ⇒ owned" invariant holds. Insert AFTER the Step-3 `xwi_sync_singleton_owners` success block (and AFTER `$ENABLED_IDS` is defined — re-locate by `ENABLED_IDS=` rather than by line number per the ANCHOR NOTE):
+```bash
+# Materialize the claimed (enabled) set into feature-overrides.local.json so the override
+# file is the single ground truth (heal + x-qa read only this file). This closes the gap
+# where a singleton with default_in_worktree:"enabled" is claimed via the profile default
+# but has no override entry, so heal would otherwise drop it. Idempotent: only writes when
+# it adds a missing entry; preserves existing disabled/acknowledged entries verbatim.
+python3 - "$ENABLED_IDS" "$OVERRIDES_FILE" <<'PY'
+import json, os, sys, time
+ids = [i for i in sys.argv[1].split(",") if i]
+ov_path = sys.argv[2]
+existing = {"schema": 1, "overrides": []}
+if os.path.isfile(ov_path):
+    try: existing = json.load(open(ov_path))
+    except (OSError, json.JSONDecodeError): existing = {"schema": 1, "overrides": []}
+overrides = {o["id"]: o["state"] for o in existing.get("overrides", [])
+             if isinstance(o, dict) and "id" in o and "state" in o}
+changed = False
+for sid in ids:
+    if overrides.get(sid) != "enabled":
+        overrides[sid] = "enabled"; changed = True
+if changed:
+    out = {"schema": 1,
+           "overrides": [{"id": k, "state": v} for k, v in sorted(overrides.items())],
+           "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    os.makedirs(os.path.dirname(ov_path), exist_ok=True)
+    tmp = ov_path + ".tmp"
+    with open(tmp, "w") as fh: json.dump(out, fh, indent=2)
+    os.replace(tmp, ov_path)
+PY
+```
+Placement / correctness notes (state these in the implementation):
+- It MUST run **after** `xwi_sync_singleton_owners` succeeds — the claim is the gate; materialize only on success, so a refusal still leaves the worktree untouched.
+- `$ENABLED_IDS` and `$OVERRIDES_FILE` are already defined in `apply.sh` (`ENABLED_IDS` from the CLAIM_PLAN in Step 3; `OVERRIDES_FILE` at apply.sh:100). Confirm BOTH are in scope at the insertion point; if `$ENABLED_IDS` is computed later than the insertion point, place the materialize **after** `ENABLED_IDS` is defined.
+- The override file schema MUST match `feature-overrides.sh` exactly: `{"schema": 1, "overrides": [{"id":..,"state":..} sorted by id], "updated_at": ISO8601}`.
+- Because this runs on **every** apply, the FIRST worktree to apply a default-enabled singleton claims + materializes it; a SECOND worktree's apply heals (sees worktree-1's materialized entry), then its own claim **REFUSES** at the claim gate (Step 3) **before** reaching this materialize step — so mutual exclusion holds.
+
 - [ ] **Step 4: Delete the now-redundant late computation + trailing claim.** Remove the duplicate `BRANCH=`/`sanitize`/`PROJECT_NAME` block (lines 144–150 — now computed early in Step 3) and the entire trailing singleton block lines 476–494 (the `# Singleton ownership bookkeeping (declarative...)` comment through `xwi_set_singleton_owners "$REPO_ROOT" "$ENABLED_IDS"`). The early claim replaces it.
 
 - [ ] **Step 5: Run test_23 — expect PASS.**
@@ -564,10 +646,61 @@ bash skills/x-worktree-isolate/tests/integration/run-all.sh
 # EXPECTED: summary FAIL: 0  (test_16 reads only owner KEYS via `"node-cron" in o`, survives the enriched shape)
 ```
 
+- [ ] **Step 6b: Add the F2 default-enabled materialization test** (`tests/integration/test_30_default_enabled_materialize.sh`, Create). A profile with a singleton `default_in_worktree:"enabled"` and NO override, after `apply`, must have that id written as `state:"enabled"` in `feature-overrides.local.json` (materialized via Step 3b); and a SECOND worktree's `apply` of the same profile must REFUSE (`SINGLETON_CONFLICT`) rather than both running it. Uses an **env-flag** singleton (path-only liveness, docker-free, deterministic), matching test_24's style:
+```bash
+#!/usr/bin/env bash
+# Test 30 (F2): default_in_worktree:"enabled" singleton is materialized into
+# feature-overrides.local.json on apply, and a second worktree's apply refuses.
+set -euo pipefail
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+test_setup t30
+trap test_teardown EXIT
+
+MAIN="$TEST_TMP/main"
+make_repo "$MAIN"
+mkdir -p "$MAIN/.worktree-isolate"
+cat > "$MAIN/.worktree-isolate/profile.json" <<'JSON'
+{
+  "schema": 2, "stack": "docker-compose",
+  "port_strategy": {"scan_range": [18000, 29999], "ports": []},
+  "services_to_strip": [], "data_dirs": [], "global_label_warnings": [], "single_worktree_profiles": [],
+  "detection_guardrails": {"scan_max_depth":4,"scan_max_file_bytes":1048576,"exclude_dirs":[],"exclude_globs":[]},
+  "singletons": [
+    {"id":"node-cron","kind":"env-flag","evidence":["src/jobs.js:1"],"rationale":"scheduler","default_in_worktree":"enabled","severity":"warning","env_var":"RUN_SCHEDULER","env_disabled_value":"false"}
+  ]
+}
+JSON
+commit_profile "$MAIN"
+
+WTA="$TEST_TMP/wtA"; make_worktree "$MAIN" "$WTA" "feat-a"
+WTB="$TEST_TMP/wtB"; make_worktree "$MAIN" "$WTB" "feat-b"
+
+# 1) wtA apply claims node-cron via the profile default AND materializes the override.
+( cd "$WTA" && bash "$DISPATCH" apply --quiet )
+ovA="$WTA/.worktree-isolate/feature-overrides.local.json"
+[ -f "$ovA" ] || fail "wtA apply must materialize feature-overrides.local.json"
+case "$(cat "$ovA")" in
+  *'"id": "node-cron"'*'"state": "enabled"'*) : ;;
+  *) fail "default-enabled node-cron must be materialized as enabled in wtA override" ;;
+esac
+
+# 2) wtB apply of the same default-enabled profile must REFUSE (claim gate before materialize).
+set +e
+errB="$( cd "$WTB" && bash "$DISPATCH" apply --quiet 2>&1 )"
+rcB=$?
+set -e
+assert_eq "1" "$([ "$rcB" -ne 0 ] && echo 1 || echo 0)" "wtB apply must refuse while wtA owns the default-enabled singleton"
+assert_contains "$errB" "SINGLETON_CONFLICT=node-cron" "wtB apply must emit SINGLETON_CONFLICT"
+
+pass "test 30 — default-enabled singleton materialized + second worktree refused"
+```
+Run it: `bash skills/x-worktree-isolate/tests/integration/test_30_default_enabled_materialize.sh` → expect `PASS: test 30 …`, exit 0.
+
 - [ ] **Step 7: Commit.**
 ```
-git add skills/x-worktree-isolate/scripts/apply.sh
-git commit -m "feat(x-worktree-isolate): enforce singleton claim before file writes in apply; --force/--steal"
+git add skills/x-worktree-isolate/scripts/apply.sh skills/x-worktree-isolate/tests/integration/test_30_default_enabled_materialize.sh skills/x-worktree-isolate/tests/integration/test_23_registry_lazy_migration.sh
+git commit -m "feat(x-worktree-isolate): enforce singleton claim before file writes in apply; --force/--steal; materialize default-enabled overrides"
 ```
 
 ---
@@ -643,6 +776,13 @@ for rid in os.listdir(root):
     if o: print(o.get("worktree_path",""))
 ' "$reg")"
 assert_eq "$WTB" "$owner_path" "after --force, wtB must own node-cron"
+# F1: --force must have cleared the loser (wtA) override so heal won't re-conflict.
+ovA="$WTA/.worktree-isolate/feature-overrides.local.json"
+if [ -f "$ovA" ]; then
+  case "$(cat "$ovA")" in
+    *'"id": "node-cron"'*'"state": "enabled"'*) fail "force-steal must clear node-cron in loser wtA override" ;;
+  esac
+fi
 
 # 4) release clears wtB ownership.
 ( cd "$WTB" && bash "$DISPATCH" release --quiet )
@@ -1536,7 +1676,7 @@ Reads ONLY `<worktree>/.worktree-isolate/feature-overrides.local.json` (R2 — n
   pass=0; fail=0
   expect() { # <desc> <expected-stdout> <worktree-root> <singleton-id>
     local desc="$1" want="$2" wt="$3" id="$4" got
-    got=$("$OWN" --singleton-id "$id" --worktree "$wt" 2>/dev/null || true)
+    got=$(bash "$OWN" --singleton-id "$id" --worktree "$wt" 2>/dev/null || true)
     if [[ "$got" == "$want" ]]; then pass=$((pass+1)); else
       fail=$((fail+1)); echo "FAIL: $desc (want '$want', got '$got')"; fi
   }
@@ -1795,7 +1935,7 @@ Decision table (per spec §Component 2):
       continue
     fi
 
-    ownership=$("$OWN" --singleton-id "$sid" --worktree "$WORKTREE")
+    ownership=$(bash "$OWN" --singleton-id "$sid" --worktree "$WORKTREE")
     case "$ownership" in
       owned)
         if [[ "$driver" == "http" ]]; then
@@ -1865,13 +2005,15 @@ Decision table (per spec §Component 2):
   cat > "$RD/channels.json" <<'JSON'
   {"tested":["admin-api","webhook"],"skipped":[{"name":"tg","reason":"stateful-not-owned"},{"name":"dash","reason":"stateful-unverifiable"}]}
   JSON
-  out=$("$AGG" --run-dir "$RD" --plan "$PLAN" --no-kb)
+  set +e; out=$("$AGG" --run-dir "$RD" --plan "$PLAN" --no-kb); rc=$?; set -e
+  [[ "$rc" -eq 0 ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: aggregate-results.sh exited nonzero (rc=$rc) — fields below are unreliable"; }
   [[ "$(field "$out" CHANNELS_TESTED)" == "admin-api,webhook" ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: CHANNELS_TESTED got=[$(field "$out" CHANNELS_TESTED)]"; }
   [[ "$(field "$out" CHANNELS_SKIPPED)" == "tg:stateful-not-owned,dash:stateful-unverifiable" ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: CHANNELS_SKIPPED got=[$(field "$out" CHANNELS_SKIPPED)]"; }
 
   # 2. channels.json absent → both keys present and empty (back-compat)
   RD="$WORK/run-2"; PLAN=$(mk_run "$RD")
-  out=$("$AGG" --run-dir "$RD" --plan "$PLAN" --no-kb)
+  set +e; out=$("$AGG" --run-dir "$RD" --plan "$PLAN" --no-kb); rc=$?; set -e
+  [[ "$rc" -eq 0 ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: aggregate-results.sh exited nonzero (rc=$rc) on absent-channels run"; }
   [[ "$(field "$out" CHANNELS_TESTED)" == "" ]] && grep -q '^CHANNELS_TESTED=' <<<"$out" && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: CHANNELS_TESTED should be present+empty"; }
   [[ "$(field "$out" CHANNELS_SKIPPED)" == "" ]] && grep -q '^CHANNELS_SKIPPED=' <<<"$out" && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: CHANNELS_SKIPPED should be present+empty"; }
 
@@ -1895,7 +2037,7 @@ Decision table (per spec §Component 2):
   echo "CHANNELS_TESTED=$channels_tested"
   echo "CHANNELS_SKIPPED=$channels_skipped"
   ```
-- [ ] **Step 4: Run the test — expect PASS.** `bash skills/x-qa/scripts/tests/aggregate-channels.sh` → expect `aggregate-channels: 4 passed, 0 failed`, exit 0.
+- [ ] **Step 4: Run the test — expect PASS.** `bash skills/x-qa/scripts/tests/aggregate-channels.sh` → expect `aggregate-channels: 6 passed, 0 failed`, exit 0 (4 field assertions + 2 exit-code assertions per F7).
 - [ ] **Step 5: Commit.** `git add skills/x-qa/scripts/aggregate-results.sh skills/x-qa/scripts/tests/aggregate-channels.sh && git commit -m "feat(x-qa): emit CHANNELS_TESTED/CHANNELS_SKIPPED from channels.json"`
 
 ---
@@ -1928,11 +2070,17 @@ C8: when a channel's `singleton_id` is set AND `<repo_root>/.worktree-isolate/pr
   if [[ $rc -eq 0 ]] && [[ "${warn:-0}" -ge 1 ]]; then pass=$((pass+1)); else
     fail=$((fail+1)); echo "FAIL: dangling singleton_id should warn not fail (rc=$rc warn=$warn)"; fi
 
-  # Info-nudge: channels present, none carry singleton_id → info= line on PASS
-  jq '.repo_root="'"$ISO"'"' "$WORK/valid.json" > .x-skills/x-qa/profile.json  # valid.json channels have no singleton_id
+  # Info-nudge: channels present, none DECLARE singleton_id key → info= line on PASS
+  jq '.repo_root="'"$ISO"'"' "$WORK/valid.json" > .x-skills/x-qa/profile.json  # valid.json channels have no singleton_id key
   out=$("$DOCTOR" .x-skills/x-qa/profile.json 2>&1)
   if grep -q "^info=" <<<"$out"; then pass=$((pass+1)); else
-    fail=$((fail+1)); echo "FAIL: expected info= nudge when no channel carries singleton_id"; fi
+    fail=$((fail+1)); echo "FAIL: expected info= nudge when no channel declares singleton_id"; fi
+
+  # F5: migrated-stateless — channel carries explicit singleton_id:null → key present → NO nudge.
+  jq '.repo_root="'"$ISO"'" | .channels[0].singleton_id=null' "$WORK/valid.json" > .x-skills/x-qa/profile.json
+  out=$("$DOCTOR" .x-skills/x-qa/profile.json 2>&1)
+  if ! grep -q "^info=" <<<"$out"; then pass=$((pass+1)); else
+    fail=$((fail+1)); echo "FAIL: explicit singleton_id:null (migrated stateless) must NOT emit info= nudge"; fi
 
   # C8 no-op under --template-mode with no isolate profile (must not error)
   jq '.channels[0].singleton_id="anything"' "$WORK/valid.json" > template-sid.json
@@ -1956,8 +2104,11 @@ C8: when a channel's `singleton_id` is set AND `<repo_root>/.worktree-isolate/pr
       done < <(jq -r '.channels[].singleton_id // empty' "$PROFILE_PATH")
     fi
 
-    # Info-nudge: channels present but none carry a non-null singleton_id.
-    with_sid=$(jq -r '[.channels[] | select(.singleton_id != null)] | length' "$PROFILE_PATH")
+    # Info-nudge: channels present but NONE declare the singleton_id key (not migrated).
+    # Use has("singleton_id") — NOT `!= null` — so a fully-migrated stateless profile that
+    # writes `singleton_id: null` explicitly counts as migrated and the nudge does NOT fire
+    # forever. Distinguishes "key present (migrated, even if null)" from "key absent (not migrated)".
+    with_sid=$(jq -r '[.channels[] | select(has("singleton_id"))] | length' "$PROFILE_PATH")
     if [[ "$with_sid" -eq 0 ]]; then
       info_nudge="channels present but none carry singleton_id — run 'x-qa update' for stateful-aware selection"
     fi
@@ -1977,7 +2128,7 @@ C8: when a channel's `singleton_id` is set AND `<repo_root>/.worktree-isolate/pr
 
   C8. When a channel sets `singleton_id` AND `<repo_root>/.worktree-isolate/profile.json` exists with a non-empty `singletons[]`, the id MUST resolve to a `singletons[].id`. A dangling ref increments `warnings` (and prints `warn=...` on stderr) — never a hard fail, because isolate is optional. No-op when no isolate profile / no `singletons[]` (survives `--template-mode`).
 
-  Info-nudge. When `channels[]` is present but no channel carries a non-null `singleton_id`, doctor prints an `info=channels present but none carry singleton_id — run 'x-qa update' for stateful-aware selection` line on the PASS path. Info-level, distinct from `warnings` — never affects exit code.
+  Info-nudge. When `channels[]` is present but **no channel declares the `singleton_id` key at all** (the not-migrated case — detected with `has("singleton_id")`, NOT `!= null`, so a migrated stateless profile that writes `singleton_id: null` explicitly does NOT keep firing the nudge), doctor prints an `info=channels present but none carry singleton_id — run 'x-qa update' for stateful-aware selection` line on the PASS path. Info-level, distinct from `warnings` — never affects exit code.
   ```
 - [ ] **Step 6: Commit.** `git add skills/x-qa/scripts/doctor.sh skills/x-qa/references/doctor-checks.md skills/x-qa/scripts/tests/channels.sh && git commit -m "feat(x-qa): doctor validates singleton_id + info-nudge for stateful migration"`
 
@@ -2167,11 +2318,12 @@ Back-compat invariants held throughout: `channels.json` missing → empty envelo
 - **Enriched registry `singleton_owners`:** `{ "<id>": { "worktree_path": str, "branch": str, "claimed_at": ISO8601 } }`; top-level `registry_schema: 2`; old shape `{ "<id>": "<worktree_path>" }` / missing marker = migrate lazily, idempotent.
 - **`feature-overrides.local.json` unchanged (schema 1):** `overrides[]` of `{id, state}`, state ∈ enabled|disabled|acknowledged.
 - **Ownership rule (consumed by x-qa, honored here):** "enabled in a worktree's feature-overrides ⇒ that worktree owns it", guaranteed because `enabled` is only reachable by winning the claim.
+- **Default-enabled materialization:** A singleton enabled via `default_in_worktree:"enabled"` is MATERIALIZED into `feature-overrides.local.json` by `apply` (written as an explicit `enabled` override on first successful claim), so heal and x-qa see a uniform ground truth — there is no owned-but-absent-from-file state.
 - **Notices:**
   - `SINGLETON_CONFLICT=<id> owner=<branch>@<path>`
   - `SINGLETON_LOCK_STOLEN=<id> from=<branch>`
   - `SINGLETON_CONFLICT_PREEXISTING=<id> owners=<b1>@<p1>,<b2>@<p2>`
-- **New flags:** `--force` / `--steal` on `enable` and `apply`. **New subcommand:** `migrate`. **Version 0.3.0.**
+- **New flags:** `--force` / `--steal` on `enable` and `apply`. **New subcommand:** `migrate`. **Version 0.3.0.** `--force`/`--steal` clears the loser worktree(s)' `feature-overrides.local.json` entry for the id (sets `state: disabled`) so the next heal elects the forcing worktree — a deliberate cross-worktree write.
 - **Liveness dead** = worktree_path gone OR no registry slot (all tiers) OR (compose-tier) zero running containers for COMPOSE_PROJECT_NAME.
 - **`claimed_at` on heal-reconstructed owners** (spec-unspecified; pinned here): use the owner worktree's `feature-overrides.local.json` `updated_at` when present, else the heal's `now()` UTC timestamp. Fresh claims via `xwi_claim_singleton` always stamp `now()`.
 
@@ -2207,4 +2359,4 @@ Back-compat invariants held throughout: `channels.json` missing → empty envelo
 5. **Matcher syntax per tier:** `TIER_COMPOSE` = substring (`WHATSAPP_`, no `*`); `TIER_ENV_FLAG` = regex under `re.MULTILINE` (escape: `makeWASocket\(`, `new\s+Client\(`, `whatsapp-web\.js`, `@whiskeysockets/baileys`).
 6. **Two version constants** (`dispatch.sh:17`, `config.json:2`) plus SKILL.md prose — bump all three. Plugin/marketplace manifest bumps are release-time, out of this plan's scope.
 7. **Test tier choice:** the basic refuse/steal test (test_24) uses an **env-flag** singleton (path-only liveness, docker-free, deterministic); compose-tier R3 (test_27) is docker-gated with `have_docker || skip`.
-8. **Known limitation — `enable` claim→override is not fully atomic (accepted):** Task 4 releases the registry lock immediately after winning the claim, *before* the override file is written, so `apply` (a child process) can re-acquire without deadlocking. This leaves a sub-millisecond window where a concurrent `--force` steal from another worktree could land between the claim and the override write, leaving this worktree's `feature-overrides.local.json` saying `enabled` while it no longer owns the lock. This is accepted, not fixed: (a) it requires a deliberate, rare, destructive `--force` from another worktree in that exact window; (b) the next `apply`/`heal` self-corrects (heal rebuilds owners from ground truth, and a re-apply re-claims or refuses); (c) the "atomic" alternative — holding the lock across the override write — reintroduces a lock-leak-on-`set -e`-failure that the current ordering deliberately avoids. If a future change adds a release trap to `feature-overrides.sh`, revisit and hold the lock through the override write.
+8. **Known limitation — `enable` claim→override is not fully atomic (accepted):** Task 4 releases the registry lock immediately after winning the claim, *before* the override file is written, so `apply` (a child process) can re-acquire without deadlocking. The force-steal path is now **durable** (per F1, a `--force`/`--steal` claim clears the loser worktree(s)' `feature-overrides.local.json` entry via `xwi_force_release_others`, so the heal's ground-truth rebuild elects the forcing worktree and does not silently re-conflict). The only remaining window is the documented sub-millisecond race: a concurrent `--force` steal from another worktree could land between this worktree's claim and its override write, leaving this worktree's `feature-overrides.local.json` saying `enabled` while it no longer owns the lock. This is accepted, not fixed: (a) it requires a deliberate, rare, destructive `--force` from another worktree in that exact window; (b) the next `apply`/`heal` self-corrects (heal rebuilds owners from ground truth, and a re-apply re-claims or refuses); (c) the "atomic" alternative — holding the lock across the override write — reintroduces a lock-leak-on-`set -e`-failure that the current ordering deliberately avoids. If a future change adds a release trap to `feature-overrides.sh`, revisit and hold the lock through the override write.
