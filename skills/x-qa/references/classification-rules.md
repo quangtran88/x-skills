@@ -36,3 +36,14 @@ When ambiguous, prefer `complex`. Cost of misclassifying simple → complex: pay
 Any case containing one or more steps with `mode: ai_fallback` is classified `complex` regardless of other signals. The cheap runner cannot satisfy the `FallbackResponse` contract (see `references/fallback-contract.md`). When the dispatcher encounters such a step in v1, it rejects the plan with:
 
 > `plan rejected: step uses 'mode: ai_fallback' but tier 2 fallback is not yet wired (forward-compat schema only). Remove the step or wait for browser entry type support.`
+
+### Eval-kind assertions
+
+Any case containing an `llm-rubric` or `semantic-similarity` assertion is classified
+`complex` and routed to the **judge-runner** (`scripts/evals/score-case.sh`), regardless
+of other signals. In v1 an eval case has exactly one eval assertion and no deterministic
+assertions (mixing deferred to v2; **enforced** — `score-case.sh` exits non-zero on a
+violation rather than silently dropping checks); the cheap HTTP runner cannot score eval
+assertions. The
+cost cascade is at the suite level — cheap deterministic HTTP cases run independently of the
+expensive judge cases.

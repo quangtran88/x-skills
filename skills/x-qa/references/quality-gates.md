@@ -24,6 +24,9 @@ Optional declarative thresholds attached to a TEST_PLAN. Evaluated after Phase 1
 | `performance.p95_ms` | p95 case duration | max | not enforced unless declared |
 | `security.critical` | count of critical findings | max | 0 (blocking when present) |
 | `kb.regressions` | gap-analyzer regression count | max | 0 (blocking) |
+| `evals.failRate` | eval cases with verdict==fail / eval total * 100 | max | 0 (blocking) |
+| `evals.advisoryFails` | count of would-fail eval cases downgraded to advisory | max | 0 (non-blocking) |
+| `evals.uncalibrated` | count of eval cases scored by an uncalibrated/low-κ judge | max | 0 (non-blocking) |
 
 Custom metrics may be declared in `profile.json.gates.custom_metrics`.
 
@@ -82,3 +85,11 @@ A run with `passRate=100, flakyRate=7, p95=400, regressions=0`:
 ```
 
 Plan-level `gates:` block fully replaces profile defaults — no merging — for predictability.
+
+## Eval κ-gate semantics
+
+For eval cases, the judge's verdict is gated by meta-evaluation (`scripts/evals/meta-gate.sh`):
+a judge sets a hard `fail` **only** when its Cohen's κ vs the human gold set is ≥ 0.90.
+In `[0.85, 0.90)` or uncalibrated, a would-fail is downgraded to advisory (`evals.advisoryFails`
+/ `evals.uncalibrated`, non-blocking → `warn`). When no plan/profile gates are declared but
+eval cases ran, `aggregate-results.sh` synthesizes the three `evals.*` default gates above.

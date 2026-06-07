@@ -17,6 +17,9 @@ instead of regenerating from scratch.
 │   │   └── <method>__<path-slug>.json
 │   ├── history/            # NEW — one .jsonl per coverage_signature, trimmed to 20
 │   │   └── <signature-slug>.jsonl
+│   ├── evals/             # NEW — eval gold sets + judge calibration
+│   │   ├── gold/<rubric_id>.jsonl       # human-labeled {input,output,reference?,human}
+│   │   └── calibration/<rubric_id>.json # {kappa,n,judge_model,threshold,gold_checksum,computed_at}
 │   └── .ledger.jsonl      # append-only run history (one line per run)
 └── runs/<run-id>/         # transient per-run artifacts (existing layout)
 ```

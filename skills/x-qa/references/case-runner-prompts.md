@@ -136,3 +136,23 @@ The dispatcher resolves the full chain by walking `precondition_case_id` pointer
 ### `auth_case_id` Default Wiring
 
 If `profile.json.auth_case_id` is non-null AND the current case has `precondition_case_id: null` (or unset) AND the case is not in `profile.public_endpoints`, the dispatcher injects `auth_case_id` as the precondition. A case may opt out by setting `precondition_case_id: ""` (explicit empty) or by tagging the case `public: true`.
+
+## Judge Runner — native eval scorer
+
+Eval-kind assertions (`llm-rubric`, `semantic-similarity`) are scored by
+`scripts/evals/score-case.sh`, NOT by an LLM free-form runner. The script:
+1. Runs the SUT output `samples` times (via `X_QA_OUTPUT_CMD`, default `curl`).
+2. Scores each output with an LLM judge (`X_QA_JUDGE_CMD`, default `gemini-agent --model flash`)
+   at temperature 0, expecting `{"score":0..1}`.
+3. Aggregates via `pass-rate.sh`, loads calibration, applies `meta-gate.sh`.
+
+**Anti-bias rule:** the judge model SHOULD differ from the model powering the
+system-under-test (`X_QA_JUDGE_MODEL` records the judge model). This is an **operator
+responsibility — not machine-enforced**: x-qa drives an HTTP endpoint and cannot infer
+which model sits behind it, so it has no SUT-model value to compare against. (A future
+`--sut-model` flag could promote this to a hard check; v1 documents the obligation.)
+Candidate output is treated as untrusted (the rubric prompt instructs the judge to ignore
+embedded instructions).
+
+The result JSON adds an `eval` block (see `references/eval-scorers.md § Result eval block`);
+the top-level `verdict` is the meta-gated verdict (a hard `fail` only when the judge's κ ≥ 0.90).
