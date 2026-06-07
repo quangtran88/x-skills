@@ -151,3 +151,18 @@ Quality-gate thresholds are static in `TEST_PLAN.yml` or `profile.json.gates.def
 (f) **Dedup is by signature.** Two workers can independently discover the same bug — especially on shared invariants or popular endpoints. `finding-merge.sh` collapses all findings with the same `signature` (`<channel>|<endpoint>|<obligation>|<failure_class>`) into one, keeping the **highest-severity** instance. Run `finding-merge.sh` output's `unique` count, not `total`, when reasoning about how many distinct bugs were found.
 
 (g) **Minted cases are RED repro stubs — never auto-promoted.** A confirmed finding is minted into a *currently-failing* repro stub for the `x-bugfix` route. It is NOT added to the green KB corpus (the KB is the proven-passing corpus). The repro earns a **regression slot** only after the fix lands, the case goes green, and the existing Phase-16 auto-promote path picks it up with a green streak. `EXPLORE_CONFIRMED` is counted after triage (post-`finding-merge.sh` + triage pass), not from the pre-triage merge output where every finding is still `suspected`.
+
+## Eval scorers
+
+(a) **Uncalibrated judge can't block.** An `llm-rubric`/`semantic-similarity` case whose
+rubric has no `kb/evals/calibration/<rubric_id>.json` (or κ < 0.90) cannot set `fail` — it
+surfaces as `evals.uncalibrated` → `warn`. Run `kb eval-calibrate` to earn fail-gating.
+Calibration is ignored if its `judge_model` ≠ the runner's judge model (re-calibrate when you
+switch judge models).
+
+(b) **N-sample ≠ flaky-retry.** `samples` measures inherent LLM output variance into a
+pass-rate; `--retry-flaky` recovers transient infra failures. They are independent — do not
+conflate. Eval cases do not participate in `flaky-recovered`.
+
+(c) **Judge == SUT model is a bug.** Using the same model to generate and grade invites
+self-preference bias and circularity. Keep `judge_model` distinct from the system-under-test.
