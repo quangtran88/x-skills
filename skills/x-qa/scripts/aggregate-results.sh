@@ -92,9 +92,19 @@ duration_s=$(awk "BEGIN { printf \"%.2f\", $(date +%s) - $run_started_epoch }")
 passRate=$(awk "BEGIN { if ($total == 0) print 0; else printf \"%.2f\", $passed * 100 / $total }")
 flakyRatePct=$(awk "BEGIN { if ($total == 0) print 0; else printf \"%.2f\", $flaky * 100 / $total }")
 
+# --- Eval metrics (cases carrying an .eval block) ---------------------------
+evals_total=$(jq '[.[] | select(.eval)] | length' <<<"$results")
+evals_fail=$(jq '[.[] | select(.eval and .verdict == "fail")] | length' <<<"$results")
+evals_adv=$(jq '[.[] | select(.eval.advisory == true)] | length' <<<"$results")
+evals_uncal=$(jq '[.[] | select(.eval.uncalibrated == true)] | length' <<<"$results")
+evals_fail_rate=$(awk "BEGIN { if ($evals_total == 0) print 0; else printf \"%.2f\", $evals_fail * 100 / $evals_total }")
+
 metrics_json=$(jq -n \
   --argjson pr "$passRate" --argjson fr "$flakyRatePct" \
-  '{tests: {passRate: $pr, flakyRate: $fr}}')
+  --argjson et "$evals_total" --argjson efr "$evals_fail_rate" \
+  --argjson ea "$evals_adv" --argjson eu "$evals_uncal" \
+  '{tests: {passRate: $pr, flakyRate: $fr},
+    evals: {total: $et, failRate: $efr, advisoryFails: $ea, uncalibrated: $eu}}')
 
 # Pull gates: plan first, then profile defaults, then empty.
 gates_json='[]'
@@ -109,6 +119,23 @@ else
       gates_json="$prof_gates"
     fi
   fi
+fi
+
+# Eval gates are ALWAYS appended when eval cases ran. Meta-eval is mandatory
+# (user decision, v1) and additive — it never replaces standard gates, and it is
+# exempt from the "plan replaces profile" rule. The non-eval path is untouched.
+if [[ "$evals_total" -gt 0 ]]; then
+  # If no standard gates resolved, seed the documented default so deterministic
+  # failures still block (failed>0 -> tests.passRate<100 -> fail) — preserving
+  # the legacy empty-gates fallback within the now-non-empty gate path.
+  if [[ "$(jq 'length' <<<"$gates_json")" -eq 0 ]]; then
+    gates_json='[{"metric":"tests.passRate","threshold":100,"blocking":true}]'
+  fi
+  gates_json=$(jq -c '. + [
+    {"metric":"evals.failRate","max":0,"blocking":true},
+    {"metric":"evals.advisoryFails","max":0,"blocking":false},
+    {"metric":"evals.uncalibrated","max":0,"blocking":false}
+  ]' <<<"$gates_json")
 fi
 
 if [[ "$(jq 'length' <<<"$gates_json")" -gt 0 ]]; then
