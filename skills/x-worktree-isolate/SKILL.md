@@ -62,7 +62,7 @@ The dispatch.sh router exposes one subcommand per workflow stage:
 9. **`release`** — drop this worktree's registry slot. Removes generated files only when their first line still matches the auto-generated header.
 10. **`doctor`** — validation suite. Asserts `docker compose --env-file .env.worktree config` (with `--env-file .env` stacked first when a base `.env` exists) actually exposes overridden host ports.
 11. **`list`** — print all slots claimed in the per-repo registry.
-12. **`version`** — print version (currently `0.3.0`).
+12. **`version`** — print version (currently `0.3.1`).
 13. **`features`** — list profiled singletons + per-worktree state (`disabled` / `enabled` / `acknowledged`).
 14. **`enable <id> [--force]`** — claim the singleton lock for this worktree, then mark it enabled and regenerate override + `.env.worktree`. Refuses if another **live** worktree owns it (`SINGLETON_CONFLICT`); auto-steals a **dead** owner (`SINGLETON_LOCK_STOLEN`); `--force`/`--steal` steals a live owner. Reaching `enabled` therefore **guarantees** this worktree owns the singleton.
 15. **`disable <id>`** — revert to disabled (default). Same regeneration.

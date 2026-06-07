@@ -14,7 +14,7 @@ SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 export XWI_SKILL_DIR="$SKILL_DIR"
 export XWI_SCRIPT_DIR="$SCRIPT_DIR"
 
-VERSION="0.3.0"
+VERSION="0.3.1"
 
 usage() {
   cat <<'EOF'
