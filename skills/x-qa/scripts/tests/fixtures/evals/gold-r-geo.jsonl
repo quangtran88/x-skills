@@ -1,0 +1,4 @@
+{"input":"capital of France?","output":"Paris.","human":"pass"}
+{"input":"capital of France?","output":"Lyon.","human":"fail"}
+{"input":"capital of France?","output":"The capital is Paris.","human":"pass"}
+{"input":"capital of France?","output":"I don't know.","human":"fail"}

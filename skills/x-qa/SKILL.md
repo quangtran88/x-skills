@@ -52,6 +52,7 @@ Full schema: `references/kb-schema.md`. Curation rules:
 | `/x-skills:x-qa kb inspect <id>` | Pretty-print a case/flow + ledger history. |
 | `/x-skills:x-qa kb promote [--force <id>] [--dry-run]` | Run auto-promotion pass manually, or force a single ID. |
 | `/x-skills:x-qa kb prune --orphans [--apply]` | Reconcile filesystem vs index (orphan files / dangling entries). |
+| `/x-skills:x-qa kb eval-calibrate --rubric-id <id> [--threshold 0.8]` | Run the judge over `kb/evals/gold/<id>.jsonl`, compute Cohen's κ, write `kb/evals/calibration/<id>.json`. Required before a judge can hard-fail a run. (Routes to `calibrate-judge.sh --gold <repo>/.x-skills/x-qa/kb/evals/gold/<id>.jsonl --rubric-id <id> --out-dir <repo>/.x-skills/x-qa/kb/evals/calibration/ [--threshold 0.8]`.) |
 
 Cross-team sharing is the git-tracked KB itself (or a submodule when shared
 across repos). Tarball export/import was cut as redundant with git.
@@ -193,6 +194,15 @@ issue real requests (curl for `http`), adjust fixture/mock data, and mint cases
 from `QA_MEMORY.md` + the KB corpus. `launch.command` starts the *service only*
 (`references/service-launch.md`); it is never a test command. This holds across
 every driver.
+
+**Eval class (v1).** LLM/agentic features are tested with eval scorers (`llm-rubric`,
+`semantic-similarity`) — x-qa scores outputs *itself* via the native judge-runner
+(`scripts/evals/score-case.sh`); it MUST NOT shell out to external eval frameworks
+(`deepeval`, `promptfoo`) any more than it runs the repo's test suites. The judge model
+SHOULD differ from the model behind the system-under-test (operator responsibility — not
+machine-enforced in v1; x-qa cannot infer the SUT's model). A judge may set `QA_VERDICT=fail`
+only when validated against a human gold set (κ ≥ 0.90); otherwise it is advisory (`warn`). See
+`references/eval-scorers.md`.
 
 ## After This Skill
 
