@@ -177,9 +177,14 @@ if [[ -f "$ENV_WT" && -f "$REPO_ROOT/compose.override.yml" ]] && command -v dock
   if [[ -n "$RENDERED" ]]; then
     # Only assert presence of host port mappings when the profile declares any
     # ports. A profile with only singletons (no `port_strategy.ports` and no
-    # services_to_strip with ports) emits no `127.0.0.1:H:C` mappings even when
-    # apply did the right thing — flagging that as "override not merging" is a
-    # false negative.
+    # services_to_strip with ports) emits no localhost host-port bindings even
+    # when apply did the right thing — flagging that as "override not merging"
+    # is a false negative.
+    #
+    # The presence check below accepts BOTH forms of `docker compose config`
+    # output: the legacy short form `127.0.0.1:H:C` (compose v1) and the
+    # normalized long form that modern compose (v2+) always emits, where each
+    # field is on its own line (`host_ip: 127.0.0.1` + `published: "H"`).
     HAS_PORTS="$(python3 -c '
 import json,sys
 p=json.load(open(sys.argv[1]))
@@ -190,7 +195,9 @@ print("1" if has else "0")
 ' "$PROFILE")"
     if [[ "$HAS_PORTS" != "1" ]]; then
       ok "docker compose config rendered (no host port mappings expected — profile declares none)"
-    elif printf '%s' "$RENDERED" | grep -qE '127\.0\.0\.1:[0-9]+:[0-9]+'; then
+    elif printf '%s' "$RENDERED" | grep -qE '127\.0\.0\.1:[0-9]+:[0-9]+' \
+         || { printf '%s' "$RENDERED" | grep -qE 'host_ip: *127\.0\.0\.1' \
+              && printf '%s' "$RENDERED" | grep -qE 'published:'; }; then
       ok "docker compose config exposes overridden host ports"
     else
       bad "docker compose config does NOT show overridden host ports — override likely not merging"
