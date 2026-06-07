@@ -55,6 +55,41 @@ expect "browser channel missing base_url fails" 1 bad-url.json
 jq '.channels[0].auth.token_source="file:../../etc/passwd"' valid.json > bad-traversal.json
 expect "path traversal in channel auth token_source fails" 1 bad-traversal.json
 
+# C8: valid singleton_id resolving against an isolate profile → no extra warning
+ISO=$(mktemp -d); cd "$ISO"; git init -q; ISO=$(git rev-parse --show-toplevel); mkdir -p .worktree-isolate .x-skills/x-qa
+cat > .worktree-isolate/profile.json <<'JSON'
+{"schema":2,"singletons":[{"id":"gh-webhook","tier":"compose-service"}]}
+JSON
+jq '.repo_root="'"$ISO"'" | .channels[0].singleton_id="gh-webhook"' "$WORK/valid.json" > .x-skills/x-qa/profile.json
+out=$("$DOCTOR" .x-skills/x-qa/profile.json 2>&1); rc=$?
+if [[ $rc -eq 0 ]] && ! grep -q "first_failure=C8" <<<"$out"; then pass=$((pass+1)); else
+  fail=$((fail+1)); echo "FAIL: valid singleton_id should pass doctor (rc=$rc)"; fi
+
+# C8: dangling singleton_id → PASS overall but warnings incremented (never hard-fail)
+jq '.repo_root="'"$ISO"'" | .channels[0].singleton_id="ghost-singleton"' "$WORK/valid.json" > .x-skills/x-qa/profile.json
+out=$("$DOCTOR" .x-skills/x-qa/profile.json 2>&1); rc=$?
+warn=$(awk -F= '/^warnings=/{print $2}' <<<"$out")
+if [[ $rc -eq 0 ]] && [[ "${warn:-0}" -ge 1 ]]; then pass=$((pass+1)); else
+  fail=$((fail+1)); echo "FAIL: dangling singleton_id should warn not fail (rc=$rc warn=$warn)"; fi
+
+# Info-nudge: channels present, none DECLARE singleton_id key → info= line on PASS
+jq '.repo_root="'"$ISO"'"' "$WORK/valid.json" > .x-skills/x-qa/profile.json  # valid.json channels have no singleton_id key
+out=$("$DOCTOR" .x-skills/x-qa/profile.json 2>&1)
+if grep -q "^info=" <<<"$out"; then pass=$((pass+1)); else
+  fail=$((fail+1)); echo "FAIL: expected info= nudge when no channel declares singleton_id"; fi
+
+# F5: migrated-stateless — channel carries explicit singleton_id:null → key present → NO nudge.
+jq '.repo_root="'"$ISO"'" | .channels[0].singleton_id=null' "$WORK/valid.json" > .x-skills/x-qa/profile.json
+out=$("$DOCTOR" .x-skills/x-qa/profile.json 2>&1)
+if ! grep -q "^info=" <<<"$out"; then pass=$((pass+1)); else
+  fail=$((fail+1)); echo "FAIL: explicit singleton_id:null (migrated stateless) must NOT emit info= nudge"; fi
+
+# C8 no-op under --template-mode with no isolate profile (must not error)
+jq '.channels[0].singleton_id="anything"' "$WORK/valid.json" > template-sid.json
+cd "$WORK"
+expect "singleton_id under template-mode (no isolate) passes" 0 "$ISO/template-sid.json"
+rm -rf "$ISO"
+
 # --- update preserves user-edited channels + warns on stale QA_MEMORY.md ---
 UP=$(mktemp -d)
 up_out=$( cd "$UP"; git init -q; mkdir -p .x-skills/x-qa
@@ -70,6 +105,20 @@ up_out=$( cd "$UP"; git init -q; mkdir -p .x-skills/x-qa
 rm -rf "$UP"
 echo "$up_out"
 grep -q "FAIL upd" <<<"$up_out" && fail=$((fail+1)) || pass=$((pass+1))
+
+# Example profile must carry a stateful channel with a non-null singleton_id
+EX="$SKILL_DIR/templates/profile.example.json"
+if [[ "$(jq -r '[.channels[]? | select(.singleton_id != null)] | length' "$EX")" -ge 1 ]]; then
+  pass=$((pass+1))
+else
+  fail=$((fail+1)); echo "FAIL: profile.example.json has no channel with a non-null singleton_id"
+fi
+# Stateless channels must explicitly carry singleton_id:null (derived statefulness)
+if jq -e '[.channels[]? | select(has("singleton_id") | not)] | length == 0' "$EX" >/dev/null; then
+  pass=$((pass+1))
+else
+  fail=$((fail+1)); echo "FAIL: profile.example.json has a channel missing the singleton_id key"
+fi
 
 echo "channels: $pass passed, $fail failed"
 [[ $fail -eq 0 ]]

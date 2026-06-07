@@ -261,6 +261,15 @@ if [[ "$KB_ENABLED" == true ]]; then
   fi
 fi
 
+# Channel selection results (Phase 4 → <run-dir>/channels.json via channel-select.sh).
+# Absent artifact = no channels selected (back-compat) → both keys empty.
+channels_tested=""
+channels_skipped=""
+if [[ -f "$RUN_DIR/channels.json" ]]; then
+  channels_tested=$(jq -r '(.tested // []) | join(",")' "$RUN_DIR/channels.json" 2>/dev/null || echo "")
+  channels_skipped=$(jq -r '(.skipped // []) | map("\(.name):\(.reason)") | join(",")' "$RUN_DIR/channels.json" 2>/dev/null || echo "")
+fi
+
 # Emit envelope
 echo "✓ x-qa run complete"
 echo "QA_VERDICT=$verdict"
@@ -280,3 +289,5 @@ echo "KB_REUSED=$kb_reused"
 echo "KB_GENERATED=$kb_generated"
 echo "KB_PROMOTED=$kb_promoted"
 echo "KB_PROMOTE_STATUS=$kb_status"
+echo "CHANNELS_TESTED=$channels_tested"
+echo "CHANNELS_SKIPPED=$channels_skipped"

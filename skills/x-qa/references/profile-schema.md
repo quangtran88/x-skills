@@ -87,6 +87,7 @@ service (`entry_point: "external"`, e.g. a hosted chat bot).
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `name` | string (slug) | yes | Unique. Used as `--channel <name>`. |
+| `singleton_id` | string \| null | no | Links this channel to `x-worktree-isolate singletons[].id`. **`null` = stateless** (default QA target, port-isolated). **Set = stateful** — selection skips it unless this worktree owns the singleton (see `references/channel-drivers.md`). Optional and additive: schema stays `1`; absence = stateless = today's behavior. The enabling env var is NOT copied here — it is looked up via the singleton. |
 | `driver` | enum | yes | `http` \| `browser` \| `computer-use`. Picks the runner; see `references/channel-drivers.md`. |
 | `audience` | enum | yes | `admin` \| `user` \| `external` \| `system`. Drives which credentials apply. |
 | `entry_point` | string | yes | A `entry_points[].name`, or `"external"` for hosted surfaces. |
@@ -108,6 +109,7 @@ service (`entry_point: "external"`, e.g. a hosted chat bot).
 - C5 `auth.token_source` matches `^(env:|file:)…$`. **Literal secrets rejected.**
 - C6 `http`/`browser` drivers require `base_url_template` + `base_url_fallback`.
 - C7 (warning) `channels[]` present but no `QA_MEMORY.md` next to the profile.
+- C8 (warning) `singleton_id`, when set AND an isolate profile (`<repo_root>/.worktree-isolate/profile.json`) is present, must resolve to a `singletons[].id`. Dangling refs warn, never hard-fail (isolate is optional). When `channels[]` is present but no channel carries a non-null `singleton_id`, doctor emits an info-level nudge to run `x-qa update`.
 
 ## Validation Rules (enforced by `doctor.sh`)
 
@@ -125,6 +127,8 @@ service (`entry_point: "external"`, e.g. a hosted chat bot).
 ## Schema Migration
 
 `x-qa init --migrate-from v0` reserved for future. v1 has no predecessor.
+
+`singleton_id` (added 2026-06) is an **additive optional field**: `schema` stays `1`; bump profile `version` only. Existing profiles without `singleton_id` keep working untouched (absence = stateless). `x-qa update` populates the field by cross-referencing the isolate profile.
 
 ## Examples
 

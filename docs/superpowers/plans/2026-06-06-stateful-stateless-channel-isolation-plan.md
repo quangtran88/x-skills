@@ -409,6 +409,11 @@ xwi_claim_singleton() {
         return 2
       fi
     else
+      # Dead owner → auto-steal. Clear its stale override too: a path-gone owner has no
+      # override to clear (xwi_force_release_others skips non-dir paths), but a compose-tier
+      # R3-dead owner (containers down, path alive) keeps an enabled override that heal would
+      # otherwise count as a live claimant → SINGLETON_CONFLICT_PREEXISTING on the next apply.
+      xwi_force_release_others "$sid" "$wpath"
       echo "SINGLETON_LOCK_STOLEN=${sid} from=${owner_branch}" >&2   # dead → auto-steal
     fi
   fi
@@ -1010,7 +1015,7 @@ assert_eq "True" "$unowned" "pre-existing conflict id must be left unowned"
 ( cd "$WTB" && bash "$DISPATCH" disable node-cron --quiet )
 ( cd "$WTA" && bash "$DISPATCH" apply --quiet )
 owner="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["singleton_owners"].get("node-cron",{}).get("worktree_path",""))' "$reg")"
-assert_eq "$WTA" "$owner" "after loser disables, wtA claims node-cron"
+assert_eq "$(cd "$WTA" && pwd -P)" "$owner" "after loser disables, wtA claims node-cron"
 
 pass "test 26 — pre-existing conflict refuse-until-resolved"
 ```
@@ -1089,7 +1094,7 @@ errB="$( cd "$WTB" && bash "$DISPATCH" enable slack-listener --quiet 2>&1 )"
 assert_contains "$errB" "SINGLETON_LOCK_STOLEN=slack-listener" "stopped-stack compose owner must be auto-stolen (R3)"
 reg="$(cd "$WTB" && . "$SKILL_DIR/scripts/allocate-ports.sh" && xwi_registry_file)"
 owner="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["singleton_owners"].get("slack-listener",{}).get("worktree_path",""))' "$reg")"
-assert_eq "$WTB" "$owner" "after R3 auto-steal, wtB must own slack-listener"
+assert_eq "$(cd "$WTB" && pwd -P)" "$owner" "after R3 auto-steal, wtB must own slack-listener"
 
 pass "test 27 — compose-tier R3 stopped-stack auto-steal"
 ```

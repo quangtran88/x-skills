@@ -68,6 +68,12 @@ TIER_COMPOSE: tuple[Pattern, ...] = (
         matchers=("containrrr/watchtower",),
         suggested_env_var="WATCHTOWER_ENABLED",
     ),
+    Pattern(
+        id="whatsapp",
+        rationale="WhatsApp Web session is single-device — two listeners fight over the session.",
+        matchers=("WHATSAPP_TOKEN", "WHATSAPP_SESSION", "WHATSAPP_"),
+        suggested_env_var="WHATSAPP_LISTENER_ENABLED",
+    ),
 )
 
 
@@ -125,6 +131,12 @@ TIER_ENV_FLAG: tuple[Pattern, ...] = (
         rationale="Procfile worker line — foreman/honcho run these as singletons; gate with an env flag.",
         matchers=(r"^worker:", r"^scheduler:"),
         suggested_env_var="RUN_PROCFILE_WORKER",
+    ),
+    Pattern(
+        id="whatsapp-web",
+        rationale="Baileys / whatsapp-web.js client — single-device session; duplicate listeners fight over it.",
+        matchers=(r"@whiskeysockets/baileys", r"whatsapp-web\.js", r"makeWASocket\(", r"new\s+Client\("),
+        suggested_env_var="WHATSAPP_LISTENER_ENABLED",
     ),
 )
 

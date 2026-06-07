@@ -7,6 +7,8 @@ description: Use when the user runs multiple git worktrees of the same repo in p
 
 > **v0.2 migration (schema 1 → 2):** Existing repos on v0.1 must run `x-worktree-isolate init --rescan` from the main checkout, hand-merge the `.new` file, and commit the updated profile. `apply` hard-rejects schema:1 profiles with a precise migration message. There is no soft fallback — schema:2 introduces `singletons[]` and `detection_guardrails{}` that the rest of v0.2 depends on.
 
+> **v0.3 migration (soft, self-healing):** Singleton locks are now **enforced** — only one worktree may `enable` a given singleton (Slack/Telegram/WhatsApp/etc.) at a time. The per-repo registry's `singleton_owners` is enriched to `{id: {worktree_path, branch, claimed_at}}` with a `registry_schema: 2` marker and **self-heals lazily** on the next `apply`/`enable`/`list`/`doctor` — no manual step required. Run `x-worktree-isolate migrate` for the one-shot upgrade view (heal + pre-existing-conflict report + rescan/`x-qa update` pointers). Unlike v0.2, there is **no hard reject**: every new field is additive. Pick up the new WhatsApp patterns via `init --rescan`. Profile `schema` stays **2**.
+
 Two-phase model:
 
 1. **INSPECT (once per repo, committed)** — scan compose files + source + host artifacts, draft `profile.json` capturing hardcoded `container_name`s, fixed ports, identity-mount data dirs, cross-worktree footguns, AND stateful singletons across three tiers (compose-service / env-flag / host). User reviews interactively + commits.
@@ -36,6 +38,8 @@ The skill never runs `docker compose up`, never reads or writes the user's `.env
 | User wants the Slack bot ON in this worktree | `enable <id>` |
 | User wants to revert a singleton to default-disabled in this worktree | `disable <id>` |
 | Host-tier singleton (crontab/systemd) blocks apply — user disabled the host state manually | `ack-host-singletons` |
+| User upgraded the skill and wants the one-shot "what do I need to do" view | `migrate` |
+| User wants to steal a live singleton lock from another worktree | `enable <id> --force` / `apply --force` |
 
 ## When NOT to use
 
@@ -50,7 +54,7 @@ The dispatch.sh router exposes one subcommand per workflow stage:
 1. **`init`** — scan repo, write `.worktree-isolate/profile.json`, patch `.gitignore`. Must run from the main checkout (not a linked worktree). Idempotent: re-runs only append missing `.gitignore` lines.
 2. **`init --dry-run`** — print the draft profile JSON to stdout, do not touch disk.
 3. **`init --rescan`** — re-detect, write `profile.json.new` next to existing, exit 1 with the exact `diff` command. The user merges by hand (no auto-merge in v1).
-4. **`apply`** — Phase 2. Reads profile, acquires registry lock, allocates next slot, picks ports (`default + slot * 1000` deterministic-first, then `lsof` collision scan inside `scan_range`), writes override + env file + state. Hard-blocks on any `severity: blocker` warning unless `--ignore-warnings`. Re-applying a worktree that already has a registry entry reuses its existing ports byte-for-byte.
+4. **`apply` (`--force`/`--steal`)** — Phase 2. Reads profile, acquires registry lock, allocates next slot, picks ports (`default + slot * 1000` deterministic-first, then `lsof` collision scan inside `scan_range`), writes override + env file + state. Hard-blocks on any `severity: blocker` warning unless `--ignore-warnings`. Re-applying a worktree that already has a registry entry reuses its existing ports byte-for-byte. `apply` now claims every enabled singleton **before writing any file**; a refused claim leaves the worktree untouched and exits non-zero. `--force`/`--steal` steals a live lock.
 5. **`apply --quiet`** — same, suppress success summary. Used by the wt hook.
 6. **`apply --if-profile-exists`** — exit 0 silently when no profile. Safe for global hooks that may run on repos that haven't opted in.
 7. **`apply --ignore-warnings`** — explicit footgun acknowledgement. Skips the blocker gate.
@@ -58,11 +62,12 @@ The dispatch.sh router exposes one subcommand per workflow stage:
 9. **`release`** — drop this worktree's registry slot. Removes generated files only when their first line still matches the auto-generated header.
 10. **`doctor`** — validation suite. Asserts `docker compose --env-file .env.worktree config` (with `--env-file .env` stacked first when a base `.env` exists) actually exposes overridden host ports.
 11. **`list`** — print all slots claimed in the per-repo registry.
-12. **`version`** — print version (currently `0.2.0`).
+12. **`version`** — print version (currently `0.3.0`).
 13. **`features`** — list profiled singletons + per-worktree state (`disabled` / `enabled` / `acknowledged`).
-14. **`enable <id>`** — mark singleton as enabled in this worktree. Regenerates override + `.env.worktree`. Records ownership in registry's `singleton_owners` (declarative).
+14. **`enable <id> [--force]`** — claim the singleton lock for this worktree, then mark it enabled and regenerate override + `.env.worktree`. Refuses if another **live** worktree owns it (`SINGLETON_CONFLICT`); auto-steals a **dead** owner (`SINGLETON_LOCK_STOLEN`); `--force`/`--steal` steals a live owner. Reaching `enabled` therefore **guarantees** this worktree owns the singleton.
 15. **`disable <id>`** — revert to disabled (default). Same regeneration.
 16. **`ack-host-singletons`** — write `acknowledged` for every host-tier singleton in `feature-overrides.local.json`. Required (per-worktree) when host singletons present, otherwise `apply` blocks.
+17. **`migrate`** — convenience upgrade view: heal registry → report pre-existing conflicts → prompt `init --rescan` → point x-qa users at `x-qa update`. The heal runs automatically on apply/enable/list/doctor regardless; `migrate` is just the single summary.
 
 ## Anti-patterns
 
@@ -71,20 +76,31 @@ The dispatch.sh router exposes one subcommand per workflow stage:
 - **Never run `docker compose up` from this skill** — that's the user's Makefile / launch tooling. Apply only writes files and prints the launch command.
 - **Never auto-patch a user's Makefile** — Makefile global label filters are reported as `severity: blocker` warnings; the user fixes them by hand. Out of scope for v1.
 - **Never use the plugin-cache path in wt.toml** — plugin caches rotate on upgrade. Always use the PATH-resolved `x-worktree-isolate` (symlinked by `bin/setup`).
+- **Never bypass the claim by hand-editing `feature-overrides.local.json` to `enabled`** — the "enabled ⇒ owned" guarantee holds only because `enable` wins the registry claim first. A hand-edited dual-enable surfaces as `SINGLETON_CONFLICT_PREEXISTING` on the next claim and blocks until resolved.
 
-## Singletons (v0.2)
+## Singletons (v0.3)
 
 Stateful features that must not run concurrently across parallel worktrees. Three tiers:
 
 | Tier | What's detected | Disable mechanism (in worktree) |
 |---|---|---|
-| 1 — compose-service | Compose service env contains Slack/Discord/Telegram/Stripe/GitHub-App token, or image matches ngrok/watchtower | `services.<svc>.profiles: [xwi-disabled]` (default) or `deploy.replicas: 0` (Swarm only) — written into `compose.override.yml` |
-| 2 — env-flag | Source code matches `node-cron`/`bullmq`/`celery beat`/`slack-bolt`/`telegraf`/`agenda`/`chokidar`/Procfile worker line | `<VAR>=false` line appended to `.env.worktree` (app code reads the flag) |
+| 1 — compose-service | Compose service env contains Slack/Discord/Telegram/Stripe/GitHub-App/**WhatsApp** token, or image matches ngrok/watchtower | `services.<svc>.profiles: [xwi-disabled]` (default) or `deploy.replicas: 0` (Swarm only) — written into `compose.override.yml` |
+| 2 — env-flag | Source code matches `node-cron`/`bullmq`/`celery beat`/`slack-bolt`/`telegraf`/`agenda`/`chokidar`/Procfile worker line/**`@whiskeysockets/baileys`/`whatsapp-web.js`** | `<VAR>=false` line appended to `.env.worktree` (app code reads the flag) |
 | 3 — host | Repo-tracked `*.crontab`, `crontab`, `*.service`, `*.timer` | NONE — `apply` hard-blocks until `x-worktree-isolate ack-host-singletons` (per-worktree) |
 
 `init` scans + prompts (interactive by default; `--non-interactive` for CI accepts all candidates as disabled). Detection is bounded by `profile.detection_guardrails` — `scan_max_depth`, `scan_max_file_bytes`, `exclude_dirs`, `exclude_globs`. The pattern catalog lives in `scripts/singleton-patterns.py`; see `references/singleton-patterns.md` for per-tier rationale and the "why no host auto-disable" answer.
 
 Per-worktree overrides via `features` / `enable <id>` / `disable <id>` write to `<worktree>/.worktree-isolate/feature-overrides.local.json` (gitignored). `apply` re-renders both files honoring those overrides.
+
+**Enforcement (v0.3):** the per-repo registry records each owned singleton as
+`singleton_owners[id] = {worktree_path, branch, claimed_at}` (top-level `registry_schema: 2`). `enable` and `apply` run an enforced **claim** inside the registry lock: unowned/owned-by-self → claim; another **live** owner → refuse (`SINGLETON_CONFLICT=<id> owner=<branch>@<path>`) unless `--force`; a **dead** owner → auto-steal (`SINGLETON_LOCK_STOLEN=<id> from=<branch>`). A lock is **dead** when the owner's `worktree_path` is gone from disk OR it no longer holds a registry slot (all tiers), OR — compose-tier only — its `COMPOSE_PROJECT_NAME` has zero running containers. On upgrade, two live worktrees that both already enabled the same singleton surface `SINGLETON_CONFLICT_PREEXISTING=<id> owners=<b1>@<p1>,<b2>@<p2>` and the id stays unowned until the loser runs `disable <id>`.
+
+**Honest guarantee per tier.** The registry makes the *claim* exclusive — two worktrees can never both *believe* they own a platform. **Runtime** exclusivity is only as strong as the tier:
+- **compose-tier** (`profiles: [xwi-disabled]`) — a real gate; the disabled service does not start. Note: a compose lock only reads as *live* once the owner's stack is up — a stopped stack is reclaimable (R3).
+- **env-flag tier** — advisory; the app must read `<VAR>=false` and short-circuit. The skill cannot enforce app code.
+- **host-tier** — manual acknowledgement only.
+
+The lock cannot reach into application code; it prevents the dual-ownership *belief*, not every possible dual *execution*.
 
 ## Gotchas
 

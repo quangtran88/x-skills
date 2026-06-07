@@ -108,6 +108,8 @@ EXPLORE_FINDINGS=<n>          # unique suspected findings on the bug-board
 EXPLORE_CONFIRMED=<n>         # findings that survived triage
 EXPLORE_CASES_MINTED=<n>      # confirmed findings minted into kb cases
 EXPLORE_OBLIGATIONS_ADDED=<n> # novel obligations minted from "none" findings
+CHANNELS_TESTED=<csv>         # channels selected for execution (names)
+CHANNELS_SKIPPED=<name:reason,...>  # skipped channels + reason (stateful-not-owned / stateful-unverifiable / stateful-owned-chat-driver-deferred)
 ```
 
 > `QA_VERDICT` is ternary as of v2. `warn` = non-blocking gates failed, no blocking ones did. Consumers branching on `pass|fail` should treat `warn` as `pass` for back-compat OR opt into ternary semantics via `QA_VERDICT_REASON`.
@@ -147,8 +149,20 @@ Refer to:
        `CHANNEL_SKIPPED=<name> reason=driver '<driver>' not executable` and stop
        with a clear notice (capture-only in this release). Do NOT fall back to a
        different channel silently.
-     - No channel selected → default to the primary entry point's implicit
-       `http` channel (back-compat with pre-channels behavior).
+     - **Stateless-first default (no `--channel`).** Run `scripts/lib/channel-select.sh
+       --profile <profile> --worktree <worktree> [--channel <name>]` → persist
+       `<run-dir>/channels.json`. With no `--channel`, it defaults to **stateless**
+       channels (`singleton_id == null`) on the primary entry point. No `channels[]`
+       at all → the implicit primary `http` channel (back-compat).
+     - **Stateful resolution** (ownership from `feature-overrides.local.json` only, R2):
+       - owned here AND `driver == http` → **EXECUTE** via the existing http runner path.
+       - owned here AND driver ∈ {browser, computer-use} → skip
+         `CHANNEL_SKIPPED reason=stateful-owned-chat-driver-deferred`.
+       - not owned (the default) → skip `CHANNEL_SKIPPED reason=stateful-not-owned`.
+       - isolate not set up → skip `CHANNEL_SKIPPED reason=stateful-unverifiable`
+         (never test a stateful channel blind).
+       `channels.json.tested` drives Phases 8-15; `channels.json.skipped` feeds the
+       envelope's `CHANNELS_SKIPPED`.
 5. **Scout (conditional).** Only when intent ∈ {`spec`, `artifact`, `artifact-dir`, `prose`}: dispatch `$X_QA_SIMPLE_RUNNER` inline per `references/scout-prompt.md`. Persist `<run-dir>/scope.json`. On invalid JSON / timeout, use whole-profile coverage and warn. The scout also performs **Domain Research** (`references/scout-prompt.md § Domain Research`) — code-first modeling of entities/constraints/invariants/transitions — and emits `domain_model` + `obligations[]` into `scope.json`. When intent is not scout-eligible (`branch`/`pr`/`service`), `obligations[]` is absent and Phase 7.5 is a no-op.
 6. **KB consult (skipped on `--no-kb`).** Read `kb/index.json`. For every endpoint in scope (from scout or PR-surface), collect matching `kb/cases/*.yaml` (not `quarantined`) and `kb/flows/*.yaml`. Pass this corpus to the planner.
 6.5. **Gap analyze** (skipped on `--no-kb`). Run `scripts/gap-analyze.sh --scope-file <run-dir>/scope.json` when scout produced a scope (otherwise run without `--scope-file` and analyze the full index). Persist to `<run-dir>/coverage_gaps.json`. Inject as a `## Coverage Gaps` block in the planner prompt per `references/gap-analyzer.md`. Default `--staleness-days 7`; override via `profile.json.gap_analyzer.staleness_days`.

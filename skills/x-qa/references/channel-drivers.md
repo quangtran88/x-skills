@@ -32,3 +32,21 @@ never the secret (`~/.claude/rules/security.md`).
 `run` resolves the target channel, reads its `driver`, and checks the gate:
 - gate satisfied → dispatch the driver's runner;
 - gate unsatisfied → emit `CHANNEL_SKIPPED=<name> reason=driver '<driver>' not executable (capability <cap> absent)` and continue.
+
+## Stateful channels (`singleton_id` set)
+
+A channel with a non-null `singleton_id` is **stateful** — it links to an
+`x-worktree-isolate singletons[].id`. Selection (`scripts/lib/channel-select.sh`)
+reads ownership from `<worktree>/.worktree-isolate/feature-overrides.local.json`
+ONLY (never the global registry, R2): `state == "enabled"` ⇒ owned here.
+
+| Situation | Outcome |
+|---|---|
+| owned here AND `driver == http` | **EXECUTE** via the existing http runner (R1 carve-out — drive the singleton this worktree holds) |
+| owned here AND driver ∈ {browser, computer-use} | skip `stateful-owned-chat-driver-deferred` (chat drivers are capture-only) |
+| not owned here (default) | skip `stateful-not-owned` |
+| isolate not set up at all | skip `stateful-unverifiable` (never test stateful blind) |
+
+Stateless channels (`singleton_id == null`) are the **default QA target** — each
+on its own isolated port. The enabling env var is looked up via the singleton
+(`singleton_id → singletons[].suggested_env_var`), never copied into the profile.

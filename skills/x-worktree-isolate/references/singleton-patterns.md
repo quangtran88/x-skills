@@ -24,6 +24,7 @@ Detection scans `services.*.environment` keys + `services.*.image` strings.
 | `github-app-webhook` | `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | Same — duplicate listeners |
 | `ngrok-tunnel` | `ngrok/ngrok`, `NGROK_AUTHTOKEN`, `localtunnel` | Fixed public URL only one worktree may own |
 | `watchtower` | `containrrr/watchtower` | watchtower is singleton by design |
+| `whatsapp` | `WHATSAPP_TOKEN`, `WHATSAPP_SESSION`, `WHATSAPP_` | WhatsApp Web session is single-device; two listeners fight over the session |
 
 Disable: emits `services.<svc>.profiles: [xwi-disabled]` in `compose.override.yml` (default — `disable_method=profile-gate`). The sentinel name is namespaced so an unrelated `COMPOSE_PROFILES` setting can't accidentally re-enable disabled services; never include `xwi-disabled` in `COMPOSE_PROFILES`. The alternative `disable_method=replicas-zero` (emits `deploy.replicas: 0`) is honored by Docker Swarm but is a no-op on standalone Compose v2 — use it only if you're running Swarm.
 
@@ -42,6 +43,7 @@ Detection greps files matching `SOURCE_EXTS` (`.ts/.tsx/.js/.jsx/.mjs/.cjs/.py/.
 | `agenda` | `new Agenda(`, `from ['"]agenda['"]` | Duplicate workers |
 | `chokidar-shared-watch` | `chokidar.watch(`, `from ['"]chokidar['"]` | Duplicate watchers fire twice |
 | `procfile-worker` | `^worker:`, `^scheduler:` (in Procfile) | foreman/honcho run these as singletons |
+| `whatsapp-web` | `@whiskeysockets/baileys`, `whatsapp-web\.js`, `makeWASocket(`, `new Client(` | Baileys / whatsapp-web.js single-device session; duplicate listeners fight over it |
 
 Disable: writes `<env_var>=false` to `.env.worktree`. App code must read the flag and short-circuit the listener/worker. The skill cannot enforce this — it's a contract between the env-flag and your code.
 
