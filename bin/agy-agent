@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# agy-agent — wrapper for Google Antigravity CLI (agy) headless mode.
+# Dual-track sibling of gemini-agent. Spec: docs/research/2026-06-06-agy-antigravity-cli-headless-usage-guide.md
+#
+# Usage:
+#   agy-agent "<prompt>"                       # default model (flash)
+#   agy-agent --model pro "<prompt>"           # Gemini 3.1 Pro (High)
+#   agy-agent --add-dir /abs/dir "<prompt>"    # mount dir into workspace
+#   agy-agent --resume "<follow-up>"           # continue latest conversation (-c)
+#   agy-agent --conversation <id> "<prompt>"   # resume a specific conversation
+#   agy-agent --grounded "<prompt>"            # inject "Use Google Search"
+#   agy-agent --system /abs/sys.md "<prompt>"  # emulate system prompt (prepend)
+#   agy-agent --sandbox / --yolo / --raw       # passthrough / output modes
+set -uo pipefail
+
+# UTF-8 locale so ${var: -N} counts chars not bytes (lifted from gemini-agent).
+if [[ -z "${LC_ALL:-}" || "${LC_ALL%%.*}" == "C" ]]; then
+  for _loc in C.UTF-8 en_US.UTF-8 C.utf8 en_US.utf8; do
+    if locale -a 2>/dev/null | grep -qiE "^${_loc//./\\.}$"; then export LC_ALL="$_loc"; break; fi
+  done
+  unset _loc
+fi
+
+# --- Defaults ---
+MODEL="${X_AGY_DEFAULT_MODEL:-}"
+SYSTEM_MD=""
+EXTRA_DIRS=()
+RESUME=""          # "" | "latest" | "<id>"
+GROUNDED=0
+YOLO=0
+SANDBOX=0
+RAW=0
+
+# --- Parse args ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model|-m)        MODEL="${2:-}"; shift 2 || true ;;
+    --model=*)         MODEL="${1#--model=}"; shift ;;
+    --system)          SYSTEM_MD="${2:-}"; shift 2 || true ;;
+    --system=*)        SYSTEM_MD="${1#--system=}"; shift ;;
+    --add-dir|--dir)   EXTRA_DIRS+=("${2:-}"); shift 2 || true ;;
+    --add-dir=*)       EXTRA_DIRS+=("${1#--add-dir=}"); shift ;;
+    --resume|-r)       RESUME="latest"; shift ;;
+    --conversation)    RESUME="${2:-}"; shift 2 || true ;;
+    --conversation=*)  RESUME="${1#--conversation=}"; shift ;;
+    --grounded)        GROUNDED=1; shift ;;
+    --yolo)            YOLO=1; shift ;;
+    --sandbox)         SANDBOX=1; shift ;;
+    --raw)             RAW=1; shift ;;
+    --help|-h)         sed -n '2,18p' "$0" | sed 's/^# //; s/^#//'; exit 0 ;;
+    -*) echo "Error: Unknown flag: $1" >&2; exit 1 ;;
+    *)  break ;;
+  esac
+done
+
+PROMPT="${*:-}"
+if [[ -z "$PROMPT" ]]; then
+  echo "Error: prompt required" >&2
+  echo "Usage: agy-agent [--model pro|flash|...] [--add-dir DIR] [--resume] [--grounded] [--system FILE] \"<prompt>\"" >&2
+  exit 1
+fi
+
+# --- Verify agy CLI (skipped under dry-run: dry-run never execs agy, so the
+# offline tests T2–T5 must not require agy on PATH — fixes "No network, no real agy") ---
+if [[ "${X_AGY_DRY_RUN:-0}" != "1" ]] && ! command -v agy &>/dev/null; then
+  echo "Error: agy CLI not found on PATH" >&2
+  echo "Install: https://antigravity.google/cli  (or run /x-skills:setup)" >&2
+  exit 1
+fi
+
+# (model resolution — Task 3) (flag build — Task 4) (preflight — Task 5)
+# (exec + classify — Task 6). For now: build a minimal argv and honor dry-run.
+ARGS=(-p "$PROMPT")
+[[ -n "$MODEL" ]] && ARGS+=(--model "$MODEL")
+
+if [[ "${X_AGY_DRY_RUN:-0}" == "1" ]]; then
+  printf 'agy\n'; printf '%s\n' "${ARGS[@]}"   # one arg per line — stable, escape-free test assertions
+  exit 0
+fi
+
+# Placeholder exec (replaced in Task 6).
+exec agy "${ARGS[@]}"
