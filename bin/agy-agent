@@ -70,8 +70,24 @@ fi
 
 # (model resolution — Task 3) (flag build — Task 4) (preflight — Task 5)
 # (exec + classify — Task 6). For now: build a minimal argv and honor dry-run.
+# --- Resolve model alias to agy's exact display string (verified via `agy models`) ---
+resolve_model() {
+  case "$1" in
+    ""|flash|flash-medium) echo "Gemini 3.5 Flash (Medium)" ;;
+    flash-low)             echo "Gemini 3.5 Flash (Low)" ;;
+    flash-high)            echo "Gemini 3.5 Flash (High)" ;;
+    pro|pro-high)          echo "Gemini 3.1 Pro (High)" ;;
+    pro-low)               echo "Gemini 3.1 Pro (Low)" ;;
+    claude-sonnet)         echo "Claude Sonnet 4.6 (Thinking)" ;;
+    claude-opus)           echo "Claude Opus 4.6 (Thinking)" ;;
+    gpt-oss)               echo "GPT-OSS 120B (Medium)" ;;
+    *)                     echo "$1" ;;   # passthrough: already an agy display string
+  esac
+}
+MODEL_RESOLVED="$(resolve_model "$MODEL")"
+
 ARGS=(-p "$PROMPT")
-[[ -n "$MODEL" ]] && ARGS+=(--model "$MODEL")
+ARGS+=(--model "$MODEL_RESOLVED")
 
 if [[ "${X_AGY_DRY_RUN:-0}" == "1" ]]; then
   printf 'agy\n'; printf '%s\n' "${ARGS[@]}"   # one arg per line — stable, escape-free test assertions
