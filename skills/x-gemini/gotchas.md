@@ -1,110 +1,12 @@
 # x-gemini gotchas
 
-## stderr corrupts JSON if not redirected
+## agy backend (agy-agent)
 
-Gemini CLI prints `Ripgrep is not available. Falling back to GrepTool.` (and similar) to **stderr**. If you merge stderr into stdout (`2>&1`), it corrupts the JSON output.
-
-**The wrapper handles this** — it always uses `2>/dev/null`. If you call `gemini` directly, always redirect.
-
-```bash
-# WRONG — JSON parser will choke
-gemini -p "..." --output-format json
-
-# RIGHT
-gemini -p "..." --output-format json 2>/dev/null
-```
-
-## Dual-model billing
-
-Every call uses **two** models:
-
-- `gemini-2.5-flash-lite` — utility router (decides tool calls, cheap)
-- `gemini-3.x` (or whatever `-m` selects) — main responder
-
-The wrapper's stderr summary reports the main model. If you check `.stats.models` in raw JSON, expect two entries.
-
-## Quota exhaustion mid-stream
-
-Streaming mode can hit `You have exhausted your capacity on this model. Your quota will reset after 0s.. Retrying after 5266ms...`. Built-in auto-retry usually recovers within seconds.
-
-If you see repeated quota errors:
-- Drop to `flash` (cheaper, higher quota)
-- Wait — quotas reset on 1-min / 1-hour windows depending on model
-- Don't loop the wrapper expecting it to back off — it doesn't
-
-## @file restricted to workspace
-
-`@/path/to/file` only resolves files under the current workspace (CWD or `--include-directories`). Files outside return a graceful error, not a crash, but the model never sees them.
-
-**Workaround:** copy the file into CWD first, or `cd` to its parent before invoking.
-
-## Workspace = current working directory
-
-Gemini's "workspace" defaults to wherever you launch the CLI. If your prompt references `@README.md`, that resolves to `$(pwd)/README.md`. The wrapper does not change CWD — caller is responsible.
-
-## Empty prompt → exit 42
-
-Gemini exits **42** (input error), not the usual 1, on empty prompts. The wrapper validates this upfront, but if you bypass the wrapper and `gemini -p ""`, expect 42.
-
-## Session resume requires same workspace
-
-`-r latest` resumes the most recent session **for the current workspace**. Switching directories silently starts a new session even with `-r latest`. To resume across dirs, capture the session UUID from the `[gemini-agent]` stderr line and pass it via `--resume <uuid>`.
-
-## `--model pro` is the slow path
-
-`gemini-3.1-pro-preview` is significantly slower than `flash`. Budget 30-180s for non-trivial prompts. Use `flash` for quick lookups, escalate to `pro` only for reasoning-heavy work.
-
-## Output truncation at 50k chars
-
-The wrapper truncates `.response` to the **last** 50k characters (≈12.5k tokens) if longer. The full raw JSON stays in the log file (`raw=` path on the stderr summary). If you need the full response programmatically, read that path.
-
-## Logs persist the full prompt + response (may contain secrets)
-
-By default the wrapper writes the raw response (which includes the prompt Gemini received) to `~/.cache/x-skills/gemini/gemini-agent-<ts>-<label>.log` with mode `0600`. If you paste secrets into a prompt (API keys in stack traces, credentials in error output), they end up in that log. Override with:
-
-- `X_GEMINI_NO_LOG=1` — disable logging entirely
-- `X_GEMINI_LOG_PROJECT=1` — write into `.omc/artifacts/x-gemini/` (project-local, opt-in only). Make sure `.omc/` is gitignored before enabling.
-
-## No tool execution by default
-
-Default approval mode is read-only — Gemini cannot run shell commands or write files. Pass `--approval-mode plan` to allow tool use. Never use `--approval-mode auto` from the wrapper without explicit user consent — it gives Gemini unrestricted shell access.
-
-## Native Google Search vs opencode-routed Gemini
-
-Direct `gemini` CLI triggers Google Search grounding for current-events queries. The same model called via `opencode --model gemini-pro` does **not** always trigger search — opencode's tool routing differs. If you need fresh web facts with citations, use `x-gemini` not `x-omo --model gemini-pro`.
-
-## Claude session env vars stripped before invocation
-
-The wrapper unsets `CLAUDECODE`, `CLAUDE_SESSION_ID`, `CLAUDECODE_SESSION_ID`, and `CLAUDE_CODE_ENTRYPOINT` before spawning `gemini`. This prevents Gemini from inheriting the Claude session ID or thinking it's running inside Claude Code.
-
-If you need any of these vars inside Gemini for some reason, the wrapper does not provide a passthrough — modify the wrapper or call `gemini` directly.
-
-## `--yolo` flag is autonomous tool execution
-
-`--yolo` (alias for `--approval-mode yolo`) lets Gemini execute shell commands and write files without per-call approval. Equivalent to OMC's default for `omc ask`. **The wrapper defaults to read-only** — `--yolo` is opt-in only. Reasoning: a wrapper that grants shell access by default is a footgun. Callers must consciously opt in.
-
-## Artifacts dir defaults to user cache
-
-Raw JSON logs default to `~/.cache/x-skills/gemini/` (mode 0600, user-private). Set `X_GEMINI_LOG_PROJECT=1` to opt into the legacy `.omc/artifacts/x-gemini/` location. Set `X_GEMINI_NO_LOG=1` to disable logging entirely. The stderr summary's `raw=` field shows the actual path used (or `(disabled)`).
-
-## Auth: Google login, not API key
-
-`gemini` uses OAuth against your Google account (Ultra subscription recommended). There is **no `GEMINI_API_KEY` env var** for the CLI in this configuration. If you see "auth" / "sign in" errors, run `gemini` interactively once to complete the OAuth flow.
-
-## Thinking-budget starvation on `gemini-3.x-pro` (CONFIRMED ROOT CAUSE)
-
-**Symptom:** A `--model pro` session "stops in the middle" — runs a few tool calls (e.g. `ReadFile`), then returns to the prompt (interactive) or emits a 0-byte stdout / empty `.response` (headless) with **no error**. Most common on the large prompts x-review / x-research / x-bugfix / x-qa dispatch (big SCOPE block + multiple files pulled in → 150k–340k token context).
-
-**Cause:** `gemini-3.1-pro-preview` is a thinking model with no thinking cap by default. On large/tool-heavy turns it spends the entire output budget on internal `thoughts` and ends the turn with an empty/tiny final text part. gemini-cli treats the empty model turn as end-of-turn. Signature in the raw JSON: `thoughts` ≫ `candidates` (observed 18030 thoughts / 684 answer tokens just before total starvation). This is the documented gemini-cli #23081 class issue.
-
-**This is NOT a timeout bug** — gemini exits cleanly on SIGTERM (verified). Equal inner/outer timeouts (wrapper `GEMINI_TIMEOUT=600` vs callers' `timeout: 600000`) are a separate latent issue, not this symptom.
-
-**Mitigation (applied):** `~/.gemini/settings.json` → `modelConfigs.overrides` matching `{model: gemini-3.1-pro-preview}` and `{model: pro}` with:
-
-```json
-"modelConfig": { "generateContentConfig": { "thinkingConfig": { "thinkingLevel": "low" } } }
-```
-
-Use **`thinkingLevel`** (`"minimal"|"low"|"medium"|"high"`), NOT `thinkingBudget` — Gemini 3 replaced the numeric budget and silently ignores it. Thinking cannot be fully disabled on Gemini 3 Pro; `"low"` is the practical floor. Don't add `maxOutputTokens` as the primary fix — too-low a value on a thinking model re-triggers the same empty-response (budget eaten by thoughts before any answer). For pure bulk file reads, route to `--model flash` instead.
-
-**Diagnosis:** the wrapper now persists stderr to `<log>.stderr.log` (mode 0600) and prints a `DIAGNOSIS: thinking starvation: thoughts=… answer=…` line plus `thoughts=`/`answer=` fields on the `[gemini-agent]` summary. A 0-byte stdout log with an empty stderr log = process killed mid-flight (timeout/SIGTERM) before output; a 0-byte stdout with non-empty stderr = the captured failure reason (auth/quota/deadline).
+- **No JSON.** agy print mode is plain text; there is no `--json`/`--output-format`. `agy-agent` emits the text directly.
+- **Exit 0 lies.** agy exits 0 even on auth/quota/empty failures. `agy-agent` re-derives a real exit code from empty-stdout + `--log-file` tail; trust the wrapper's exit code, not agy's.
+- **trustedWorkspaces.** agy hangs on a trust prompt for untrusted dirs in non-TTY. `agy-agent` preflights and warns; set `X_AGY_AUTO_TRUST=1` to auto-append CWD.
+- **Grounding is prompt-driven** (no flag) AND load-bearing for currency. Without `--grounded`, agy trusts the repo over live docs and will return stale identifiers (verified: it returned a *legacy* OpenAI event the repo still contained instead of the current GA one). Pass `--grounded` for any "what's current / latest version" question.
+- **Never `--add-dir` a large tree.** Pointing it at a repo root (e.g. a 65 GB monorepo with node_modules/build/vendored checkouts) makes agy's agentic traversal hang for 15–25 min with zero output. Scope to the relevant subtree(s) — a 572 KB scope returned in 79 s. `agy-agent` warns when a target looks large.
+- **Serialize agy calls.** agy spawns a local gRPC language-server per invocation; concurrent calls contend and hang. Consumers that fan out (x-research, x-qa) MUST run agy lanes sequentially, not in parallel.
+- **Auth noise in the log is NOT an auth failure.** Every run's log contains `not logged into Antigravity` / `failed to set auth token` (auxiliary caches), even on success. Don't classify on it; trust `agy-agent`'s status, which strips this noise.
+- **Latency** ~2× a single scoped grounded run (≈79 s) — NOT 3–5×. The 3–5× only appears under the two pathologies above (huge `--add-dir`, concurrency). Route bulk work to `--model flash-low`.
