@@ -13,7 +13,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 OMO_AGENT_SRC="$PLUGIN_DIR/bin/omo-agent"
-GEMINI_AGENT_SRC="$PLUGIN_DIR/bin/gemini-agent"
 AGY_AGENT_SRC="$PLUGIN_DIR/bin/agy-agent"
 XWI_AGENT_SRC="$PLUGIN_DIR/bin/x-worktree-isolate"
 XUP_AGENT_SRC="$PLUGIN_DIR/bin/x-upstream"
@@ -21,7 +20,6 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/x-skills"
 CAPS_FILE="$CONFIG_DIR/capabilities.json"
 LINK_DIR="$HOME/.local/bin"
 LINK_PATH="$LINK_DIR/omo-agent"
-GEMINI_LINK_PATH="$LINK_DIR/gemini-agent"
 AGY_LINK_PATH="$LINK_DIR/agy-agent"
 XWI_LINK_PATH="$LINK_DIR/x-worktree-isolate"
 XUP_LINK_PATH="$LINK_DIR/x-upstream"
@@ -154,9 +152,6 @@ run_install() {
     oh-my-openagent-mode-all)
       "$SCRIPT_DIR/setup" --fix
       ;;
-    gemini)
-      npm install -g @google/gemini-cli
-      ;;
     jq)
       brew install jq
       ;;
@@ -219,7 +214,6 @@ manifest_file_list() {
     find "$PLUGIN_DIR/skills/x-shared" -maxdepth 2 -name "*.md" -type f -not -type l 2>/dev/null
     find "$PLUGIN_DIR/hooks" -maxdepth 1 -name "*.sh" -type f -not -type l 2>/dev/null
     [[ -f "$PLUGIN_DIR/bin/omo-agent" && ! -L "$PLUGIN_DIR/bin/omo-agent" ]] && echo "$PLUGIN_DIR/bin/omo-agent"
-    [[ -f "$PLUGIN_DIR/bin/gemini-agent" && ! -L "$PLUGIN_DIR/bin/gemini-agent" ]] && echo "$PLUGIN_DIR/bin/gemini-agent"
     [[ -f "$PLUGIN_DIR/bin/x-worktree-isolate" && ! -L "$PLUGIN_DIR/bin/x-worktree-isolate" ]] && echo "$PLUGIN_DIR/bin/x-worktree-isolate"
     [[ -f "$PLUGIN_DIR/bin/x-upstream" && ! -L "$PLUGIN_DIR/bin/x-upstream" ]] && echo "$PLUGIN_DIR/bin/x-upstream"
     [[ -f "$PLUGIN_DIR/bin/setup" && ! -L "$PLUGIN_DIR/bin/setup" ]] && echo "$PLUGIN_DIR/bin/setup"
@@ -530,56 +524,6 @@ if [[ "$MODE" != "check" ]]; then
   fi
 fi
 
-# --- 1b. gemini-agent binding ---
-header "1b. gemini-agent binding"
-
-if [[ ! -f "$GEMINI_AGENT_SRC" ]]; then
-  warn "gemini-agent not found at $GEMINI_AGENT_SRC"
-else
-  chmod +x "$GEMINI_AGENT_SRC"
-  ok "gemini-agent is executable"
-  install_symlink "$GEMINI_AGENT_SRC" "$GEMINI_LINK_PATH"
-fi
-
-# --- 1c. Gemini CLI ---
-header "1c. Gemini CLI (for x-gemini skill)"
-
-# H3: gemini_cli capability requires BOTH `gemini` AND a timeout binary.
-# Without timeout/gtimeout, bin/gemini-agent hard-fails at runtime — reporting
-# the capability as ready would mislead skills.
-GEMINI_PRESENT=0
-TIMEOUT_PRESENT=0
-command -v gemini &>/dev/null && GEMINI_PRESENT=1
-{ command -v timeout &>/dev/null || command -v gtimeout &>/dev/null; } && TIMEOUT_PRESENT=1
-
-if [[ $GEMINI_PRESENT -eq 1 ]]; then
-  GEMINI_VERSION=$(gemini --version 2>/dev/null || echo "unknown")
-  ok "gemini found: $GEMINI_VERSION"
-else
-  warn "gemini CLI not found"
-  info "x-gemini skill will be unavailable. Install: https://github.com/google-gemini/gemini-cli"
-  missing_add "cli" "gemini" "Direct Google Gemini CLI (for x-gemini skill)" "npm install -g @google/gemini-cli"
-fi
-
-if [[ $TIMEOUT_PRESENT -eq 1 ]]; then
-  ok "timeout/gtimeout binary available"
-else
-  warn "neither 'timeout' nor 'gtimeout' on PATH — gemini-agent would fail at runtime"
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    missing_add "cli" "coreutils" "Provides timeout/gtimeout (required by gemini-agent)" "brew install coreutils"
-  else
-    missing_add "cli" "coreutils" "Provides timeout (required by gemini-agent)" "apt-get install coreutils"
-  fi
-fi
-
-if [[ $GEMINI_PRESENT -eq 1 && $TIMEOUT_PRESENT -eq 1 ]]; then
-  cap_set gemini_cli true
-else
-  cap_set gemini_cli false
-  [[ $GEMINI_PRESENT -eq 1 && $TIMEOUT_PRESENT -eq 0 ]] && \
-    info "gemini_cli capability gated false until coreutils installed"
-fi
-
 # --- 1d. worktrunk CLI (optional, for x-worktree skill) ---
 header "1d. worktrunk wt CLI (optional, for x-worktree skill)"
 
@@ -653,8 +597,24 @@ else
   info "agy CLI not found — x-gemini and all Google-model routing depend on it"
   missing_add "cli" "agy" "Antigravity CLI (Google-model backend for x-gemini/x-research/x-qa)" "https://antigravity.google/cli"
 fi
-# Same timeout gate as gemini (TIMEOUT_PRESENT is set in 1c).
-if [[ $AGY_PRESENT -eq 1 && ${TIMEOUT_PRESENT:-0} -eq 1 ]]; then
+
+# agy_cli capability requires BOTH `agy` AND a timeout binary. Without
+# timeout/gtimeout, bin/agy-agent hard-fails at runtime — reporting the
+# capability as ready would mislead skills.
+TIMEOUT_PRESENT=0
+{ command -v timeout &>/dev/null || command -v gtimeout &>/dev/null; } && TIMEOUT_PRESENT=1
+if [[ $TIMEOUT_PRESENT -eq 1 ]]; then
+  ok "timeout/gtimeout binary available"
+else
+  warn "neither 'timeout' nor 'gtimeout' on PATH — agy-agent would fail at runtime"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    missing_add "cli" "coreutils" "Provides timeout/gtimeout (required by agy-agent)" "brew install coreutils"
+  else
+    missing_add "cli" "coreutils" "Provides timeout (required by agy-agent)" "apt-get install coreutils"
+  fi
+fi
+
+if [[ $AGY_PRESENT -eq 1 && $TIMEOUT_PRESENT -eq 1 ]]; then
   cap_set agy_cli true
 else
   cap_set agy_cli false
@@ -933,7 +893,6 @@ manifest = {
         "opencode":           cap("$(cap_get opencode)"),
         "omo_plugin":         cap("$(cap_get omo_plugin)"),
         "omo_mode_all":       cap("$(cap_get omo_mode_all)"),
-        "gemini_cli":         cap("$(cap_get gemini_cli)"),
         "agy_cli":            cap("$(cap_get agy_cli)"),
         "x_worktree_isolate": cap("$(cap_get x_worktree_isolate)"),
         "x_upstream":         cap("$(cap_get x_upstream)"),
@@ -1001,7 +960,6 @@ report_skill() {
     case "$dep" in
       opencode)       [[ "$(cap_get opencode)" == "true" ]] && met=true ;;
       omo_plugin)     [[ "$(cap_get omo_plugin)" == "true" || "$(cap_get omo_plugin)" == "partial" ]] && met=true ;;
-      gemini_cli)     [[ "$(cap_get gemini_cli)" == "true" ]] && met=true ;;
       agy_cli)        [[ "$(cap_get agy_cli)" == "true" ]] && met=true ;;
       omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
       superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
