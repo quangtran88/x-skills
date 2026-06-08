@@ -1,0 +1,27 @@
+Critique and improve this PROPOSED architecture for adding call recording + transcript (uploaded to a storage layer called Coffer) to an existing WhatsApp<->OpenAI-Realtime voice bridge in Node.js. Be opinionated and flag anything wrong.
+
+VERIFIED FACTS:
+- Bridge file: extensions/oneclaw-multiagent/src/adapters/whatsapp/realtime-bridge.ts relays Opus RTP between a Meta WhatsApp WebRTC leg (human caller) and an OpenAI Realtime leg (gpt-realtime voice agent), using werift (werift 0.23.0). Audio is never decoded today.
+- werift ships a native MediaRecorder (nonstandard/recorder): `new MediaRecorder({ tracks: MediaStreamTrack[], numOfTracks, path?, stream?, disableLipSync?, disableNtp? })`, addTrack(), stop(). It muxes incoming RTP straight into a WebM container (Opus stays Opus — NO transcode, pure JS, no ffmpeg). Internally: RtpSourceCallback -> depacketize -> jitterBuffer/ntpTime/lipsync -> WebM writer. Output to a file path OR an in-memory stream sink.
+- Both legs are MediaStreamTracks: assistant = openaiTrack from openaiPc.onTrack (realtime-bridge.ts:443); caller = track from metaPc.onTrack (calling-webhook.ts:272). The bridge also already sees every caller RTP packet via routeMetaRtp(rtp) (line 830), and MediaStreamTrack has writeRtp(rtp), so the bridge can materialize a synthetic caller track in-process.
+- Neither Meta nor OpenAI provides server-side recordings; recording must happen here.
+- OpenAI gpt-4o-transcribe does NOT diarize, but TWO separate per-speaker files need no diarization: transcribe each, merge by timestamp = perfect speaker labels. OpenAI /v1/audio/transcriptions accepts webm, ~23min/req cap, verbose_json gives segment timestamps. Deepgram Nova-3 (~$0.26/hr) is a cheaper diarizing alt if a single mixed file is ever required.
+- Constraints: gateway is CPU-sensitive (documented single-thread saturation on the voice path); recording must NEVER break the live call; Coffer writes go through dispatchCoffer (ACL); buildCofferDriver() throws on partial config so must be lazy/guarded inside the record branch; feature-flag gated.
+
+PROPOSED ARCHITECTURE (record-once, transcribe-after, two per-speaker files):
+1. When record===true & recording enabled: assistantTrack = openaiTrack; callerTrack = new MediaStreamTrack({kind:'audio'}) fed via callerTrack.writeRtp(rtp) inside routeMetaRtp.
+2. Two MediaRecorder instances -> caller.webm + agent.webm written to STATE_DIR temp.
+3. Single flush latch in bridge.close(): stop both recorders, read both webm files, dispatchCoffer write to practice-calls/<agentId>/<displayName>/<callId>-{caller,agent}.webm.
+4. Post-call (async, off the hot path): POST each webm to gpt-4o-transcribe (verbose_json), label by known speaker, merge by timestamp -> <callId>.md -> dispatchCoffer write.
+5. All lazy/guarded/flag-gated; recorder errors (onError) are swallowed, call never breaks.
+
+QUESTIONS:
+- Is two-separate-files + per-file transcription genuinely better than one 2-track WebM + diarization here? Any reason to prefer the single mixed file?
+- Any failure/ordering/CPU/memory risk in writeRtp-into-synthetic-track + dual MediaRecorder on the live call? (buffering a whole call in memory vs streaming to disk?)
+- Is post-call transcription clearly better than the alternative of enabling live OpenAI Realtime input ASR + assistant transcript events during the call? Consider token cost, latency, contention with the live model, and quality.
+- Where exactly should the recorders be created/stopped given the bridge lifecycle, and what breaks if onDead fires vs normal terminate?
+- Give the final recommended design in 6-9 concrete steps.
+
+FINALLY, answer these two precisely — one line each, EXACT strings, no hedging:
+[ANCHOR-1] The exact OpenAI Realtime API server-event `type` string that delivers the ASSISTANT's spoken-output transcript text (the current GA event, not a legacy alias).
+[ANCHOR-2] The exact TypeScript call signature of the `dispatchCoffer` function as DEFINED in this repository — parameter names and order.
