@@ -1,6 +1,6 @@
 ---
 name: x-gemini
-description: Direct Google Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, and gemini-3.x models without the OpenCode layer
+description: Direct Google Gemini bridge via the Antigravity (agy) CLI — uses Google Ultra subscription (no API key), opt-in Google Search grounding (via `--grounded`), and gemini-3.x models without the OpenCode layer
 triggers:
   - "x-gemini"
   - "ask gemini directly"

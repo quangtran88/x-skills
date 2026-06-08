@@ -6,7 +6,7 @@ no scout.
 
 ## Runner Pair
 
-Reuse the bootstrap-pinned `X_QA_SIMPLE_RUNNER` (gemini-flash by default;
+Reuse the bootstrap-pinned `X_QA_SIMPLE_RUNNER` (agy-flash by default;
 OMC executor / Explore when agy_cli is unpinned). Scout is one
 short-lived dispatch — NOT `run_in_background` — orchestrator waits inline.
 

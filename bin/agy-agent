@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # agy-agent — wrapper for Google Antigravity CLI (agy) headless mode.
-# Dual-track sibling of gemini-agent. Spec: docs/research/2026-06-06-agy-antigravity-cli-headless-usage-guide.md
+# Headless Google-model backend for x-skills. Spec: docs/research/2026-06-06-agy-antigravity-cli-headless-usage-guide.md
 #
 # Usage:
 #   agy-agent "<prompt>"                       # default model (flash)

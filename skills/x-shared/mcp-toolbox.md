@@ -23,7 +23,7 @@ Availability is gated by the user's MCP setup; skills should fall back gracefull
 - **perplexity vs exa:** perplexity = pre-synthesized answer with citations. exa = raw source material. Pick by whether you need a summary or the underlying content.
 - **perplexity_ask vs perplexity_reason vs perplexity_research:** ask handles 80% of queries; reason for complex tradeoffs; research only for exhaustive analysis.
 - **deepwiki vs context7:** deepwiki = how a specific repo's code works internally. context7 = how to use a library's public API.
-- **agy-agent vs perplexity for fresh facts:** agy-agent has native Google Search grounding (best for current events, "is X still maintained"). perplexity_ask is faster for synthesized factual lookups.
+- **agy-agent vs perplexity for fresh facts:** agy-agent has opt-in Google Search grounding (via `--grounded`; best for current events, "is X still maintained"). perplexity_ask is faster for synthesized factual lookups.
 
 ## Availability
 

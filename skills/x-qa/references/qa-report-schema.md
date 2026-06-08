@@ -25,7 +25,7 @@ Markdown with embedded YAML front-matter for machine-readability.
 |---|---|---|
 | `id` | string | From plan. |
 | `verdict` | enum | `pass` \| `fail` \| `flaky-recovered`. |
-| `runner` | enum | `gemini-flash` \| `claude-sonnet` \| `claude-haiku`. |
+| `runner` | enum | `agy-flash` \| `claude-sonnet` \| `claude-haiku`. |
 | `attempts` | int | 1 + retries used. |
 | `evidence` | object | Inline raw evidence (request/response/steps). Schema differs by simple vs complex runner — see `case-runner-prompts.md`. |
 | `duration_ms` | int | Final attempt duration. |
@@ -76,7 +76,7 @@ duration_s: 18.4
 cases:
   - id: tc-001
     verdict: pass
-    runner: gemini-flash
+    runner: agy-flash
     attempts: 1
     duration_ms: 142
     error: ""
