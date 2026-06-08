@@ -16,9 +16,9 @@ while [[ $# -gt 0 ]]; do case "$1" in
 esac; done
 [[ -f "$GOLD" ]] || { echo "calibrate-judge: gold not found: $GOLD" >&2; exit 2; }
 [[ -n "$RUBRIC" && -n "$OUT_DIR" ]] || { echo "calibrate-judge: --rubric-id and --out-dir required" >&2; exit 2; }
-JUDGE_MODEL="${X_QA_JUDGE_MODEL:-gemini-flash}"
+JUDGE_MODEL="${X_QA_JUDGE_MODEL:-agy-flash}"
 JUDGE_CMD="${X_QA_JUDGE_CMD:-}"
-run_judge() { if [[ -n "$JUDGE_CMD" ]]; then sh -c "$JUDGE_CMD"; else gemini-agent --model flash --raw "$(cat)"; fi }
+run_judge() { if [[ -n "$JUDGE_CMD" ]]; then sh -c "$JUDGE_CMD"; else agy-agent --model flash "$(cat)"; fi }
 
 pairs='[]'
 while IFS= read -r line; do
