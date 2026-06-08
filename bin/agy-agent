@@ -34,14 +34,14 @@ RAW=0
 # --- Parse args ---
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --model|-m)        MODEL="${2:-}"; shift 2 || true ;;
+    --model|-m)        [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; MODEL="$2"; shift 2 ;;
     --model=*)         MODEL="${1#--model=}"; shift ;;
-    --system)          SYSTEM_MD="${2:-}"; shift 2 || true ;;
+    --system)          [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; SYSTEM_MD="$2"; shift 2 ;;
     --system=*)        SYSTEM_MD="${1#--system=}"; shift ;;
-    --add-dir|--dir)   EXTRA_DIRS+=("${2:-}"); shift 2 || true ;;
+    --add-dir|--dir)   [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; EXTRA_DIRS+=("$2"); shift 2 ;;
     --add-dir=*)       EXTRA_DIRS+=("${1#--add-dir=}"); shift ;;
     --resume|-r)       RESUME="latest"; shift ;;
-    --conversation)    RESUME="${2:-}"; shift 2 || true ;;
+    --conversation)    [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; RESUME="$2"; shift 2 ;;
     --conversation=*)  RESUME="${1#--conversation=}"; shift ;;
     --grounded)        GROUNDED=1; shift ;;
     --yolo)            YOLO=1; shift ;;
@@ -68,8 +68,6 @@ if [[ "${X_AGY_DRY_RUN:-0}" != "1" ]] && ! command -v agy &>/dev/null; then
   exit 1
 fi
 
-# (model resolution — Task 3) (flag build — Task 4) (preflight — Task 5)
-# (exec + classify — Task 6). For now: build a minimal argv and honor dry-run.
 # --- Resolve model alias to agy's exact display string (verified via `agy models`) ---
 resolve_model() {
   case "$1" in
@@ -186,7 +184,7 @@ elif [[ -z "$STRIPPED" ]]; then
   # NOT the model-serving path). Verified in the merged research doc Part 2 (§8/§14). So those
   # strings are NOISE, not auth signal. Strip the known-noise lines first, check quota/planner
   # before auth, and only call it auth on a specific serving-path marker.
-  diag="$(grep -ivE 'not logged into Antigravity|failed to set auth token|loadCodeAssistResponse|fetchAdminControls|ListExperiments|availableModels|Singleflight' "$RUN_LOG" "$ERR_TMP" 2>/dev/null)"
+  diag="$(grep -ivEh 'not logged into Antigravity|failed to set auth token|loadCodeAssistResponse|fetchAdminControls|ListExperiments|availableModels|Singleflight' "$RUN_LOG" "$ERR_TMP" 2>/dev/null)"
   if   grep -qiE 'quota|exhaust|rate.?limit|credit' <<<"$diag"; then STATUS="quota_error"
   elif grep -qiE 'PlannerResponse|panic' <<<"$diag"; then STATUS="planner_empty"
   elif grep -qiE 'not authenticated|unauthor|invalid.{0,3}token|token expired|sign.?in required|403' <<<"$diag"; then STATUS="auth_error"

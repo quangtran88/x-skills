@@ -91,6 +91,13 @@ assert_contains "chrome kept by default" "Work Summary" "$out"
 out=$(FAKE_AGY_MODE=chrome X_AGY_STRIP_SUMMARY=1 run_live "ping" 2>/dev/null)
 assert_eq "chrome stripped" "0" "$([[ "$out" == *"Work Summary"* ]] && echo 1 || echo 0)"
 
+# T-guard: trailing value-flag must error fast, not infinite-loop hang (exit 1, not 124).
+# Each guarded by `timeout 5` so a regression would surface as rc=124, never wedge the suite.
+for tf in --model -m --system --add-dir --dir --conversation; do
+  ( timeout 5 "$AGY_AGENT" "$tf" ) >/dev/null 2>&1; rc=$?
+  assert_eq "trailing $tf errors not hangs" "1" "$rc"
+done
+
 # T7 live smoke — only when X_AGY_LIVE=1 and real agy present (costs quota, ~10-150s)
 if [[ "${X_AGY_LIVE:-0}" == "1" ]] && command -v agy &>/dev/null; then
   out=$("$AGY_AGENT" --model flash-low "Reply with exactly one word: PONG" 2>/dev/null); rc=$?
