@@ -34,4 +34,18 @@ assert_contains "passthrough"     'Gemini 3.1 Pro (Low)'       "$(run_dry --mode
 # default (no --model) must still pin a model so headless isn't model-ambiguous
 assert_contains "default flash"   'Gemini 3.5 Flash (Medium)'  "$(run_dry x)"
 
+# T4 flag translation
+assert_contains "add-dir flag" '--add-dir'                       "$(run_dry --add-dir /tmp x)"
+assert_contains "add-dir val"  '/tmp'                            "$(run_dry --add-dir /tmp x)"
+assert_contains "resume->-c"   '-c'                              "$(run_dry --resume x)"
+assert_contains "conversation" 'abc123'                          "$(run_dry --conversation abc123 x)"
+assert_contains "sandbox"      '--sandbox'                       "$(run_dry --sandbox x)"
+assert_contains "yolo"         '--dangerously-skip-permissions' "$(run_dry --yolo x)"
+# grounding injects the directive into the prompt (last positional -p arg)
+assert_contains "grounded dir" 'Use Google Search'              "$(run_dry --grounded 'latest bun version')"
+# system prompt is prepended to the prompt text (agy has no --system)
+sys=$(mktemp); printf 'You are terse.' > "$sys"
+assert_contains "system prepend" 'You are terse.'               "$(run_dry --system "$sys" 'hi')"
+rm -f "$sys"
+
 echo "---"; echo "PASS=$PASS FAIL=$FAIL"; [[ $FAIL -eq 0 ]]

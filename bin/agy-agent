@@ -84,10 +84,43 @@ resolve_model() {
     *)                     echo "$1" ;;   # passthrough: already an agy display string
   esac
 }
+# --- Assemble final prompt (system prepend + grounding directive) ---
+if [[ -n "$SYSTEM_MD" ]]; then
+  if [[ ! -f "$SYSTEM_MD" ]]; then echo "Error: system prompt file not found: $SYSTEM_MD" >&2; exit 1; fi
+  PROMPT="$(cat "$SYSTEM_MD")"$'\n\n---\n\n'"$PROMPT"
+fi
+if [[ "$GROUNDED" -eq 1 ]]; then
+  PROMPT="$PROMPT"$'\n\n(Use Google Search to ground your answer in current sources and cite URLs.)'
+fi
+
 MODEL_RESOLVED="$(resolve_model "$MODEL")"
 
 ARGS=(-p "$PROMPT")
 ARGS+=(--model "$MODEL_RESOLVED")
+
+# --add-dir: validate each path (reject leading '-'; warn+skip missing dirs)
+for d in "${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}"; do
+  if [[ "$d" == -* ]]; then echo "Error: --add-dir path begins with '-' (rejected): $d" >&2; exit 1; fi
+  if [[ ! -d "$d" ]]; then echo "Warning: --add-dir not a directory: $d (skipping)" >&2; continue; fi
+  # AMENDMENT (finding #2): a large --add-dir makes agy's traversal hang (15-25min, 0 bytes).
+  # Warn past a threshold; `find|head` bounds the cost so we don't walk a 65GB tree to count it.
+  fcount=$(find "$d" -type f 2>/dev/null | head -n "${X_AGY_ADDDIR_MAX:-2000}" | wc -l | tr -d ' ')
+  if [[ "$fcount" -ge "${X_AGY_ADDDIR_MAX:-2000}" ]]; then
+    echo "[agy-agent] WARNING: --add-dir '$d' has ≥${X_AGY_ADDDIR_MAX:-2000} files — agy may hang on traversal." >&2
+    echo "[agy-agent]   Scope to a specific subtree (e.g. src/<feature>), not a repo root." >&2
+  fi
+  ARGS+=(--add-dir "$d")
+done
+
+# resume: "latest" -> -c ; specific id -> --conversation <id>
+if [[ "$RESUME" == "latest" ]]; then
+  ARGS+=(-c)
+elif [[ -n "$RESUME" ]]; then
+  ARGS+=(--conversation "$RESUME")
+fi
+
+[[ "$SANDBOX" -eq 1 ]] && ARGS+=(--sandbox)
+[[ "$YOLO" -eq 1 ]]    && ARGS+=(--dangerously-skip-permissions)
 
 if [[ "${X_AGY_DRY_RUN:-0}" == "1" ]]; then
   printf 'agy\n'; printf '%s\n' "${ARGS[@]}"   # one arg per line — stable, escape-free test assertions
