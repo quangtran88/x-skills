@@ -5,8 +5,8 @@
 #   - capability manifest is missing (Case 1)
 #   - manifest's plugin_dir doesn't match the loaded plugin (Case 2)
 #   - manifest's plugin_version doesn't match plugin.json's version (Case 2b)
-#   - gemini-agent is in the plugin but not on PATH (Case 3)
-#   - manifest predates the gemini_cli capability key (Case 4)
+#   - agy-agent is in the plugin but not on PATH (Case 3)
+#   - manifest predates the agy_cli capability key (Case 4)
 #
 # Silent when in sync. Cheap (<50ms), non-fatal — never blocks a session.
 # Set XSKILLS_SUPPRESS_VERSION_CHECK=1 to mute all nudges.
@@ -34,15 +34,15 @@ if [[ ! -f "$CAPS_FILE" ]]; then
 fi
 
 # Single jq call extracts all fields needed below — cheaper than N forks.
-# Output format: <plugin_dir>\t<plugin_version>\t<has_gemini_cli_field:true|false>
+# Output format: <plugin_dir>\t<plugin_version>\t<has_agy_cli_field:true|false>
 CAPS_FIELDS=$(jq -r '
   [
     (.plugin_dir // ""),
     (.plugin_version // ""),
-    (if (.capabilities | has("gemini_cli")) then "true" else "false" end)
+    (if (.capabilities | has("agy_cli")) then "true" else "false" end)
   ] | @tsv
 ' "$CAPS_FILE" 2>/dev/null)
-IFS=$'\t' read -r CACHED_DIR MANIFEST_PLUGIN_VERSION HAS_GEMINI_FIELD <<<"$CAPS_FIELDS"
+IFS=$'\t' read -r CACHED_DIR MANIFEST_PLUGIN_VERSION HAS_AGY_FIELD <<<"$CAPS_FIELDS"
 
 # Case 2: capabilities file points at a different plugin_dir → upgraded
 # to a new cache version, old symlinks/manifest still point at old path.
@@ -58,19 +58,19 @@ if [[ -n "$MANIFEST_PLUGIN_VERSION" && "$MANIFEST_PLUGIN_VERSION" != "$PLUGIN_VE
   exit 0
 fi
 
-# Case 3 (H4): gemini-agent missing from PATH but binary exists in plugin →
-# upgraded from a pre-1.4.0 install without re-running setup. Use `command -v`
+# Case 3 (H4): agy-agent missing from PATH but binary exists in plugin →
+# upgraded without re-running setup. Use `command -v`
 # instead of hardcoding ~/.local/bin to honor custom LINK_DIR installs.
-if [[ -f "$PLUGIN_DIR/bin/gemini-agent" ]] && ! command -v gemini-agent &>/dev/null; then
-  echo "[x-skills] gemini-agent binding missing (added in v1.4.0). Run: /x-skills:setup to enable x-gemini skill."
+if [[ -f "$PLUGIN_DIR/bin/agy-agent" ]] && ! command -v agy-agent &>/dev/null; then
+  echo "[x-skills] agy-agent binding missing. Run: /x-skills:setup to enable the agy backend."
   exit 0
 fi
 
-# Case 4: capability manifest lacks the gemini_cli field entirely → manifest
+# Case 4: capability manifest lacks the agy_cli field entirely → manifest
 # was written by an older setup script. (Distinct from the field being
-# present-and-false, which just means gemini is not installed.)
-if [[ "$HAS_GEMINI_FIELD" != "true" ]]; then
-  echo "[x-skills] Capability manifest is from a pre-v1.4.0 setup. Re-run: /x-skills:setup to refresh."
+# present-and-false, which just means agy is not installed.)
+if [[ "$HAS_AGY_FIELD" != "true" ]]; then
+  echo "[x-skills] Capability manifest predates the agy backend. Re-run: /x-skills:setup to refresh."
   exit 0
 fi
 

@@ -20,7 +20,7 @@ The skill never runs `docker compose up`, never reads or writes the user's `.env
 
 **MANDATORY first step — do this BEFORE anything else:**
 
-1. Pin capabilities for the session per `../x-shared/capability-loading.md`. Relevant capabilities: `gemini_cli` is irrelevant; this skill is a self-contained CLI. Skip the multi-model dispatch lanes.
+1. Pin capabilities for the session per `../x-shared/capability-loading.md`. Relevant capabilities: `agy_cli` is irrelevant; this skill is a self-contained CLI. Skip the multi-model dispatch lanes.
 2. Verify the launcher is on PATH: `command -v x-worktree-isolate`. If absent, point the user at the repo root: `/Users/randytran/Codes/x-skills/bin/setup` (the setup script symlinks `bin/x-worktree-isolate` into `~/.local/bin/`).
 3. Read `gotchas.md` — known failure patterns the apply step won't catch.
 4. Read `config.json` for the version, schema version, stack identity, minimum Compose version, and dependency list. Per-repo runtime values (port range, registry root, lock retry counts) are owned by `port_strategy` in each profile and the constants in `scripts/allocate-ports.sh`.

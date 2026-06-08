@@ -53,7 +53,7 @@ These are independent and can run simultaneously (`run_in_background: true`, max
 | Pre-planning | `OMO oracle` ∥ `OMO explore` ∥ native `Grep` | Strategic framing + semantic search + literal pattern context (canonical Type F — see `../x-research/references/prompt-templates.md`) |
 | Plan review | `--model gpt` blocker-finder + OMC `code-reviewer` (+ `requesting-code-review` Skill) | Cross-model review of a complex plan — see `../x-review/steps/step-02-review.md` § "Plan Review" |
 | Visual + context | `multimodal-looker` + `explore` | Image input + related code lookup |
-| Code review (diff) | OMC `code-reviewer` + `OMO oracle` (+ `gemini-agent --model pro` when `gemini_cli` pinned, + `requesting-code-review` Skill) | Claude + GPT (+ Gemini) cross-model review on code/diff per `../x-review/steps/step-02-review.md` § "Code / Git Diff Review". **`--model gpt` is plan-only; using it for code/diff is a known target-routing mistake.** |
+| Code review (diff) | OMC `code-reviewer` + `OMO oracle` (+ `agy-agent --model pro` when `agy_cli` pinned, + `requesting-code-review` Skill) | Claude + GPT (+ Gemini) cross-model review on code/diff per `../x-review/steps/step-02-review.md` § "Code / Git Diff Review". **`--model gpt` is plan-only; using it for code/diff is a known target-routing mistake.** |
 
 ## Sequential Dependencies (Never Parallelize)
 

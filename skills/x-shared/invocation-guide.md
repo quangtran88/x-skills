@@ -24,34 +24,31 @@ omo-agent --file /path/to/file oracle "<prompt>"
 
 For the full agent catalog, see the [OMO skill](../x-omo/SKILL.md).
 
-## Gemini Agent Invocation
+## Agy Agent Invocation
 
 ```bash
 # Default model (flash)
-gemini-agent "<prompt>"
+agy-agent "<prompt>"
 
 # Specific model (pro / flash)
-gemini-agent --model pro "<prompt>"
+agy-agent --model pro "<prompt>"
 
-# Attach files (multimodal / large input)
-gemini-agent --file /abs/path "<prompt>"
-
-# Resume last session
-gemini-agent --resume "<follow-up>"
+# Attach a directory (multimodal / large input)
+agy-agent --add-dir /abs/dir "<prompt>"
 ```
 
 For the full flag list and gotchas, see the [x-gemini skill](../x-gemini/SKILL.md).
 
 ## ⚠ Literal binaries — there is NO `omo` wrapper verb
 
-`gemini-agent` and `omo-agent` are **standalone CLIs** on PATH (installed by `bin/setup` at `~/.local/bin/`). They are NOT subcommands of an `omo` binary — that binary does not exist.
+`agy-agent` and `omo-agent` are **standalone CLIs** on PATH (installed by `bin/setup` at `~/.local/bin/`). They are NOT subcommands of an `omo` binary — that binary does not exist.
 
 **Do NOT invent these forms** (all fail with `command not found: omo`):
 
-- ❌ `omo dispatch gemini-agent --model pro "..."`
+- ❌ `omo dispatch agy-agent --model pro "..."`
 - ❌ `omo run oracle "..."`
 - ❌ `omo exec --model gpt "..."`
-- ❌ `omo gemini-agent ...`
+- ❌ `omo agy-agent ...`
 
 **Correct forms** — exactly as shown in the two blocks above.
 

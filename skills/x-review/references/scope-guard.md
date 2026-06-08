@@ -1,6 +1,6 @@
 # Scope Guard
 
-Prepend this block VERBATIM to every reviewer prompt (Agent code-reviewer, omo-agent oracle, omo-agent --model gpt, gemini-agent --model pro, requesting-code-review). Do not summarize, paraphrase, or partially include — paste the whole block.
+Prepend this block VERBATIM to every reviewer prompt (Agent code-reviewer, omo-agent oracle, omo-agent --model gpt, agy-agent --model pro, requesting-code-review). Do not summarize, paraphrase, or partially include — paste the whole block.
 
 ```
 SCOPE: Report only (1) bugs that affect correctness, (2) security issues, (3) false

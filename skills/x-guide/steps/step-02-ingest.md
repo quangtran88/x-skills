@@ -30,7 +30,7 @@ Then route:
 input.type == "vague"
   → x-research (multi-source synthesis)
 input.type in {file, dir, url, paste} AND size_estimate > 50_000
-  → if `gemini_cli` capability active:
+  → if `agy_cli` capability active:
         x-gemini ingest
     else:
         Claude direct (warn user once if size_estimate > 150_000)

@@ -68,7 +68,7 @@ Smart review that detects what to review and how deep to go.
 0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch. **If `mcp.gitnexus` is pinned, also consume the shared session-pinned indexed+fresh probe per `../x-shared/capability-loading.md` § "Shared GitNexus Indexed+Fresh Probe" — do NOT run an independent `gitnexus list`; read the single pinned record.** (F3)
 1. Read `config.json` in this skill directory to get the `omo_agent` path (used at dispatch time).
 2. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. **For the unavailable-agent list and replacement model-routing (`--model gpt`, `--model codex`), see `../x-shared/omo-routing.md § Unavailable Agents`.**
-3. Read `../x-gemini/SKILL.md` if `gemini_cli` capability is pinned. Gemini-3-pro is the third cross-model reviewer (alongside Claude opus + GPT oracle), strong on Google-Search-grounded fact checks, large diff handling (1M context), and visual/UI screenshot diffs.
+3. Read `../x-gemini/SKILL.md` if `agy_cli` capability is pinned. Gemini-3-pro is the third cross-model reviewer (alongside Claude opus + GPT oracle), strong on Google-Search-grounded fact checks, large diff handling (1M context), and visual/UI screenshot diffs.
 
 ## Invocation
 
@@ -103,7 +103,7 @@ All findings use consistent severity. See `../x-shared/severity-guide.md` for th
 ## Dependencies
 
 - **x-omo** — bootstrap (agent catalog) + oracle agent for GPT perspective
-- **x-gemini** — third cross-model reviewer (Gemini-3-pro); skipped gracefully if `gemini_cli` capability not pinned
+- **x-gemini** — third cross-model reviewer (Gemini-3-pro); skipped gracefully if `agy_cli` capability not pinned
 - **x-shared** — severity-guide, invocation-guide, context-envelope, workflow-chains
 - **superpowers** — code-reviewer (primary + S/P/D passes via Agent tool), requesting-code-review (reviewer #3 via Skill tool), receiving-code-review (fix workflow), verification-before-completion (evidence gate), finishing-a-development-branch (post-approve)
 
