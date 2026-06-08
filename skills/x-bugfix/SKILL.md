@@ -13,7 +13,7 @@ Smart entry point for bugs and investigations. Detects severity, routes through 
 
 0. Pin capabilities for the session per `../x-shared/capability-loading.md`. Filter routing tables against the pinned set; do NOT re-check per dispatch.
 1. Read `../x-omo/SKILL.md` to load the OMO agent catalog, invocation commands, and model routing. This ensures you know how to invoke OMO agents (`oracle`, `explore`, `librarian`, `multimodal-looker`) via Bash — they are NOT OMC agents. For the canonical list of UNAVAILABLE role agents and their replacements, see [`../x-shared/omo-routing.md § Unavailable Agents`](../x-shared/omo-routing.md#unavailable-agents).
-2. Read `../x-gemini/SKILL.md` if `agy_cli` capability is pinned. Agy's 1M context, native Google Search grounding, and multimodal `--add-dir` flag handle three bug scenarios that OMO/MCP cannot: large-log analysis, screenshot/mockup-driven bugs, and fresh CVE/regression web facts.
+2. Read `../x-gemini/SKILL.md` if `agy_cli` capability is pinned. Agy's 1M context, Google Search grounding (opt-in via `--grounded`), and multimodal `--add-dir` flag handle three bug scenarios that OMO/MCP cannot: large-log analysis, screenshot/mockup-driven bugs, and fresh CVE/regression web facts.
 
 ## Invocation
 
@@ -82,7 +82,7 @@ For MCP tool selection (search, edit, web facts, library docs), see the canonica
 | OMO `explore` | Codebase search when `mcp-toolbox.md` primary (native `Grep`) insufficient — needs parallel multi-tool search | Bash (omo-agent) |
 | `agy-agent --add-dir <log-dir>` | Large log/trace (>50k tokens) — single-shot analysis without paging | Bash (1M context, gemini-3-pro) |
 | `agy-agent --add-dir <screenshot-dir>` | Visual bug input (screenshot, mockup, design ref) | Bash (multimodal pro) |
-| `agy-agent --model pro` | Fresh web facts (CVE advisory, recent regression, library current state) | Bash (native Google Search grounding) |
+| `agy-agent --model pro --grounded` | Fresh web facts (CVE advisory, recent regression, library current state) | Bash (Google Search grounding via `--grounded`) |
 
 ## Mode A: Quick Bug
 
@@ -144,10 +144,10 @@ Skip: hypothesis testing, pattern catalog, OMO delegation, debug report. Still r
 | Codebase search needed (simple) | native `Grep` / OMO `explore` | Fast literal/semantic search, no agent overhead |
 | Codebase search needed (complex, multi-tool) | `explore` | Parallel multi-tool search |
 | Stalled >3 iterations (per iteration-patterns.md §2 definitions) | `--model codex` | Deep autonomous worker |
-| Unfamiliar library in stack | `librarian` OR `agy-agent --model pro` | External docs specialist; agy for fresh web grounding |
+| Unfamiliar library in stack | `librarian` OR `agy-agent --model pro --grounded` | External docs specialist; agy for fresh web grounding |
 | Log/trace >50k tokens | `agy-agent --add-dir <log-dir>` | 1M context single-shot beats paging |
 | Visual bug (screenshot/mockup) | `agy-agent --add-dir <image-dir>` | Multimodal pro |
-| Fresh CVE / library regression | `agy-agent --model pro` | Native Google Search beats stale training cutoff |
+| Fresh CVE / library regression | `agy-agent --model pro --grounded` | Google Search (`--grounded`) beats stale training cutoff |
 
 ## Red Flags — STOP and Reinvestigate
 
