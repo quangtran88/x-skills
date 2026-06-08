@@ -81,7 +81,7 @@ If deepwiki returns an error (repo not indexed), report that clearly so we can f
 
 ## Type F: Pre-Planning Analysis
 
-**Canonical fan-out (Standard Mode):** `OMO oracle ∥ OMO explore ∥ native Grep` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + `gemini-agent` for external context.
+**Canonical fan-out (Standard Mode):** `OMO oracle ∥ OMO explore ∥ native Grep` — three lanes, all `run_in_background: true`. Max Mode adds `perplexity_research` + a single `agy-agent` lane for external context (only one agy lane may be in flight — agy is a process-global singleton; concurrent agy calls hang).
 
 For `oracle` (pre-planning consult — replaces UNAVAILABLE `metis`):
 ```
@@ -109,7 +109,7 @@ For native `Grep` (literal pattern/path lane — grep/glob/ast_grep):
 ```
 {{specific extraction/analysis prompt}}
 ```
-Always use `--file /path/to/file` flag with `multimodal-looker`.
+Primary lane: `agy-agent --add-dir /path/to/dir` (point at the **containing directory**, not a single file — agy mounts a scoped subtree). Escalation: OMO `multimodal-looker` — see `../../x-omo/SKILL.md` for its invocation flags (do NOT redefine them here).
 
 ## Type H: Local Structural (GitNexus, advisory)
 
