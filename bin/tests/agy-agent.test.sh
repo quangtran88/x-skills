@@ -91,4 +91,15 @@ assert_contains "chrome kept by default" "Work Summary" "$out"
 out=$(FAKE_AGY_MODE=chrome X_AGY_STRIP_SUMMARY=1 run_live "ping" 2>/dev/null)
 assert_eq "chrome stripped" "0" "$([[ "$out" == *"Work Summary"* ]] && echo 1 || echo 0)"
 
+# T7 live smoke — only when X_AGY_LIVE=1 and real agy present (costs quota, ~10-150s)
+if [[ "${X_AGY_LIVE:-0}" == "1" ]] && command -v agy &>/dev/null; then
+  out=$("$AGY_AGENT" --model flash-low "Reply with exactly one word: PONG" 2>/dev/null); rc=$?
+  assert_eq "live exit 0" "0" "$rc"
+  assert_contains "live PONG" "PONG" "$out"
+  out=$("$AGY_AGENT" --model flash-low --grounded "Latest stable Bun version this week? Cite a URL." 2>/dev/null)
+  assert_contains "live grounding cites url" "http" "$out"
+else
+  echo "(skipping live smoke — set X_AGY_LIVE=1 to enable)"
+fi
+
 echo "---"; echo "PASS=$PASS FAIL=$FAIL"; [[ $FAIL -eq 0 ]]
