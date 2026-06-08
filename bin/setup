@@ -14,6 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 OMO_AGENT_SRC="$PLUGIN_DIR/bin/omo-agent"
 GEMINI_AGENT_SRC="$PLUGIN_DIR/bin/gemini-agent"
+AGY_AGENT_SRC="$PLUGIN_DIR/bin/agy-agent"
 XWI_AGENT_SRC="$PLUGIN_DIR/bin/x-worktree-isolate"
 XUP_AGENT_SRC="$PLUGIN_DIR/bin/x-upstream"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/x-skills"
@@ -21,6 +22,7 @@ CAPS_FILE="$CONFIG_DIR/capabilities.json"
 LINK_DIR="$HOME/.local/bin"
 LINK_PATH="$LINK_DIR/omo-agent"
 GEMINI_LINK_PATH="$LINK_DIR/gemini-agent"
+AGY_LINK_PATH="$LINK_DIR/agy-agent"
 XWI_LINK_PATH="$LINK_DIR/x-worktree-isolate"
 XUP_LINK_PATH="$LINK_DIR/x-upstream"
 
@@ -638,6 +640,26 @@ else
     "npm install -g gitnexus"
 fi
 
+# --- 1h. Antigravity CLI (agy) — Google-model backend (replaces gemini) ---
+header "1h. Antigravity CLI (agy) — Google-model backend"
+AGY_PRESENT=0
+command -v agy &>/dev/null && AGY_PRESENT=1
+if [[ -f "$AGY_AGENT_SRC" ]]; then
+  chmod +x "$AGY_AGENT_SRC"; install_symlink "$AGY_AGENT_SRC" "$AGY_LINK_PATH"
+fi
+if [[ $AGY_PRESENT -eq 1 ]]; then
+  ok "agy found: $(agy --version 2>/dev/null || echo unknown)"
+else
+  info "agy CLI not found — x-gemini and all Google-model routing depend on it"
+  missing_add "cli" "agy" "Antigravity CLI (Google-model backend for x-gemini/x-research/x-qa)" "https://antigravity.google/cli"
+fi
+# Same timeout gate as gemini (TIMEOUT_PRESENT is set in 1c).
+if [[ $AGY_PRESENT -eq 1 && ${TIMEOUT_PRESENT:-0} -eq 1 ]]; then
+  cap_set agy_cli true
+else
+  cap_set agy_cli false
+fi
+
 # --- 2. OpenCode CLI ---
 header "2. OpenCode CLI"
 
@@ -912,6 +934,7 @@ manifest = {
         "omo_plugin":         cap("$(cap_get omo_plugin)"),
         "omo_mode_all":       cap("$(cap_get omo_mode_all)"),
         "gemini_cli":         cap("$(cap_get gemini_cli)"),
+        "agy_cli":            cap("$(cap_get agy_cli)"),
         "x_worktree_isolate": cap("$(cap_get x_worktree_isolate)"),
         "x_upstream":         cap("$(cap_get x_upstream)"),
         "mcp": {
@@ -979,6 +1002,7 @@ report_skill() {
       opencode)       [[ "$(cap_get opencode)" == "true" ]] && met=true ;;
       omo_plugin)     [[ "$(cap_get omo_plugin)" == "true" || "$(cap_get omo_plugin)" == "partial" ]] && met=true ;;
       gemini_cli)     [[ "$(cap_get gemini_cli)" == "true" ]] && met=true ;;
+      agy_cli)        [[ "$(cap_get agy_cli)" == "true" ]] && met=true ;;
       omc)            [[ "$(cap_get plugin_oh-my-claudecode)" == "true" ]] && met=true ;;
       superpowers)    [[ "$(cap_get plugin_superpowers)" == "true" ]] && met=true ;;
       research-mcps)  for m in perplexity deepwiki exa context7; do
@@ -1008,7 +1032,7 @@ report_skill "x-bugfix"       opencode omo_plugin omc
 report_skill "x-design"
 report_skill "x-api-pentest"  security-tools
 report_skill "x-omo"          opencode omo_plugin
-report_skill "x-gemini"       gemini_cli
+report_skill "x-gemini"       agy_cli
 report_skill "x-skill-review" omc
 report_skill "x-skill-improve" omc
 report_skill "x-guide"         gemini_cli research-mcps

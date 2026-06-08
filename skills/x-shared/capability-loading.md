@@ -30,6 +30,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
     "omo_plugin": "partial|full|false",
     "omo_mode_all": true,
     "gemini_cli": true,
+    "agy_cli": true,
     "mcp": {
       "perplexity": true,
       "deepwiki": true,
