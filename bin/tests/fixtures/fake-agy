@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Test double for `agy`. Behavior toggled by env:
+#   FAKE_AGY_MODE=ok      -> print canned response, exit 0
+#   FAKE_AGY_MODE=empty   -> print nothing, exit 0 (agy's "exit-0 lies" failure)
+#   FAKE_AGY_MODE=chrome  -> print response + "### Work Summary" block, exit 0
+#   FAKE_AGY_MODE=authlog -> empty stdout, write 'not authenticated' to --log-file, exit 0
+#   FAKE_AGY_MODE=noiselog-> empty stdout, write the REAL always-present auth NOISE (appears on
+#                            success too) to --log-file, exit 0 — regression guard for finding #1
+# Recognizes -p, --model, --log-file; ignores the rest.
+LOG=""
+while [[ $# -gt 0 ]]; do case "$1" in --log-file) LOG="$2"; shift 2;; *) shift;; esac; done
+case "${FAKE_AGY_MODE:-ok}" in
+  ok)       printf 'PONG\n' ;;
+  empty)    : ;;
+  chrome)   printf 'PONG\n\n### Work Summary\n* did a thing\n' ;;
+  authlog)  [[ -n "$LOG" ]] && echo 'error: not authenticated' > "$LOG" ;;
+  noiselog) [[ -n "$LOG" ]] && printf '%s\n%s\n' \
+              'W log_context.go:117] Cache(loadCodeAssistResponse): Singleflight refresh failed: error getting token source: You are not logged into Antigravity.' \
+              'W client.go:81] failed to set auth token' > "$LOG" ;;
+esac
+exit 0

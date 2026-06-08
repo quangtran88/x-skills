@@ -60,4 +60,35 @@ err=$(cd /tmp && HOME="$fakehome" X_AGY_DRY_RUN=1 "$AGY_AGENT" x 2>&1 >/dev/null
 assert_eq "trusted is silent" "" "$err"
 rm -rf "$fakehome"
 
+# T6 execution + failure detection, using the fake-agy stub on PATH
+FIX="$HERE/fixtures"
+run_live() { PATH="$FIX:$PATH" X_AGY_NO_LOG=1 "$AGY_AGENT" "$@"; }
+
+# ok -> stdout has response, exit 0
+out=$(FAKE_AGY_MODE=ok run_live "ping" 2>/dev/null); rc=$?
+assert_eq "ok exit 0" "0" "$rc"; assert_contains "ok stdout" "PONG" "$out"
+
+# empty stdout -> wrapper exits NON-zero (synthetic), since agy lies with exit 0
+out=$(FAKE_AGY_MODE=empty run_live "ping" 2>/dev/null); rc=$?
+assert_eq "empty -> non-zero exit" "1" "$rc"
+
+# authlog -> non-zero + stderr classifies as auth
+err=$(FAKE_AGY_MODE=authlog run_live "ping" 2>&1 >/dev/null); rc=$?
+assert_eq "authlog -> non-zero" "1" "$rc"
+assert_contains "auth classified" "auth_error" "$err"
+
+# REGRESSION (finding #1): the always-present auth NOISE must NOT be classified as auth.
+# noiselog writes the same lines agy emits on SUCCESS — empty stdout here means a generic
+# failure, and the classifier must say empty_output, never auth_error.
+err=$(FAKE_AGY_MODE=noiselog run_live "ping" 2>&1 >/dev/null); rc=$?
+assert_eq "noiselog -> non-zero" "1" "$rc"
+assert_contains "noise -> empty_output" "status=empty_output" "$err"
+assert_eq "noise NOT auth" "0" "$([[ "$err" == *"auth_error"* ]] && echo 1 || echo 0)"
+
+# chrome stripping is opt-in: default keeps it, X_AGY_STRIP_SUMMARY=1 removes it
+out=$(FAKE_AGY_MODE=chrome run_live "ping" 2>/dev/null)
+assert_contains "chrome kept by default" "Work Summary" "$out"
+out=$(FAKE_AGY_MODE=chrome X_AGY_STRIP_SUMMARY=1 run_live "ping" 2>/dev/null)
+assert_eq "chrome stripped" "0" "$([[ "$out" == *"Work Summary"* ]] && echo 1 || echo 0)"
+
 echo "---"; echo "PASS=$PASS FAIL=$FAIL"; [[ $FAIL -eq 0 ]]

@@ -151,5 +151,79 @@ if [[ "${X_AGY_DRY_RUN:-0}" == "1" ]]; then
   exit 0
 fi
 
-# Placeholder exec (replaced in Task 6).
-exec agy "${ARGS[@]}"
+# --- Resolve timeout binary (macOS lacks `timeout` without coreutils) ---
+if command -v timeout &>/dev/null; then TIMEOUT_BIN="timeout"
+elif command -v gtimeout &>/dev/null; then TIMEOUT_BIN="gtimeout"
+else echo "Error: neither 'timeout' nor 'gtimeout' on PATH (brew install coreutils)" >&2; exit 1; fi
+AGY_TIMEOUT="${AGY_TIMEOUT:-600}"
+
+# agy's own run log — used to classify failures (agy exits 0 even on error).
+RUN_LOG="$(mktemp /tmp/agy-agent-runlog-XXXXXXXX)"
+OUT_TMP="$(mktemp /tmp/agy-agent-out-XXXXXXXX)"
+ERR_TMP="$(mktemp /tmp/agy-agent-err-XXXXXXXX)"
+trap 'rm -f "$RUN_LOG" "$OUT_TMP" "$ERR_TMP"' EXIT
+ARGS+=(--log-file "$RUN_LOG" --print-timeout "${AGY_TIMEOUT}s")
+
+LABEL="${MODEL:-flash}"
+START=$(date +%s)
+echo "[agy-agent] started model=$LABEL at $(date +%H:%M:%S) (timeout=${AGY_TIMEOUT}s)" >&2
+
+env -u CLAUDECODE -u CLAUDE_SESSION_ID -u CLAUDECODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT \
+  "$TIMEOUT_BIN" "$AGY_TIMEOUT" agy "${ARGS[@]}" > "$OUT_TMP" 2> "$ERR_TMP"
+RAW_EXIT=$?
+DURATION=$(( $(date +%s) - START ))
+
+# --- Failure detection: agy exits 0 even on failure, so judge by output + log ---
+RESPONSE="$(cat "$OUT_TMP")"
+STRIPPED="${RESPONSE//[$' \t\n\r']/}"   # whitespace-only counts as empty
+STATUS="success"; SYNTH_EXIT=0
+if [[ "$RAW_EXIT" -eq 124 ]]; then
+  STATUS="timeout"; SYNTH_EXIT=124
+elif [[ -z "$STRIPPED" ]]; then
+  SYNTH_EXIT=1
+  # AMENDMENT (finding #1): agy's log ALWAYS contains "not logged into Antigravity" and
+  # "failed to set auth token" — even on SUCCESSFUL runs (auxiliary admin/experiment caches,
+  # NOT the model-serving path). Verified in the merged research doc Part 2 (§8/§14). So those
+  # strings are NOISE, not auth signal. Strip the known-noise lines first, check quota/planner
+  # before auth, and only call it auth on a specific serving-path marker.
+  diag="$(grep -ivE 'not logged into Antigravity|failed to set auth token|loadCodeAssistResponse|fetchAdminControls|ListExperiments|availableModels|Singleflight' "$RUN_LOG" "$ERR_TMP" 2>/dev/null)"
+  if   grep -qiE 'quota|exhaust|rate.?limit|credit' <<<"$diag"; then STATUS="quota_error"
+  elif grep -qiE 'PlannerResponse|panic' <<<"$diag"; then STATUS="planner_empty"
+  elif grep -qiE 'not authenticated|unauthor|invalid.{0,3}token|token expired|sign.?in required|403' <<<"$diag"; then STATUS="auth_error"
+  else STATUS="empty_output"; fi
+elif [[ "$RAW_EXIT" -ne 0 ]]; then
+  STATUS="error_exit_${RAW_EXIT}"; SYNTH_EXIT="$RAW_EXIT"
+fi
+
+# --- Persist log (0600, user-private) unless disabled (lifted from gemini-agent) ---
+DEBUG_LOG="(disabled)"
+if [[ "${X_AGY_NO_LOG:-0}" != "1" ]]; then
+  TS=$(date +%Y%m%d-%H%M%S)
+  DIR="${XDG_CACHE_HOME:-$HOME/.cache}/x-skills/agy"
+  if mkdir -p "$DIR" 2>/dev/null; then
+    DEBUG_LOG="$DIR/agy-agent-${TS}-${LABEL// /_}.log"
+    if [[ ! -L "$DEBUG_LOG" ]]; then
+      install -m 0600 /dev/null "$DEBUG_LOG" 2>/dev/null && { cat "$OUT_TMP" "$RUN_LOG" > "$DEBUG_LOG" 2>/dev/null; } || DEBUG_LOG="(disabled)"
+    else DEBUG_LOG="(disabled)"; fi
+  fi
+fi
+
+# --- On failure: surface diagnosis, emit summary, exit non-zero ---
+if [[ "$SYNTH_EXIT" -ne 0 ]]; then
+  echo "[agy-agent] FAILED status=${STATUS} (agy raw exit=${RAW_EXIT}; agy exits 0 even on error — judged by empty output + log)" >&2
+  tail -5 "$RUN_LOG" "$ERR_TMP" 2>/dev/null | sed 's/^/[agy-agent]   /' >&2
+  echo "[agy-agent] $LABEL | duration=${DURATION}s | status=${STATUS} | log=${DEBUG_LOG}" >&2
+  exit "$SYNTH_EXIT"
+fi
+
+# --- Success path: optional chrome strip, truncation, emit ---
+if [[ "$RAW" -eq 0 && "${X_AGY_STRIP_SUMMARY:-0}" == "1" ]]; then
+  RESPONSE="${RESPONSE%%$'\n'### Work Summary*}"
+fi
+MAX_CHARS=50000
+if [[ "${#RESPONSE}" -gt "$MAX_CHARS" ]]; then
+  RESPONSE="[agy-agent: truncated — showing tail]"$'\n\n'"${RESPONSE: -$MAX_CHARS}"
+fi
+printf '%s\n' "$RESPONSE"
+echo "[agy-agent] $LABEL | duration=${DURATION}s | status=${STATUS} | log=${DEBUG_LOG}" >&2
+exit 0
