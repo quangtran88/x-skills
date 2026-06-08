@@ -10,6 +10,22 @@
 
 **Spec source:** `docs/research/2026-06-06-agy-antigravity-cli-headless-usage-guide.md` (binary-verified). Read it before starting — every flag/path/behavior below traces to a verified finding there.
 
+**Validation source (NEW):** `docs/research/2026-06-06-agy-antigravity-cli-headless-usage-guide.md` **Part 2 (§12–15)** — a live 3-backend bake-off (agy vs gemini-agent vs omo-explore) replaying a real research prompt against 2 primary-source anchors. It produced the amendments below. Read it before Task 6 and Task 10. (Runnable harness: `docs/research/agy-eval-harness/`.)
+
+---
+
+## Findings & Amendments (eval harness, 2026-06-06)
+
+The bake-off confirmed the plan's core thesis (**agy is a viable gemini-CLI replacement for repo-grounded research** — it tied gemini on the anchors, *beat* it on grounding because it reads the repo, and ran ~2× slower not 3–5×). But it overturned four specifics this plan currently gets wrong. Apply these where flagged inline.
+
+1. **The Task 6 auth classifier is BROKEN as written — fix required.** agy writes `error getting token source: You are not logged into Antigravity` + `failed to set auth token` into its log on **every** run, *including successful ones* (they're for auxiliary `loadCodeAssistResponse`/`fetchAdminControls`/`ListExperiments` caches, not model serving). The Task 6 classifier greps the log for `auth|...|credential` whenever stdout is empty → it will mislabel **every** empty-output failure (traversal hang, quota, planner-empty) as `auth_error`. The auth string is noise, not signal. → **Patched inline in Task 6 Step 4 below** (auth bucket demoted; check timeout/quota/planner first; only call it auth on a *specific, serving-path* marker).
+
+2. **`--add-dir` on a large tree hangs agy — add a guard (Task 4).** Pointing `--add-dir` at the 65 GB oneclaw repo root caused agy to hang for 15–25 min with zero output (agentic traversal blowup). Scoped to a 572 KB subtree it returned in 79 s. The wrapper must **warn when an `--add-dir` target is large** (file-count or du threshold) and the docs must say "scope to the relevant subtree, never the repo root." → see Task 4 amendment + Task 9 gotcha.
+
+3. **agy invocations must be SERIALIZED (new constraint).** agy spawns a local gRPC language-server per call; concurrent invocations contend and hang. This matters for **x-research Max Mode and x-qa parallel runners**, which fan out backends. → Task 9 gotcha + a note for consumers; do **not** dispatch parallel `agy-agent` calls.
+
+4. **Latency is ~2×, not 3–5×; the web/docs-currency gap is real.** Single scoped run: 79 s (agy) vs 37 s (gemini). The 3–5× figure only appears under the two pathologies above (huge `--add-dir`, concurrency). Separately: agy returned the repo's **legacy** event string instead of the current GA one because it trusted the repo over live docs — so `--grounded` (inject "Use Google Search") is **load-bearing for "what's current" questions**, not optional. → fix the gotchas.md latency line; keep `--grounded` (Task 4) and exercise it in Task 10.
+
 ---
 
 ## File Structure
@@ -328,6 +344,13 @@ ARGS+=(--model "$MODEL_RESOLVED")
 for d in "${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}"; do
   if [[ "$d" == -* ]]; then echo "Error: --add-dir path begins with '-' (rejected): $d" >&2; exit 1; fi
   if [[ ! -d "$d" ]]; then echo "Warning: --add-dir not a directory: $d (skipping)" >&2; continue; fi
+  # AMENDMENT (finding #2): a large --add-dir makes agy's traversal hang (15-25min, 0 bytes).
+  # Warn past a threshold; `find|head` bounds the cost so we don't walk a 65GB tree to count it.
+  fcount=$(find "$d" -type f 2>/dev/null | head -n "${X_AGY_ADDDIR_MAX:-2000}" | wc -l | tr -d ' ')
+  if [[ "$fcount" -ge "${X_AGY_ADDDIR_MAX:-2000}" ]]; then
+    echo "[agy-agent] WARNING: --add-dir '$d' has ≥${X_AGY_ADDDIR_MAX:-2000} files — agy may hang on traversal." >&2
+    echo "[agy-agent]   Scope to a specific subtree (e.g. src/<feature>), not a repo root." >&2
+  fi
   ARGS+=(--add-dir "$d")
 done
 
@@ -443,14 +466,19 @@ Create `bin/tests/fixtures/fake-agy`:
 #   FAKE_AGY_MODE=empty   -> print nothing, exit 0 (agy's "exit-0 lies" failure)
 #   FAKE_AGY_MODE=chrome  -> print response + "### Work Summary" block, exit 0
 #   FAKE_AGY_MODE=authlog -> empty stdout, write 'not authenticated' to --log-file, exit 0
+#   FAKE_AGY_MODE=noiselog-> empty stdout, write the REAL always-present auth NOISE (appears on
+#                            success too) to --log-file, exit 0 — regression guard for finding #1
 # Recognizes -p, --model, --log-file; ignores the rest.
 LOG=""
 while [[ $# -gt 0 ]]; do case "$1" in --log-file) LOG="$2"; shift 2;; *) shift;; esac; done
 case "${FAKE_AGY_MODE:-ok}" in
-  ok)      printf 'PONG\n' ;;
-  empty)   : ;;
-  chrome)  printf 'PONG\n\n### Work Summary\n* did a thing\n' ;;
-  authlog) [[ -n "$LOG" ]] && echo 'error: not authenticated' > "$LOG" ;;
+  ok)       printf 'PONG\n' ;;
+  empty)    : ;;
+  chrome)   printf 'PONG\n\n### Work Summary\n* did a thing\n' ;;
+  authlog)  [[ -n "$LOG" ]] && echo 'error: not authenticated' > "$LOG" ;;
+  noiselog) [[ -n "$LOG" ]] && printf '%s\n%s\n' \
+              'W log_context.go:117] Cache(loadCodeAssistResponse): Singleflight refresh failed: error getting token source: You are not logged into Antigravity.' \
+              'W client.go:81] failed to set auth token' > "$LOG" ;;
 esac
 exit 0
 ```
@@ -474,7 +502,15 @@ assert_eq "empty -> non-zero exit" "1" "$rc"
 # authlog -> non-zero + stderr classifies as auth
 err=$(FAKE_AGY_MODE=authlog run_live "ping" 2>&1 >/dev/null); rc=$?
 assert_eq "authlog -> non-zero" "1" "$rc"
-assert_contains "auth classified" "auth" "$err"
+assert_contains "auth classified" "auth_error" "$err"
+
+# REGRESSION (finding #1): the always-present auth NOISE must NOT be classified as auth.
+# noiselog writes the same lines agy emits on SUCCESS — empty stdout here means a generic
+# failure, and the classifier must say empty_output, never auth_error.
+err=$(FAKE_AGY_MODE=noiselog run_live "ping" 2>&1 >/dev/null); rc=$?
+assert_eq "noiselog -> non-zero" "1" "$rc"
+assert_contains "noise -> empty_output" "status=empty_output" "$err"
+assert_eq "noise NOT auth" "0" "$([[ "$err" == *"auth_error"* ]] && echo 1 || echo 0)"
 
 # chrome stripping is opt-in: default keeps it, X_AGY_STRIP_SUMMARY=1 removes it
 out=$(FAKE_AGY_MODE=chrome run_live "ping" 2>/dev/null)
@@ -526,9 +562,15 @@ if [[ "$RAW_EXIT" -eq 124 ]]; then
   STATUS="timeout"; SYNTH_EXIT=124
 elif [[ -z "$STRIPPED" ]]; then
   SYNTH_EXIT=1
-  if grep -qiE 'auth|sign.?in|unauthor|credential' "$RUN_LOG" "$ERR_TMP" 2>/dev/null; then STATUS="auth_error"
-  elif grep -qiE 'quota|exhaust|rate.?limit|credit' "$RUN_LOG" "$ERR_TMP" 2>/dev/null; then STATUS="quota_error"
-  elif grep -qiE 'PlannerResponse|panic' "$RUN_LOG" "$ERR_TMP" 2>/dev/null; then STATUS="planner_empty"
+  # AMENDMENT (finding #1): agy's log ALWAYS contains "not logged into Antigravity" and
+  # "failed to set auth token" — even on SUCCESSFUL runs (auxiliary admin/experiment caches,
+  # NOT the model-serving path). Verified in the merged research doc Part 2 (§8/§14). So those
+  # strings are NOISE, not auth signal. Strip the known-noise lines first, check quota/planner
+  # before auth, and only call it auth on a specific serving-path marker.
+  diag="$(grep -ivE 'not logged into Antigravity|failed to set auth token|loadCodeAssistResponse|fetchAdminControls|ListExperiments|availableModels|Singleflight' "$RUN_LOG" "$ERR_TMP" 2>/dev/null)"
+  if   grep -qiE 'quota|exhaust|rate.?limit|credit' <<<"$diag"; then STATUS="quota_error"
+  elif grep -qiE 'PlannerResponse|panic' <<<"$diag"; then STATUS="planner_empty"
+  elif grep -qiE 'not authenticated|unauthor|invalid.{0,3}token|token expired|sign.?in required|403' <<<"$diag"; then STATUS="auth_error"
   else STATUS="empty_output"; fi
 elif [[ "$RAW_EXIT" -ne 0 ]]; then
   STATUS="error_exit_${RAW_EXIT}"; SYNTH_EXIT="$RAW_EXIT"
@@ -718,8 +760,11 @@ x-gemini has two interchangeable backends. The wrappers share a flag surface (`-
 - **No JSON.** agy print mode is plain text; there is no `--json`/`--output-format`. `agy-agent` emits the text directly.
 - **Exit 0 lies.** agy exits 0 even on auth/quota/empty failures. `agy-agent` re-derives a real exit code from empty-stdout + `--log-file` tail; trust the wrapper's exit code, not agy's.
 - **trustedWorkspaces.** agy hangs on a trust prompt for untrusted dirs in non-TTY. `agy-agent` preflights and warns; set `X_AGY_AUTO_TRUST=1` to auto-append CWD.
-- **Grounding is prompt-driven** (no flag). Pass `--grounded` to inject the directive.
-- **Latency** ~3–5× the gemini wrapper for grounded/agentic runs; route bulk work to `--model flash-low`.
+- **Grounding is prompt-driven** (no flag) AND load-bearing for currency. Without `--grounded`, agy trusts the repo over live docs and will return stale identifiers (verified: it returned a *legacy* OpenAI event the repo still contained instead of the current GA one). Pass `--grounded` for any "what's current / latest version" question.
+- **Never `--add-dir` a large tree.** Pointing it at a repo root (e.g. a 65 GB monorepo with node_modules/build/vendored checkouts) makes agy's agentic traversal hang for 15–25 min with zero output. Scope to the relevant subtree(s) — a 572 KB scope returned in 79 s. `agy-agent` warns when a target looks large.
+- **Serialize agy calls.** agy spawns a local gRPC language-server per invocation; concurrent calls contend and hang. Consumers that fan out (x-research Max Mode, x-qa parallel runners) MUST run agy lanes sequentially, not in parallel.
+- **Auth noise in the log is NOT an auth failure.** Every run's log contains `not logged into Antigravity` / `failed to set auth token` (auxiliary caches), even on success. Don't classify on it; trust `agy-agent`'s status, which strips this noise.
+- **Latency** ~2× the gemini wrapper for a single scoped grounded run (≈79 s vs ≈37 s) — NOT 3–5×. The 3–5× only appears under the two pathologies above (huge `--add-dir`, concurrency). Route bulk work to `--model flash-low`.
 ```
 
 - [ ] **Step 3: capability-loading.md — register `agy_cli`** in the capability list/schema and add the fallback row:
@@ -777,6 +822,8 @@ git commit -m "docs(research): agy consumer-validation results + cutover trigger
 
 **Known open item (flagged, not a placeholder):** capturing a conversation **id** from a headless `-p` run is unverified (research doc §7). `--resume` (latest, via `-c`) works; explicit `--conversation <id>` is wired but id-capture is a follow-up probe — not blocking, because `-c` covers the multi-turn case. T10 can add an id-capture probe if a consumer needs it.
 
-**Type/flag consistency:** env knobs are uniform `X_AGY_*` (`X_AGY_DRY_RUN`, `X_AGY_NO_LOG`, `X_AGY_DEFAULT_MODEL`, `X_AGY_AUTO_TRUST`, `X_AGY_STRIP_SUMMARY`, `AGY_TIMEOUT`); model aliases identical across T3 map and T9 docs; `resolve_model()` named consistently; fake-agy modes (`ok/empty/chrome/authlog`) match the T6 assertions.
+**Type/flag consistency:** env knobs are uniform `X_AGY_*` (`X_AGY_DRY_RUN`, `X_AGY_NO_LOG`, `X_AGY_DEFAULT_MODEL`, `X_AGY_AUTO_TRUST`, `X_AGY_STRIP_SUMMARY`, `X_AGY_ADDDIR_MAX`, `AGY_TIMEOUT`); model aliases identical across T3 map and T9 docs; `resolve_model()` named consistently; fake-agy modes (`ok/empty/chrome/authlog/noiselog`) match the T6 assertions.
+
+**Eval-harness amendments (2026-06-06):** the four findings from the merged research doc Part 2 (§12–15) are integrated — classifier auth-noise bug fixed + regression-tested (T6 `noiselog`), large-`--add-dir` guard (T4), serialization + currency + latency gotchas (T9). See the "Findings & Amendments" section near the top.
 
 **Placeholder scan:** none — every code step is complete and copy-pasteable.
