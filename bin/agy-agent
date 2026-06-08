@@ -122,6 +122,30 @@ fi
 [[ "$SANDBOX" -eq 1 ]] && ARGS+=(--sandbox)
 [[ "$YOLO" -eq 1 ]]    && ARGS+=(--dangerously-skip-permissions)
 
+# --- trustedWorkspaces preflight (avoids interactive trust-prompt hang) ---
+AGY_SETTINGS="${HOME}/.gemini/antigravity-cli/settings.json"
+is_trusted() { # $1 = absolute path
+  [[ -f "$AGY_SETTINGS" ]] || return 1
+  command -v jq &>/dev/null || return 0   # can't check without jq -> assume ok, don't block
+  jq -e --arg p "$1" '(.trustedWorkspaces // []) | index($p)' "$AGY_SETTINGS" >/dev/null 2>&1
+}
+# Check BOTH the logical ($PWD) and physical (pwd -P) CWD. On macOS /tmp is a
+# symlink to /private/tmp, so `pwd -P` canonicalizes it — and agy may store
+# either form in trustedWorkspaces. Matching either avoids a spurious warning
+# (and makes the T5 "trusted is silent" assertion pass on darwin).
+CWD_ABS="$(pwd -P)"
+if ! is_trusted "$PWD" && ! is_trusted "$CWD_ABS"; then
+  if [[ "${X_AGY_AUTO_TRUST:-0}" == "1" && -w "$AGY_SETTINGS" ]]; then
+    tmp="$(mktemp)"; jq --arg p "$CWD_ABS" '.trustedWorkspaces = ((.trustedWorkspaces // []) + [$p] | unique)' \
+      "$AGY_SETTINGS" > "$tmp" 2>/dev/null && mv "$tmp" "$AGY_SETTINGS" \
+      && echo "[agy-agent] auto-trusted workspace: $CWD_ABS" >&2
+  else
+    echo "[agy-agent] WARNING: '$CWD_ABS' is not a trusted workspace in $AGY_SETTINGS." >&2
+    echo "[agy-agent]   agy may hang on an interactive trust prompt. Fix: add the path to trustedWorkspaces," >&2
+    echo "[agy-agent]   or re-run with X_AGY_AUTO_TRUST=1 to append it automatically." >&2
+  fi
+fi
+
 if [[ "${X_AGY_DRY_RUN:-0}" == "1" ]]; then
   printf 'agy\n'; printf '%s\n' "${ARGS[@]}"   # one arg per line — stable, escape-free test assertions
   exit 0

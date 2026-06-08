@@ -48,4 +48,16 @@ sys=$(mktemp); printf 'You are terse.' > "$sys"
 assert_contains "system prepend" 'You are terse.'               "$(run_dry --system "$sys" 'hi')"
 rm -f "$sys"
 
+# T5 trust preflight warns (to stderr) when CWD not trusted; never blocks dry-run
+fakehome=$(mktemp -d); mkdir -p "$fakehome/.gemini/antigravity-cli"
+echo '{"trustedWorkspaces":[]}' > "$fakehome/.gemini/antigravity-cli/settings.json"
+err=$(cd /tmp && HOME="$fakehome" X_AGY_DRY_RUN=1 "$AGY_AGENT" x 2>&1 >/dev/null)
+assert_contains "untrusted warns" "not a trusted workspace" "$err"
+# trusted CWD -> no warning. NB: the wrapper checks BOTH $PWD (logical "/tmp")
+# and pwd -P (physical "/private/tmp" on macOS), so seeding the logical path matches.
+echo "{\"trustedWorkspaces\":[\"/tmp\"]}" > "$fakehome/.gemini/antigravity-cli/settings.json"
+err=$(cd /tmp && HOME="$fakehome" X_AGY_DRY_RUN=1 "$AGY_AGENT" x 2>&1 >/dev/null)
+assert_eq "trusted is silent" "" "$err"
+rm -rf "$fakehome"
+
 echo "---"; echo "PASS=$PASS FAIL=$FAIL"; [[ $FAIL -eq 0 ]]
