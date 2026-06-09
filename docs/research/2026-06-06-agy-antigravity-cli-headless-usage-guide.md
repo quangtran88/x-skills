@@ -244,6 +244,24 @@ Task 10 smoke of the migrated `agy-agent` backend against the three consumer sig
 
 **Concern (recorded, not blocking):** agy's serving path was unreachable at validation time, so the three signal classes could NOT be positively confirmed in this session. Per the no-loop / no-block discipline this is recorded honestly and the migration proceeds — the wrapper's failure-detection (empty-stdout + log-tail → synthesized exit code) is the safety net and it fired correctly. **Re-run the three calls once agy serving recovers** to confirm grounded URLs, chrome absence, and bare-JSON parseability before fanning the migration out to the parallel consumers (x-research Task 12, x-qa Task 13).
 
+## Validation results (2026-06-09) — RESOLVED (successful re-run)
+
+agy serving recovered (a bounded smoke returned `PONG` in 8 s, `status=success`). The three Task 10 signal classes were re-run **serially** (one agy process at a time) and **all positively confirmed** — superseding the 2026-06-08 outage's open item. Latency/output are real observed values.
+
+| Signal class | Command | Latency | Usable? | Grounding cited URLs? | `### Work Summary` chrome? | Parseable bare JSON? |
+|---|---|---|---|---|---|---|
+| library-current-state (x-research / x-guide) | `agy-agent --model flash-low --grounded "…zod… latest version + cite URLs"` | 23 s | ✅ | ✅ **real URLs** (npmjs.com, socket.dev, github.com/colinhacks/zod); zod `4.4.3`, May 4 2026 | none | n/a |
+| multi-file review (x-review / x-bugfix) | `agy-agent --model flash --add-dir skills/x-gemini "top 3 risks as FILE:LINE"` | 41 s | ✅ FILE:LINE output | n/a | none | n/a |
+| multi-file review — pro tier | `agy-agent --model pro --add-dir skills/x-gemini "top 3 risks as FILE:LINE"` | **105 s** (1st attempt hit a 240 s cap → wrapper correctly synthesized `status=timeout`/124; retry at 420 s cap succeeded) | ✅ FILE:LINE output | n/a | none | n/a |
+| pass/fail judge (x-qa eval) | `agy-agent --model flash "Reply with ONLY this JSON: {\"score\": 0.9}"` | 8 s | ✅ | n/a | none | ✅ bare `{"score": 0.9}` (no `--raw` needed) |
+
+**Findings:**
+- **Grounding works and is current** — `--grounded` cited live, real URLs and the current zod version. Confirms `--grounded` is the right lever for "what's current" questions.
+- **No chrome** — no `### Work Summary` block appeared in any response; the judge emitted bare parseable JSON, so the x-qa plain-text passthrough (Task 13, `--raw` dropped) is parse-safe.
+- **Failure-detector validated for real** — the first `pro --add-dir` attempt timed out at a 240 s cap and the wrapper correctly synthesized `status=timeout`/exit 124; the retry succeeded. So `pro`+`--add-dir` has high/variable latency: **use `AGY_TIMEOUT` ≥ 300 s for pro+add-dir** (the wrapper default 600 s is fine — do not cap pro lanes below ~300 s).
+- **`--add-dir` widens visibility, it does not sandbox** — pointed at `skills/x-gemini`, the agent still roamed the workspace CWD and returned risks in `bin/agy-agent`. Keep the large-tree guard in mind (never point `--add-dir` at a repo root).
+- **Latency profile:** flash/flash-low 8–42 s, grounded 23 s, pro+add-dir ~105 s. Route bulk/routine work to the flash tier; reserve `pro` for genuine reasoning depth.
+
 ### Replacement status
 - `agy` is the SOLE Google-model backend. `gemini-agent` + `gemini_cli` are removed (Task 14).
 - Re-pin model aliases if `agy models` changes the display strings (re-run `agy models`; update Task 3's `resolve_model` + the x-gemini table).
