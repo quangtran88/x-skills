@@ -7,6 +7,7 @@
 - **READ COMPLETELY** before acting
 - **NEVER** act on step 3 until ALL reviewers complete (or fail with output assessed) and results are collected (pre-loading the step file while waiting is acceptable)
 - OMO agents run via **Bash** (path from `config.json` → `omo_agent`), NOT via Agent tool
+- Code-reviewer inherits the parent session model: pass `model: "<parent session model>"` explicitly — the agent's frontmatter pins opus, so omitting `model` silently falls back to opus
 - Launch all reviewers in ONE message for true parallelism
 - Wait for ALL background notifications before proceeding
 
@@ -31,7 +32,7 @@ The caller (typically `x-do` for research-produced plans, trivial impls, or mech
 
 Launch these 4 in ONE message (3 when `gemini_cli` capability is NOT pinned). **Dispatch the Agent code-reviewer even if your parent context is already opus** — a separate context window catches what the current context misses, and self-grep does not substitute for it.
 
-1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective. Prepend the Scope Guard above.
+1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "<parent session model>"`, `run_in_background: true` — Claude perspective. Prepend the Scope Guard above.
 2. **Bash tool:** `<omo_agent from config.json> --model gpt "<SCOPE_GUARD>\n\nYou are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: false assumptions in the plan, missing dependencies, ambiguous success criteria, verification gaps. Do NOT propose new features, alternative architectures, or scope additions."`, `run_in_background: true`, `timeout: 600000` — GPT-5.5 blocker-finder (OKAY/REJECT verdict). *Replaces the UNAVAILABLE `momus` role agent — see `../../x-omo/gotchas.md`.*
 3. **Bash tool:** `gemini-agent --model pro "<SCOPE_GUARD>\n\nYou are a plan blocker-finder. Review the plan at <plan-path>. Return at most 3 blockers ranked by severity, then OKAY or REJECT. Focus on: false assumptions in the plan (especially library/API claims you can verify via Google Search), missing dependencies, ambiguous success criteria, verification gaps. Do NOT propose new features, alternative architectures, or scope additions."`, `run_in_background: true`, `timeout: 600000` — Gemini-3-pro plan blocker-finder. Strengths: Google Search grounding catches stale library claims / removed APIs / outdated framework guidance in the plan that Claude+GPT miss; 1M context handles plan + linked specs in one pass. **Skip this lane only if `gemini_cli` capability is NOT pinned** (per `../../x-shared/capability-loading.md`); note the skip in synthesis.
 4. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow. Prepend the Scope Guard.
@@ -43,7 +44,7 @@ For architecture-sensitive plans, add a 4th reviewer **only if the user explicit
 
 Launch these 4 in ONE message — all tool calls in a single response, not sequential messages. **Every prompt below MUST start with the Scope Guard block from the top of this file.**
 
-1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "opus"`, `run_in_background: true` — Claude perspective. Prepend Scope Guard.
+1. **Agent tool:** `subagent_type: "oh-my-claudecode:code-reviewer"`, `model: "<parent session model>"`, `run_in_background: true` — Claude perspective. Prepend Scope Guard.
 2. **Bash tool:** `<omo_agent from config.json> oracle "<SCOPE_GUARD>\n\n<review prompt with diff/file content>"`, `run_in_background: true`, `timeout: 600000` — GPT perspective
 3. **Bash tool:** `gemini-agent --model pro "<SCOPE_GUARD>\n\n<review prompt with diff/file content>"`, `run_in_background: true`, `timeout: 600000` — Gemini perspective. Strengths: native Google Search grounding (catches CVE / library version regressions Claude/GPT miss), 1M context (handles 50+ file diffs without paging), multimodal (handles UI screenshot diffs). **Skip this lane only if `gemini_cli` capability is NOT pinned** (per `../../x-shared/capability-loading.md`); note the skip in synthesis.
 4. **Skill tool:** `superpowers:requesting-code-review` — structured review workflow. Prepend Scope Guard to the request.
@@ -51,7 +52,7 @@ Launch these 4 in ONE message — all tool calls in a single response, not seque
 **Example — correct (one message, four tool calls):**
 ```
 [assistant response]
-  Tool: Agent(subagent_type="oh-my-claudecode:code-reviewer", model="opus", run_in_background=true, prompt="...")
+  Tool: Agent(subagent_type="oh-my-claudecode:code-reviewer", model="<parent session model>", run_in_background=true, prompt="...")
   Tool: Bash(command="<omo_agent from config.json> oracle '...'", run_in_background=true, timeout=600000)
   Tool: Bash(command="gemini-agent --model pro '...'", run_in_background=true, timeout=600000)
   Tool: Skill(skill="superpowers:requesting-code-review")
@@ -90,7 +91,7 @@ If an OMO agent times out (exit code 124) or fails:
 
 ## Completion Checklist (ALL required before proceeding)
 
-- [ ] code-reviewer (Agent tool, opus, `run_in_background: true`) — result collected
+- [ ] code-reviewer (Agent tool, parent session model, `run_in_background: true`) — result collected
 - [ ] oracle (Bash tool, `omo-agent oracle`, `run_in_background: true`) — result collected OR failure handled (partial output assessed, gap noted)
 - [ ] gemini-agent --model pro (Bash tool, `run_in_background: true`) — result collected OR `gemini_cli` capability not pinned (skip noted in synthesis) OR failure handled
 - [ ] `superpowers:requesting-code-review` (Skill tool) — structured review workflow result collected
