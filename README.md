@@ -12,7 +12,7 @@ All dependencies are optional. Skills degrade gracefully to Claude-only mode whe
 /reload-plugins
 ```
 
-Then run setup to configure the bindings (omo-agent, gemini-agent) and detect available dependencies:
+Then run setup to configure the bindings (omo-agent, agy-agent) and detect available dependencies:
 
 ```
 /x-skills:setup
@@ -21,7 +21,7 @@ Then run setup to configure the bindings (omo-agent, gemini-agent) and detect av
 ### Upgrading
 
 **After every plugin upgrade, re-run `/x-skills:setup`.** It refreshes:
-- Symlinks (`~/.local/bin/omo-agent`, `~/.local/bin/gemini-agent`) to point at the new plugin cache
+- Symlinks (`~/.local/bin/omo-agent`, `~/.local/bin/agy-agent`) to point at the new plugin cache
 - `~/.config/x-skills/capabilities.json` (new fields appear with each release)
 - Detection of newly-supported dependencies (e.g. v1.4.0 added `gemini` CLI detection for the `x-gemini` skill)
 

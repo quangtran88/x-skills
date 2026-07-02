@@ -41,7 +41,7 @@ def truthy: . == true or . == "partial" or . == "full";
   (.capabilities.opencode             | select(truthy) | "opencode"),
   (.capabilities.omo_plugin           | select(truthy) | "omo_plugin"),
   (.capabilities.omo_mode_all         | select(truthy) | "omo_mode_all"),
-  (.capabilities.gemini_cli           | select(truthy) | "gemini_cli"),
+  (.capabilities.agy_cli              | select(truthy) | "agy_cli"),
   (.capabilities.mcp.perplexity       | select(truthy) | "mcp.perplexity"),
   (.capabilities.mcp.deepwiki         | select(truthy) | "mcp.deepwiki"),
   (.capabilities.mcp.exa              | select(truthy) | "mcp.exa"),

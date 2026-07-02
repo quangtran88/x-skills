@@ -4,7 +4,7 @@ Decision matrix for picking the ingest route. Step 2 quotes the routing tree; th
 
 ## Decision Matrix
 
-| input.type | size_estimate | gemini_cli active | mcp.{perplexity,exa,deepwiki} active | Route |
+| input.type | size_estimate | agy_cli active | mcp.{perplexity,exa,deepwiki} active | Route |
 |---|---|---|---|---|
 | `vague` | n/a | any | any (≥1 helps) | x-research |
 | `file` / `dir` / `url` / `paste` | ≤ 50k tokens | any | any | Claude direct |
@@ -33,7 +33,7 @@ Per `../../x-shared/capability-loading.md`. Read once at session start from the 
 
 | Capability | Used for | Fallback when missing |
 |---|---|---|
-| `gemini_cli` | x-gemini ingest of large input | Claude direct; warn if size > 150k |
+| `agy_cli` | x-gemini ingest of large input | Claude direct; warn if size > 150k |
 | `mcp.perplexity` / `mcp.exa` / `mcp.deepwiki` | x-research vague-target lanes (web sources) | x-research falls back to repo-only Agent(Explore) lanes |
 | `omo_plugin` + `oracle` | Optional `q deep` accuracy cross-check (Phase 4) | Skip cross-check, note in part footer |
 

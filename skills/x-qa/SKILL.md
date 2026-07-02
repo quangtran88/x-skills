@@ -1,6 +1,6 @@
 ---
 name: x-qa
-description: Use when the user wants end-to-end QA testing for a feature, branch, or PR — scans the project for entry points, generates a TEST_PLAN.md with edge cases, launches the service in an isolated container, and dispatches parallel test runners (cheap gemini for simple HTTP cases, claude for complex flows). Profile-driven: `init` once, then `run` repeatedly.
+description: Use when the user wants end-to-end QA testing for a feature, branch, or PR — scans the project for entry points, generates a TEST_PLAN.md with edge cases, launches the service in an isolated container, and dispatches test runners (cheap agy for simple HTTP cases, claude for complex flows). Profile-driven: `init` once, then `run` repeatedly.
 ---
 
 # x-qa — Profile-Driven E2E QA Orchestrator
@@ -18,7 +18,7 @@ add new user-facing flags for input source — the classifier handles it.
 Before any subcommand:
 
 1. Pin capabilities per `../x-shared/capability-loading.md`.
-2. Read `../x-omo/SKILL.md` if `gemini_cli` or `plugin.omc` capability is pinned (needed for fanout).
+2. Read `../x-omo/SKILL.md` if `agy_cli` or `plugin.omc` capability is pinned (needed for fanout).
 3. Read `gotchas.md` for known failure modes.
 4. Resolve repo root: `git rev-parse --show-toplevel`. Refuse outside a git repo.
 5. **Pin runner pair (D10)** — derive `X_QA_SIMPLE_RUNNER` and `X_QA_COMPLEX_RUNNER` from the Capability Routing table below and export them for downstream phases. The runner template in `references/case-runner-prompts.md` reads these env vars rather than hardcoding a tool name.
@@ -61,12 +61,14 @@ across repos). Tarball export/import was cut as redundant with git.
 
 | Pinned | Simple Runner | Complex Runner |
 |---|---|---|
-| `gemini_cli + plugin.omc` | x-gemini bg | Agent oh-my-claudecode:qa-tester (sonnet) bg |
-| `gemini_cli` only | x-gemini bg | Agent Explore (sonnet) bg |
+| `agy_cli + plugin.omc` | x-gemini (agy) **serial** | Agent oh-my-claudecode:qa-tester (sonnet) bg |
+| `agy_cli` only | x-gemini (agy) **serial** | Agent Explore (sonnet) bg |
 | `plugin.omc` only | Agent oh-my-claudecode:executor (haiku) bg | Agent oh-my-claudecode:qa-tester (sonnet) bg |
 | neither | Agent Explore (haiku) bg | Agent Explore (sonnet) bg |
 
 The bootstrap step pins the runner pair into env vars `X_QA_SIMPLE_RUNNER` and `X_QA_COMPLEX_RUNNER` (read by `case-runner-prompts.md`). Never hardcode an `Agent` subagent_type in the runner template — always reference the pinned env var.
+
+**Serial-agy rule (MANDATORY).** When `X_QA_SIMPLE_RUNNER` is the `agy-agent` (x-gemini) runner, simple-runner cases MUST be dispatched **one at a time** — effective `--max-bg 1` for the agy runner — because concurrent `agy` processes hang (agy is a process-global singleton). The parallel-wave fanout (`--max-bg`) stays in effect for the **non-agy fallback simple runners** (OMC executor / Explore) and for **all complex runners** (qa-tester / Explore). The cap is on **concurrent agy processes (≤1)**, not on the wave: complex cases and non-agy simple cases in the same wave still run in parallel; only the agy simple cases serialize among themselves.
 
 ### Exploratory Team Routing (Arc C)
 
@@ -172,7 +174,7 @@ Refer to:
 8. Launch service via `scripts/launch-entry-point.sh` (skipped on `--no-launch` or `--service <ext-url>`).
 9. Health wait via `scripts/health-wait.sh`.
 10. Classify cases per `references/classification-rules.md` (simple vs complex).
-11. **Compute dispatch waves.** Pipe plan JSON through `scripts/lib/topo-order.sh`. Refuse plan on cycle (exit 2) or unknown dependency id (exit 1). Each wave dispatches in parallel (capped at `--max-bg`); the next wave starts when every case in the current wave reaches terminal state. Cases whose deps failed are marked `skipped`, not `fail`. Templates in `references/case-runner-prompts.md`. Each case's full precondition chain is pre-resolved by `scripts/run/resolve-preconditions.sh` (depth cap 4) into `X_QA_PRECONDITION_STEPS` before dispatch.
+11. **Compute dispatch waves.** Pipe plan JSON through `scripts/lib/topo-order.sh`. Refuse plan on cycle (exit 2) or unknown dependency id (exit 1). Each wave dispatches in parallel (capped at `--max-bg`); the next wave starts when every case in the current wave reaches terminal state. **Exception — serial agy:** if `X_QA_SIMPLE_RUNNER` is the `agy-agent` runner, the simple cases in a wave are dispatched **one at a time** (effective `--max-bg 1` for the agy runner — concurrent agy processes hang); see "Serial-agy rule" under Capability Routing. Non-agy simple runners and the complex runner keep the parallel `--max-bg` fanout. Cases whose deps failed are marked `skipped`, not `fail`. Templates in `references/case-runner-prompts.md`. Each case's full precondition chain is pre-resolved by `scripts/run/resolve-preconditions.sh` (depth cap 4) into `X_QA_PRECONDITION_STEPS` before dispatch.
 
     **Background-execution gate (CI vs local).** Dispatch is `run_in_background: true` only when the environment looks interactive (`[[ -z "$CI" && -z "$GITHUB_ACTIONS" && -z "$BUILDKITE" && -z "$GITLAB_CI" ]]`). In CI, dispatch synchronously so the runner's stdout/stderr land in the build log and the run does not complete before agents finish. The `--no-bg` flag forces synchronous dispatch unconditionally.
 12. Collect every dispatch terminal state (mandatory per `~/.claude/rules/background-agents.md`). Never `background_cancel(all=true)` before collection.
@@ -216,8 +218,8 @@ Confirmed exploratory findings (`EXPLORE_CONFIRMED > 0`) are also offered to `/x
 ## Dependencies
 
 - `../x-shared/capability-loading.md`, `invocation-guide.md`, `context-envelope.md`
-- `../x-omo/SKILL.md` (if gemini_cli/plugin.omc pinned)
-- `../x-gemini/SKILL.md` (if gemini_cli pinned)
+- `../x-omo/SKILL.md` (if agy_cli/plugin.omc pinned)
+- `../x-gemini/SKILL.md` (if agy_cli pinned)
 
 ## Gotchas
 

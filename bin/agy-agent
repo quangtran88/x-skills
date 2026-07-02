@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+# agy-agent — wrapper for Google Antigravity CLI (agy) headless mode.
+# Headless Google-model backend for x-skills. Spec: docs/research/2026-06-06-agy-antigravity-cli-headless-usage-guide.md
+#
+# Usage:
+#   agy-agent "<prompt>"                       # default model (flash)
+#   agy-agent --model pro "<prompt>"           # Gemini 3.1 Pro (High)
+#   agy-agent --add-dir /abs/dir "<prompt>"    # mount dir into workspace
+#   agy-agent --resume "<follow-up>"           # continue latest conversation (-c)
+#   agy-agent --conversation <id> "<prompt>"   # resume a specific conversation
+#   agy-agent --grounded "<prompt>"            # inject "Use Google Search"
+#   agy-agent --system /abs/sys.md "<prompt>"  # emulate system prompt (prepend)
+#   agy-agent --sandbox / --yolo / --raw       # passthrough / output modes
+set -uo pipefail
+
+# UTF-8 locale so ${var: -N} counts chars not bytes (lifted from gemini-agent).
+if [[ -z "${LC_ALL:-}" || "${LC_ALL%%.*}" == "C" ]]; then
+  for _loc in C.UTF-8 en_US.UTF-8 C.utf8 en_US.utf8; do
+    if locale -a 2>/dev/null | grep -qiE "^${_loc//./\\.}$"; then export LC_ALL="$_loc"; break; fi
+  done
+  unset _loc
+fi
+
+# --- Defaults ---
+MODEL="${X_AGY_DEFAULT_MODEL:-}"
+SYSTEM_MD=""
+EXTRA_DIRS=()
+RESUME=""          # "" | "latest" | "<id>"
+GROUNDED=0
+YOLO=0
+SANDBOX=0
+RAW=0
+
+# --- Parse args ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --model|-m)        [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; MODEL="$2"; shift 2 ;;
+    --model=*)         MODEL="${1#--model=}"; shift ;;
+    --system)          [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; SYSTEM_MD="$2"; shift 2 ;;
+    --system=*)        SYSTEM_MD="${1#--system=}"; shift ;;
+    --add-dir|--dir)   [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; EXTRA_DIRS+=("$2"); shift 2 ;;
+    --add-dir=*)       EXTRA_DIRS+=("${1#--add-dir=}"); shift ;;
+    --resume|-r)       RESUME="latest"; shift ;;
+    --conversation)    [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; RESUME="$2"; shift 2 ;;
+    --conversation=*)  RESUME="${1#--conversation=}"; shift ;;
+    --grounded)        GROUNDED=1; shift ;;
+    --yolo)            YOLO=1; shift ;;
+    --sandbox)         SANDBOX=1; shift ;;
+    --raw)             RAW=1; shift ;;
+    --help|-h)         sed -n '2,18p' "$0" | sed 's/^# //; s/^#//'; exit 0 ;;
+    -*) echo "Error: Unknown flag: $1" >&2; exit 1 ;;
+    *)  break ;;
+  esac
+done
+
+PROMPT="${*:-}"
+if [[ -z "$PROMPT" ]]; then
+  echo "Error: prompt required" >&2
+  echo "Usage: agy-agent [--model pro|flash|...] [--add-dir DIR] [--resume] [--grounded] [--system FILE] \"<prompt>\"" >&2
+  exit 1
+fi
+
+# --- Verify agy CLI (skipped under dry-run: dry-run never execs agy, so the
+# offline tests T2–T5 must not require agy on PATH — fixes "No network, no real agy") ---
+if [[ "${X_AGY_DRY_RUN:-0}" != "1" ]] && ! command -v agy &>/dev/null; then
+  echo "Error: agy CLI not found on PATH" >&2
+  echo "Install: https://antigravity.google/cli  (or run /x-skills:setup)" >&2
+  exit 1
+fi
+
+# --- Resolve model alias to agy's exact display string (verified via `agy models`) ---
+resolve_model() {
+  case "$1" in
+    ""|flash|flash-medium) echo "Gemini 3.5 Flash (Medium)" ;;
+    flash-low)             echo "Gemini 3.5 Flash (Low)" ;;
+    flash-high)            echo "Gemini 3.5 Flash (High)" ;;
+    pro|pro-high)          echo "Gemini 3.1 Pro (High)" ;;
+    pro-low)               echo "Gemini 3.1 Pro (Low)" ;;
+    claude-sonnet)         echo "Claude Sonnet 4.6 (Thinking)" ;;
+    claude-opus)           echo "Claude Opus 4.6 (Thinking)" ;;
+    gpt-oss)               echo "GPT-OSS 120B (Medium)" ;;
+    *)                     echo "$1" ;;   # passthrough: already an agy display string
+  esac
+}
+# --- Assemble final prompt (system prepend + grounding directive) ---
+if [[ -n "$SYSTEM_MD" ]]; then
+  if [[ ! -f "$SYSTEM_MD" ]]; then echo "Error: system prompt file not found: $SYSTEM_MD" >&2; exit 1; fi
+  PROMPT="$(cat "$SYSTEM_MD")"$'\n\n---\n\n'"$PROMPT"
+fi
+if [[ "$GROUNDED" -eq 1 ]]; then
+  PROMPT="$PROMPT"$'\n\n(Use Google Search to ground your answer in current sources and cite URLs.)'
+fi
+
+MODEL_RESOLVED="$(resolve_model "$MODEL")"
+
+ARGS=(-p "$PROMPT")
+ARGS+=(--model "$MODEL_RESOLVED")
+
+# --add-dir: validate each path (reject leading '-'; warn+skip missing dirs)
+for d in "${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}"; do
+  if [[ "$d" == -* ]]; then echo "Error: --add-dir path begins with '-' (rejected): $d" >&2; exit 1; fi
+  if [[ ! -d "$d" ]]; then echo "Warning: --add-dir not a directory: $d (skipping)" >&2; continue; fi
+  # AMENDMENT (finding #2): a large --add-dir makes agy's traversal hang (15-25min, 0 bytes).
+  # Warn past a threshold; `find|head` bounds the cost so we don't walk a 65GB tree to count it.
+  fcount=$(find "$d" -type f 2>/dev/null | head -n "${X_AGY_ADDDIR_MAX:-2000}" | wc -l | tr -d ' ')
+  if [[ "$fcount" -ge "${X_AGY_ADDDIR_MAX:-2000}" ]]; then
+    echo "[agy-agent] WARNING: --add-dir '$d' has ≥${X_AGY_ADDDIR_MAX:-2000} files — agy may hang on traversal." >&2
+    echo "[agy-agent]   Scope to a specific subtree (e.g. src/<feature>), not a repo root." >&2
+  fi
+  ARGS+=(--add-dir "$d")
+done
+
+# resume: "latest" -> -c ; specific id -> --conversation <id>
+if [[ "$RESUME" == "latest" ]]; then
+  ARGS+=(-c)
+elif [[ -n "$RESUME" ]]; then
+  ARGS+=(--conversation "$RESUME")
+fi
+
+[[ "$SANDBOX" -eq 1 ]] && ARGS+=(--sandbox)
+[[ "$YOLO" -eq 1 ]]    && ARGS+=(--dangerously-skip-permissions)
+
+# --- trustedWorkspaces preflight (avoids interactive trust-prompt hang) ---
+AGY_SETTINGS="${HOME}/.gemini/antigravity-cli/settings.json"
+is_trusted() { # $1 = absolute path
+  [[ -f "$AGY_SETTINGS" ]] || return 1
+  command -v jq &>/dev/null || return 0   # can't check without jq -> assume ok, don't block
+  jq -e --arg p "$1" '(.trustedWorkspaces // []) | index($p)' "$AGY_SETTINGS" >/dev/null 2>&1
+}
+# Check BOTH the logical ($PWD) and physical (pwd -P) CWD. On macOS /tmp is a
+# symlink to /private/tmp, so `pwd -P` canonicalizes it — and agy may store
+# either form in trustedWorkspaces. Matching either avoids a spurious warning
+# (and makes the T5 "trusted is silent" assertion pass on darwin).
+CWD_ABS="$(pwd -P)"
+if ! is_trusted "$PWD" && ! is_trusted "$CWD_ABS"; then
+  if [[ "${X_AGY_AUTO_TRUST:-0}" == "1" && -w "$AGY_SETTINGS" ]]; then
+    tmp="$(mktemp)"; jq --arg p "$CWD_ABS" '.trustedWorkspaces = ((.trustedWorkspaces // []) + [$p] | unique)' \
+      "$AGY_SETTINGS" > "$tmp" 2>/dev/null && mv "$tmp" "$AGY_SETTINGS" \
+      && echo "[agy-agent] auto-trusted workspace: $CWD_ABS" >&2
+  else
+    echo "[agy-agent] WARNING: '$CWD_ABS' is not a trusted workspace in $AGY_SETTINGS." >&2
+    echo "[agy-agent]   agy may hang on an interactive trust prompt. Fix: add the path to trustedWorkspaces," >&2
+    echo "[agy-agent]   or re-run with X_AGY_AUTO_TRUST=1 to append it automatically." >&2
+  fi
+fi
+
+if [[ "${X_AGY_DRY_RUN:-0}" == "1" ]]; then
+  printf 'agy\n'; printf '%s\n' "${ARGS[@]}"   # one arg per line — stable, escape-free test assertions
+  exit 0
+fi
+
+# --- Resolve timeout binary (macOS lacks `timeout` without coreutils) ---
+if command -v timeout &>/dev/null; then TIMEOUT_BIN="timeout"
+elif command -v gtimeout &>/dev/null; then TIMEOUT_BIN="gtimeout"
+else echo "Error: neither 'timeout' nor 'gtimeout' on PATH (brew install coreutils)" >&2; exit 1; fi
+AGY_TIMEOUT="${AGY_TIMEOUT:-600}"
+
+# agy's own run log — used to classify failures (agy exits 0 even on error).
+RUN_LOG="$(mktemp /tmp/agy-agent-runlog-XXXXXXXX)"
+OUT_TMP="$(mktemp /tmp/agy-agent-out-XXXXXXXX)"
+ERR_TMP="$(mktemp /tmp/agy-agent-err-XXXXXXXX)"
+trap 'rm -f "$RUN_LOG" "$OUT_TMP" "$ERR_TMP"' EXIT
+ARGS+=(--log-file "$RUN_LOG" --print-timeout "${AGY_TIMEOUT}s")
+
+LABEL="${MODEL:-flash}"
+START=$(date +%s)
+echo "[agy-agent] started model=$LABEL at $(date +%H:%M:%S) (timeout=${AGY_TIMEOUT}s)" >&2
+
+env -u CLAUDECODE -u CLAUDE_SESSION_ID -u CLAUDECODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT \
+  "$TIMEOUT_BIN" "$AGY_TIMEOUT" agy "${ARGS[@]}" > "$OUT_TMP" 2> "$ERR_TMP"
+RAW_EXIT=$?
+DURATION=$(( $(date +%s) - START ))
+
+# --- Failure detection: agy exits 0 even on failure, so judge by output + log ---
+RESPONSE="$(cat "$OUT_TMP")"
+STRIPPED="${RESPONSE//[$' \t\n\r']/}"   # whitespace-only counts as empty
+STATUS="success"; SYNTH_EXIT=0
+if [[ "$RAW_EXIT" -eq 124 ]]; then
+  STATUS="timeout"; SYNTH_EXIT=124
+elif [[ -z "$STRIPPED" ]]; then
+  SYNTH_EXIT=1
+  # AMENDMENT (finding #1): agy's log ALWAYS contains "not logged into Antigravity" and
+  # "failed to set auth token" — even on SUCCESSFUL runs (auxiliary admin/experiment caches,
+  # NOT the model-serving path). Verified in the merged research doc Part 2 (§8/§14). So those
+  # strings are NOISE, not auth signal. Strip the known-noise lines first, check quota/planner
+  # before auth, and only call it auth on a specific serving-path marker.
+  diag="$(grep -ivEh 'not logged into Antigravity|failed to set auth token|loadCodeAssistResponse|fetchAdminControls|ListExperiments|availableModels|Singleflight' "$RUN_LOG" "$ERR_TMP" 2>/dev/null)"
+  if   grep -qiE 'quota|exhaust|rate.?limit|credit' <<<"$diag"; then STATUS="quota_error"
+  elif grep -qiE 'PlannerResponse|panic' <<<"$diag"; then STATUS="planner_empty"
+  elif grep -qiE 'not authenticated|unauthor|invalid.{0,3}token|token expired|sign.?in required|403' <<<"$diag"; then STATUS="auth_error"
+  else STATUS="empty_output"; fi
+elif [[ "$RAW_EXIT" -ne 0 ]]; then
+  STATUS="error_exit_${RAW_EXIT}"; SYNTH_EXIT="$RAW_EXIT"
+fi
+
+# --- Persist log (0600, user-private) unless disabled (lifted from gemini-agent) ---
+DEBUG_LOG="(disabled)"
+if [[ "${X_AGY_NO_LOG:-0}" != "1" ]]; then
+  TS=$(date +%Y%m%d-%H%M%S)
+  DIR="${XDG_CACHE_HOME:-$HOME/.cache}/x-skills/agy"
+  if mkdir -p "$DIR" 2>/dev/null; then
+    DEBUG_LOG="$DIR/agy-agent-${TS}-${LABEL// /_}.log"
+    if [[ ! -L "$DEBUG_LOG" ]]; then
+      install -m 0600 /dev/null "$DEBUG_LOG" 2>/dev/null && { cat "$OUT_TMP" "$RUN_LOG" > "$DEBUG_LOG" 2>/dev/null; } || DEBUG_LOG="(disabled)"
+    else DEBUG_LOG="(disabled)"; fi
+  fi
+fi
+
+# --- On failure: surface diagnosis, emit summary, exit non-zero ---
+if [[ "$SYNTH_EXIT" -ne 0 ]]; then
+  echo "[agy-agent] FAILED status=${STATUS} (agy raw exit=${RAW_EXIT}; agy exits 0 even on error — judged by empty output + log)" >&2
+  tail -5 "$RUN_LOG" "$ERR_TMP" 2>/dev/null | sed 's/^/[agy-agent]   /' >&2
+  echo "[agy-agent] $LABEL | duration=${DURATION}s | status=${STATUS} | log=${DEBUG_LOG}" >&2
+  exit "$SYNTH_EXIT"
+fi
+
+# --- Success path: optional chrome strip, truncation, emit ---
+if [[ "$RAW" -eq 0 && "${X_AGY_STRIP_SUMMARY:-0}" == "1" ]]; then
+  RESPONSE="${RESPONSE%%$'\n'### Work Summary*}"
+fi
+MAX_CHARS=50000
+if [[ "${#RESPONSE}" -gt "$MAX_CHARS" ]]; then
+  RESPONSE="[agy-agent: truncated — showing tail]"$'\n\n'"${RESPONSE: -$MAX_CHARS}"
+fi
+printf '%s\n' "$RESPONSE"
+echo "[agy-agent] $LABEL | duration=${DURATION}s | status=${STATUS} | log=${DEBUG_LOG}" >&2
+exit 0

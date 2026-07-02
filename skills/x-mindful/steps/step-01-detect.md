@@ -36,7 +36,7 @@ Count the plan content size after light pre-processing (strip code fences when m
 | Large | 30k – 200k | `x-gemini` ingest → return structured items |
 | XL | > 200k | reject and ask user to scope down (per-section, per-feature) |
 
-Capability gating: if `gemini_cli: false` in the pinned capability set, fall back to chunked claude-direct with explicit "depth reduced" note in the final envelope.
+Capability gating: if `agy_cli: false` in the pinned capability set, fall back to chunked claude-direct with explicit "depth reduced" note in the final envelope.
 
 ## Slug + Source ID
 

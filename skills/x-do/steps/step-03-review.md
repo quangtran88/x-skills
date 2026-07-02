@@ -32,7 +32,7 @@ args: <absolute plan path>
 ```
 
 x-review will detect **Target A: Plan/Spec** from the `.md` path and run its plan-mode pipeline:
-1. Cross-model dispatch (Claude `code-reviewer` opus + `--model gpt` blocker-finder + `superpowers:requesting-code-review`; Gemini-pro added if `gemini_cli` capability is pinned)
+1. Cross-model dispatch (Claude `code-reviewer` opus + `--model gpt` blocker-finder + `superpowers:requesting-code-review`; Gemini-pro added if `agy_cli` capability is pinned)
 2. Synthesis filtered by scope (false assumptions, missing deps, ambiguous success criteria, verification gaps)
 3. Returns the `<!-- x-review plan-mode envelope v1 -->` block with verdict + findings counts. No passes menu, no Fix Mode.
 

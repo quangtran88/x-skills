@@ -6,8 +6,8 @@
 #                    Env passed to it: METHOD, URL, BODY. Default: curl (body sent
 #                    only when the case declares a request body).
 #   X_QA_JUDGE_CMD   command reading a judge prompt on stdin, printing {"score":0..1}.
-#                    Default: gemini-agent judge wrapper (temperature handled by wrapper).
-#   X_QA_JUDGE_MODEL judge model id recorded in the result (default "gemini-flash").
+#                    Default: agy-agent judge wrapper (temperature handled by wrapper).
+#   X_QA_JUDGE_MODEL judge model id recorded in the result (default "agy-flash").
 #   X_QA_SAMPLES     default sample count when the case omits one (default 3).
 # stdout: CaseResult JSON (also written to <run-dir>/cases/<id>.json).
 set -euo pipefail
@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do case "$1" in
 esac; done
 [[ -f "$CASE" ]] || { echo "score-case: --case file not found: $CASE" >&2; exit 2; }
 
-JUDGE_MODEL="${X_QA_JUDGE_MODEL:-gemini-flash}"
+JUDGE_MODEL="${X_QA_JUDGE_MODEL:-agy-flash}"
 DEFAULT_SAMPLES="${X_QA_SAMPLES:-3}"
 OUTPUT_CMD="${X_QA_OUTPUT_CMD:-}"
 JUDGE_CMD="${X_QA_JUDGE_CMD:-}"
@@ -78,7 +78,7 @@ run_output() { # prints one SUT output; non-zero exit on failure (infra error)
 
 run_judge() { # stdin: prompt ; stdout: {score}
   if [[ -n "$JUDGE_CMD" ]]; then sh -c "$JUDGE_CMD"
-  else gemini-agent --model flash --raw "$(cat)"; fi
+  else agy-agent --model flash "$(cat)"; fi
 }
 
 # Infra failure (SUT down, judge crash, non-numeric judge output) is a HARD error,

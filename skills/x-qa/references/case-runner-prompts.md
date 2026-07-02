@@ -2,17 +2,19 @@
 
 Each test case becomes one bg dispatch. Output is a single JSON document at `<run-dir>/cases/<case-id>.json` matching the CaseResult schema (see `qa-report-schema.md`).
 
-## Simple Runner — gemini-bg
+## Simple Runner — agy-bg (SERIAL)
 
-Dispatched via `Bash(run_in_background: true)` against the `gemini-agent` bridge from `skills/x-gemini` (resolves the right model id and binds to the Google Ultra subscription):
+Dispatched against the `agy-agent` bridge from `skills/x-gemini` (resolves the right model id and binds to the Google Ultra subscription):
 
 ```bash
-gemini-agent --model flash "$PROMPT" > "$RUN_DIR/cases/$CASE_ID.json"
+agy-agent --model flash "$PROMPT" > "$RUN_DIR/cases/$CASE_ID.json"
 ```
 
-`--model flash` resolves to `gemini-2.5-flash` (per `skills/x-gemini/SKILL.md` model table). Do NOT call the raw `gemini` CLI directly with `--model gemini-3.x-flash` — that flag and that model id are not real.
+**Serialize the agy runner (MANDATORY).** Concurrent `agy` processes hang — agy is a process-global singleton. So when the simple runner is `agy-agent`, dispatch the wave's simple cases **one at a time** (effective `--max-bg 1` for the agy runner): run one `agy-agent` call to completion before launching the next. The parallel `--max-bg` fanout is **disabled for the agy runner only** — it stays in effect for the **non-agy fallback simple runners** (OMC executor / Explore) and for **all complex runners**, which may still dispatch in parallel `run_in_background: true` within a wave. The ≤1 cap is on **concurrent agy processes**, not on the wave as a whole.
 
-If `gemini_cli` capability is unpinned, `bootstrap` falls back to the simple runner stored in env var `X_QA_SIMPLE_RUNNER` (e.g., `Agent oh-my-claudecode:executor model=haiku`).
+`--model flash` resolves to the `flash` alias in `skills/x-gemini/SKILL.md` model table (currently Gemini 3.5 Flash, Medium tier). Do NOT call the raw `gemini` CLI directly — agy is the bridge; let it resolve the model id.
+
+If `agy_cli` capability is unpinned, `bootstrap` falls back to the simple runner stored in env var `X_QA_SIMPLE_RUNNER` (e.g., `Agent oh-my-claudecode:executor model=haiku`). The serial constraint above applies **only** to the agy runner; the fallback runners keep parallel waves.
 
 Where `$PROMPT`:
 
@@ -49,7 +51,7 @@ Procedure:
 {
   "id": "<CASE_ID>",
   "verdict": "pass" | "fail",
-  "runner": "gemini-flash",
+  "runner": "agy-flash",
   "attempts": 1,
   "evidence": {
     "request": { "method": "...", "url": "...", "headers": {...}, "body": {...} },
@@ -142,8 +144,10 @@ If `profile.json.auth_case_id` is non-null AND the current case has `preconditio
 Eval-kind assertions (`llm-rubric`, `semantic-similarity`) are scored by
 `scripts/evals/score-case.sh`, NOT by an LLM free-form runner. The script:
 1. Runs the SUT output `samples` times (via `X_QA_OUTPUT_CMD`, default `curl`).
-2. Scores each output with an LLM judge (`X_QA_JUDGE_CMD`, default `gemini-agent --model flash`)
-   at temperature 0, expecting `{"score":0..1}`.
+2. Scores each output with an LLM judge (`X_QA_JUDGE_CMD`, default `agy-agent --model flash`)
+   at temperature 0, expecting `{"score":0..1}`. agy emits plain text natively (it has no
+   raw-output flag); the judge prompt instructs "Reply ONLY JSON", so `jq -r '.score'` parses
+   the bare output directly.
 3. Aggregates via `pass-rate.sh`, loads calibration, applies `meta-gate.sh`.
 
 **Anti-bias rule:** the judge model SHOULD differ from the model powering the

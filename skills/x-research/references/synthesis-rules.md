@@ -86,4 +86,4 @@ When the orchestrator ran Max Mode (multiple parallel lanes), use the reconciled
 5. **Always cite per-lane sources** in a single Sources block, attributed by lane.
 6. **Name failed lanes** — partial failure is normal; silent omission is not.
 
-Apply Evidence Tiering (above) to break ties when same-class lanes disagree (e.g., perplexity_ask vs gemini-agent both Tier 4 web — present both; deepwiki Tier 2 beats either when they conflict).
+Apply Evidence Tiering (above) to break ties when same-class lanes disagree (e.g., perplexity_ask vs agy-agent both Tier 4 web — present both; deepwiki Tier 2 beats either when they conflict).

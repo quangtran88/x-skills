@@ -44,7 +44,7 @@
 17. **Skipped vs failed cases.** A `fail` in wave N skips downstream
     dependents. They show `verdict: skipped` in QA_REPORT.md and do NOT
     count toward `flaky_rate`. Only `fail` blocks the run verdict.
-18. **Scout dispatched without gemini_cli.** When `gemini_cli` capability is
+18. **Scout dispatched without agy_cli.** When `agy_cli` capability is
     unpinned, `X_QA_SIMPLE_RUNNER` resolves to OMC executor / Explore.
     Scout latency rises (~3-5x); cost lower. Acceptable.
 

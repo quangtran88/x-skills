@@ -21,9 +21,9 @@
 - **Symptom**: a single part exceeds ~8k tokens when rendered.
 - **Action**: split into sub-parts (e.g., Part 3 → Part 3a, 3b). Update TOC, shift later part numbers.
 
-## Capability missing — gemini_cli absent
+## Capability missing — agy_cli absent
 
-- **Symptom**: large input (>50k tokens) but no `gemini_cli` in active capability set.
+- **Symptom**: large input (>50k tokens) but no `agy_cli` in active capability set.
 - **Action**: read into Claude directly. Warn user once if input >150k tokens; do not block.
 
 ## Capability missing — MCP servers absent for vague target

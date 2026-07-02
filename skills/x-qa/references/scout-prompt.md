@@ -6,8 +6,8 @@ no scout.
 
 ## Runner Pair
 
-Reuse the bootstrap-pinned `X_QA_SIMPLE_RUNNER` (gemini-flash by default;
-OMC executor / Explore when gemini_cli is unpinned). Scout is one
+Reuse the bootstrap-pinned `X_QA_SIMPLE_RUNNER` (agy-flash by default;
+OMC executor / Explore when agy_cli is unpinned). Scout is one
 short-lived dispatch — NOT `run_in_background` — orchestrator waits inline.
 
 ## Prompt Template
@@ -91,7 +91,7 @@ Before enumerating obligations, model the domain — **code-first**:
    constraints, invariants, and transitions.
 2. **Only if the code does not reveal a rule** (e.g. an external/business
    constraint with no in-repo definition) escalate to one external research
-   lane (`perplexity_ask` or a `gemini-agent` reading) — cheapest-viable-first,
+   lane (`perplexity_ask` or a `agy-agent` reading) — cheapest-viable-first,
    mirroring x-research's own gate. Do NOT open a research session when the code
    already answers the question; that wastes tokens and latency.
 3. Emit the findings as the `domain_model` block (entities → fields →

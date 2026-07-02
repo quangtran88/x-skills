@@ -1,6 +1,6 @@
 ---
 name: x-gemini
-description: Direct Google Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, and gemini-3.x models without the OpenCode layer
+description: Direct Google Gemini bridge via the Antigravity (agy) CLI — uses Google Ultra subscription (no API key), opt-in Google Search grounding (via `--grounded`), and gemini-3.x models without the OpenCode layer
 triggers:
   - "x-gemini"
   - "ask gemini directly"
@@ -12,25 +12,26 @@ matching: fuzzy
 
 ## Bootstrap (MANDATORY first step)
 
-0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `gemini_cli` flag gates this skill.
-1. If `gemini-agent` or `gemini` is not on PATH, instruct the user: **run `/x-skills:setup` inside Claude Code**. Do not tell them to run `bin/setup` directly — the slash command is the canonical entry point.
+0. Pin capabilities for the session per `../x-shared/capability-loading.md`. The `agy_cli` flag gates this skill.
+1. If `agy-agent` or `agy` is not on PATH, instruct the user: **run `/x-skills:setup` inside Claude Code**. Do not tell them to run `bin/setup` directly — the slash command is the canonical entry point.
 
 ---
 
-Wraps the official `gemini` CLI for headless invocation from Claude Code skills. Bypasses OpenCode entirely — no `oh-my-openagent.json`, no plugin compat bugs, no API key. Uses your Google Ultra subscription and Gemini's native Google Search grounding.
+Wraps the official `agy` (Antigravity) CLI for headless invocation from Claude Code skills. Bypasses OpenCode entirely — no `oh-my-openagent.json`, no plugin compat bugs, no API key. Uses your Google Ultra subscription and prompt-driven Google Search grounding.
 
 ## Quick Dispatch
 
 If `{{ARGUMENTS}}` is non-empty, invoke immediately via Bash:
 
 ```
-/x-gemini "prompt"                              → gemini-agent "prompt"
-/x-gemini --model pro "prompt"                  → gemini-agent --model pro "prompt"
-/x-gemini --resume "follow-up"                  → gemini-agent --resume "follow-up"
-/x-gemini --file /abs/file.md "explain this"    → gemini-agent --file /abs/file.md "explain this"
+/x-gemini "prompt"                              → agy-agent "prompt"
+/x-gemini --model pro "prompt"                  → agy-agent --model pro "prompt"
+/x-gemini --resume "follow-up"                  → agy-agent --resume "follow-up"
+/x-gemini --add-dir /abs/dir "explain this"     → agy-agent --add-dir /abs/dir "explain this"
+/x-gemini --grounded "latest version of X?"     → agy-agent --grounded "latest version of X?"
 ```
 
-The wrapper lives at `bin/gemini-agent` (symlinked to `~/.local/bin/gemini-agent` by `bin/setup`).
+The wrapper lives at `bin/agy-agent` (symlinked to `~/.local/bin/agy-agent` by `bin/setup`).
 
 ---
 
@@ -38,11 +39,12 @@ The wrapper lives at `bin/gemini-agent` (symlinked to `~/.local/bin/gemini-agent
 
 | Use Case | Why x-gemini, not x-omo / x-research |
 |---|---|
-| Need fresh web facts with citations | Gemini has native Google Search; opencode-routed Gemini does not always trigger it |
-| Quick factual lookup, want low latency | Skips opencode → gemini routing layer |
-| Want `gemini-3.1-pro-preview` specifically | Default opencode config may not expose pro-preview |
+| Need fresh web facts with citations | `--grounded` triggers Google Search; opencode-routed Gemini does not always trigger it |
+| Quick factual lookup, want low latency | Skips the opencode → gemini routing layer |
+| Want `Gemini 3.1 Pro` specifically | Default opencode config may not expose the agy pro tier |
 | Multi-turn research session | `--resume` keeps conversation context across calls |
-| Analyze a workspace file | `@file` reference works for any file under CWD |
+| Analyze a workspace dir | `--add-dir DIR` mounts a scoped subtree into the workspace |
+| Cross-provider models | agy also serves Claude (`claude-sonnet`/`claude-opus`) and `gpt-oss` — opencode-free |
 
 ## When NOT to Use
 
@@ -57,13 +59,16 @@ The wrapper lives at `bin/gemini-agent` (symlinked to `~/.local/bin/gemini-agent
 
 ## Models
 
-| Alias | Resolves To | Best For |
+| Alias | agy model (display string) | Best For |
 |---|---|---|
-| `flash` (default) | `gemini-2.5-flash` | Fast lookups, classification, summaries |
-| `pro` | `gemini-3.1-pro-preview` | Reasoning, deep analysis, multimodal |
-| Full ID | passthrough | e.g., `gemini-2.5-flash-lite` |
+| `flash` (default) | `Gemini 3.5 Flash (Medium)` | Fast lookups, classification, summaries |
+| `flash-low` / `flash-high` | `Gemini 3.5 Flash (Low)` / `(High)` | bulk / harder fast-tier |
+| `pro` | `Gemini 3.1 Pro (High)` | Reasoning, deep analysis |
+| `pro-low` | `Gemini 3.1 Pro (Low)` | cheaper reasoning |
+| `claude-sonnet` / `claude-opus` | `Claude Sonnet 4.6 (Thinking)` / `Claude Opus 4.6 (Thinking)` | cross-provider (agy-only advantage) |
+| `gpt-oss` | `GPT-OSS 120B (Medium)` | cross-provider |
 
-**Architecture note:** Every Gemini call uses TWO models — `gemini-2.5-flash-lite` (utility router that decides tool calls) plus the main responder. Both are billed against your Google Ultra subscription.
+**Note:** agy is **plain-text only** (no JSON surface). The wrapper **synthesizes a real exit code** (agy exits 0 even on failure). Pass `--grounded` — it is **required** for "what's current / latest version" questions; without it agy trusts the repo over live docs and returns stale identifiers.
 
 ---
 
@@ -71,46 +76,48 @@ The wrapper lives at `bin/gemini-agent` (symlinked to `~/.local/bin/gemini-agent
 
 ```bash
 # Basic
-gemini-agent "Research topic X"
+agy-agent "Research topic X"
 
 # Specific model
-gemini-agent --model pro "Complex reasoning task"
+agy-agent --model pro "Complex reasoning task"
 
-# Custom system prompt (constrains behavior)
-gemini-agent --system /path/to/system.md "Analyze this"
+# Custom system prompt (prepended to the prompt to constrain behavior)
+agy-agent --system /path/to/system.md "Analyze this"
 
-# Workspace file
-gemini-agent --file ./README.md "Summarize this project"
+# Mount a scoped workspace dir (replaces the old per-file attach)
+agy-agent --add-dir ./src/feature "Summarize this module"
 
-# Resume last session (multi-turn research)
-gemini-agent --resume "Follow-up: how does it differ from approach Y?"
+# Grounded lookup — REQUIRED for "what's current / latest version" questions
+agy-agent --grounded "Latest stable version of X? cite URLs"
 
-# Streaming for long tasks (JSONL events)
-gemini-agent --stream "Deep research with multiple tool calls..."
+# Resume last conversation (multi-turn research)
+agy-agent --resume "Follow-up: how does it differ from approach Y?"
 
-# Tool execution allowed (plan mode — auto-approves plan tools only)
-gemini-agent --approval-mode plan "List files in current dir"
+# Resume a specific conversation by id
+agy-agent --conversation <id> "Continue from there"
 
 # Autonomous tool execution (yolo mode — no approvals required)
-# DANGER: Gemini gets unrestricted shell access. Only use when caller
+# DANGER: agy gets unrestricted shell access. Only use when caller
 # explicitly approves.
-gemini-agent --yolo "Set up the project and run tests"
+agy-agent --yolo "Set up the project and run tests"
 
-# Raw text passthrough (skip JSON parsing)
-gemini-agent --raw "Plain text response"
+# Raw passthrough (skip the optional Work Summary chrome strip)
+agy-agent --raw "Plain text response"
 ```
 
 ### Env Vars
 
 | Var | Effect |
 |---|---|
-| `X_GEMINI_DEFAULT_MODEL` | Default model when `--model` not passed (e.g. `pro`, `flash`) |
-| `GEMINI_TIMEOUT` | Override default 600s timeout (seconds) |
-| `GEMINI_SYSTEM_MD` | Set internally by `--system` flag — do not set externally |
+| `X_AGY_DEFAULT_MODEL` | Default model alias when `--model` not passed (e.g. `pro`, `flash`) |
+| `AGY_TIMEOUT` | Override default 600s timeout (seconds) |
+| `X_AGY_AUTO_TRUST` | `=1` auto-appends CWD to `trustedWorkspaces` (avoids trust-prompt hang) |
+| `X_AGY_STRIP_SUMMARY` | `=1` strips a trailing `### Work Summary` chrome block from the response |
+| `X_AGY_NO_LOG` | `=1` disables persisting the raw log |
 
-**Timeout:** Set Bash timeout to **600000** (10 min). Most calls return in 5-30s; `--model pro` with tool use can take 1-3 min.
+**Timeout:** Set Bash timeout to **600000** (10 min). A single scoped grounded call returns in ~80s; bulk/`pro` work runs longer. agy buffers output to the end — never set a short timeout, it truncates to 0 bytes.
 
-**Output format:** By default, the wrapper parses Gemini's `--output-format json` and emits only `.response`. Stats (model, tools, session ID) go to stderr.
+**Output format:** agy is **plain text only** — there is no JSON/structured-output surface. The wrapper emits the text directly to stdout; stats (model, duration, status) go to stderr.
 
 ---
 
@@ -118,35 +125,37 @@ gemini-agent --raw "Plain text response"
 
 `stdout`:
 ```
-<gemini's response, plain markdown>
+<agy's response, plain text / markdown>
 ```
 
 `stderr` (last line):
 ```
-[gemini-agent] pro | duration=12s | status=success | model=gemini-3.1-pro-preview | tools=2 | session=<uuid> | raw=/tmp/gemini-agent-...log
+[agy-agent] pro | duration=79s | status=success | log=~/.cache/x-skills/agy/agy-agent-...log
 ```
 
-Capture the session ID from stderr if you want to `--resume` later. The full raw JSON is at the `raw=` path.
+Use `--resume` (latest conversation) or `--conversation <id>` for multi-turn. The persisted run log is at the `log=` path.
 
 ---
 
 ## Error Handling
 
+agy itself exits **0 even on failure**. The wrapper re-derives a real exit code from empty stdout + the noise-stripped `--log-file` tail — trust the wrapper's code, not agy's.
+
 | Exit Code | Meaning | Recovery |
 |---|---|---|
 | `0` | success | continue |
-| `1` | generic failure | check raw log |
-| `42` | empty prompt (input error) | non-issue, validation |
-| `124` | timeout (killed by `timeout` cmd) | shorten prompt or `GEMINI_TIMEOUT=1200 ...` |
-| non-zero + log mentions "exhausted/quota" | rate limited | wait or switch to `flash` |
-| non-zero + log mentions "auth/sign in" | not logged in | run `gemini` interactively to auth |
+| `1` | empty output / `auth_error` / `empty_output` / `planner_empty` | check `log=` path; for auth run `agy` interactively |
+| `124` | timeout (killed by `timeout` cmd) | raise `AGY_TIMEOUT=1200 ...`; never lower it (truncates to 0 bytes) |
+| `1` + status=`quota_error` | rate limited | wait or switch to `flash-low` |
+
+> The log always contains `not logged into Antigravity` / `failed to set auth token` (auxiliary caches) even on success — that is **noise**, not an auth failure. The wrapper's `status=` is the signal.
 
 ## Dependencies
 
-- **`gemini` CLI** (required) — install: https://github.com/google-gemini/gemini-cli; auth via `gemini` interactive (Google account login)
+- **`agy` CLI** (required) — install: https://antigravity.google/cli; auth via `agy` interactive (Google account login)
 - **`timeout`** (required) — `brew install coreutils` on macOS, or use `gtimeout`
-- **`jq`** (required for default JSON mode) — `brew install jq`
-- **Google Ultra subscription** (recommended) — quota-friendly access to gemini-3.x
+- **`jq`** (recommended) — `brew install jq` (used by the `trustedWorkspaces` preflight)
+- **Google Ultra subscription** (recommended) — quota-friendly access
 
 `bin/setup` detects all of these and writes capability flags to `~/.config/x-skills/capabilities.json`.
 
