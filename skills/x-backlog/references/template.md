@@ -2,11 +2,11 @@
 
 Canonical skeleton rendered into `docs/backlog/<slug>.md`. **CORE** sections are always
 present. **MODULE** sections are included only when the feature actually has them (decided
-during the module offer in the gated walk). Omit a module entirely rather than writing "N/A".
+by self-triage during the draft-first walk). Omit a module entirely rather than writing "N/A".
 
-Fill every section with real content harvested from the conversation and confirmed by the
-user. Never ship a `<placeholder>` — if a fact is genuinely unknown, capture it as a bullet
-under **Handoff Notes / Open Questions** instead.
+Fill every section with real content harvested from the conversation. Never ship a
+`<placeholder>` — if a fact is genuinely unknown, capture it as a bullet under
+**Handoff Notes / Open Questions** instead.
 
 ---
 
@@ -14,7 +14,7 @@ under **Handoff Notes / Open Questions** instead.
 ---
 title: <Feature name>
 slug: <kebab-slug>
-status: backlog          # backlog | ready | in-progress | done — set ready only once Acceptance is confirmed
+status: backlog          # backlog | ready | in-progress | done — set ready only when Acceptance is grounded in real conversation material
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 related: []              # links to research docs, PRs, plans, tickets
@@ -112,7 +112,7 @@ not the low-level "how" (that's the implementation plan).
 
 `backlog` → `ready` → `in-progress` → `done`
 
-- **backlog** — idea captured, not yet fleshed out enough to build (interview parked early).
-- **ready** — CORE complete + acceptance criteria **confirmed** (not skipped); safe to hand to writing-plans / x-do. A completed walk with skipped Acceptance stays `backlog`.
+- **backlog** — idea captured, not yet fleshed out enough to build (conversation too thin).
+- **ready** — CORE complete + acceptance criteria **grounded in real conversation material** (not invented from thin context); safe to hand to writing-plans / x-do. A completed walk that had to invent Acceptance stays `backlog`.
 - **in-progress** — implementation started (set by hand or by the downstream skill).
 - **done** — shipped; kept as a reference record.

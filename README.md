@@ -46,7 +46,7 @@ The plugin's SessionStart hook detects stale capabilities and reminds you, but y
 | **x-omo** | `/x-skills:x-omo` | OpenCode multi-model bridge — dispatch to GPT-5.5, Gemini, Codex models via role agents or direct model routing |
 | **x-gemini** | `/x-skills:x-gemini` | Direct Gemini CLI bridge — uses Google Ultra subscription (no API key), native Google Search grounding, gemini-3.x access without OpenCode layer |
 | **x-guide** | `/x-skills:x-guide` | Progressive comprehension-gated tutor — turns docs/PRDs/specs/code/features into a resumable walkthrough with per-project state in `.x-guide/<slug>/` |
-| **x-backlog** | `/x-skills:x-backlog` | Durable backlog/spec doc builder — interview-first gated walk that crystallizes a brainstormed idea into `docs/backlog/<slug>.md` (context, solution, ADR-lite decisions, scope, acceptance + optional feature/integration/contract/use-case/handoff modules) |
+| **x-backlog** | `/x-skills:x-backlog` | Durable backlog/spec doc builder — drafts `docs/backlog/<slug>.md` autonomously from the conversation (context, solution, ADR-lite decisions, scope, acceptance + optional feature/integration/contract/use-case/handoff modules); asks only when blocked or a decision needs user input |
 | **x-skill-improve** | `/x-skills:x-skill-improve` | Session-based skill alignment analyzer — evaluates how well a skill was followed during real sessions and proposes targeted edits |
 
 `x-shared` is a reference library used by other skills (not invokable directly).
