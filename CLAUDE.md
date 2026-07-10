@@ -1,6 +1,6 @@
 # x-skills — Intelligent Skill Routers for Claude Code
 
-14 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
+18 plugin skills that classify user intent and route to the optimal executor, plus an external companion skill (`x-skill-review`, installed at `~/.claude/skills/`). Ships with optional multi-model orchestration via OpenCode.
 
 See `README.md` for the per-skill table, install steps, and dependency list. This file holds only runtime / behavior-shaping rules that Claude needs at every turn.
 
