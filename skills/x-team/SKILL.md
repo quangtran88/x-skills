@@ -39,7 +39,7 @@ Before any phase:
 
 Per `references/decomposition-rules.md`:
 
-- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<request keywords> x-skills", page_size: 5 })` call BEFORE decomposition — surface prior failed-feature root causes / blocker verdicts as leads, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
+- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<request keywords>", page_size: 5 })` call BEFORE decomposition — surface prior failed-feature root causes / blocker verdicts as leads, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
 
 1. Read user request.
 2. If `--features <N>` not given: use native `Grep` / OMO `explore` to scan project, propose feature split, ask user via `AskUserQuestion` (header: "Feature split"). Allow edit/cancel.

@@ -17,7 +17,7 @@ Before any phase dispatch, load:
 0. `../x-shared/capability-loading.md` — pin the active capability set for this session. Trust the bootstrap-pinned set; do not re-verify per dispatch.
 1. `gotchas.md` — known failure patterns.
 
-- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<target name/topic> x-skills", page_size: 5 })` call BEFORE Phase-2 ingest — surface prior guides / durable facts on the same target as leads to weave into the walkthrough, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
+- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<target name/topic>", page_size: 5 })` call BEFORE Phase-2 ingest — surface prior guides / durable facts on the same target as leads to weave into the walkthrough, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
 
 Lazy-load only when needed:
 - `../x-gemini/SKILL.md` — when Phase 2 routes large input to gemini ingest.

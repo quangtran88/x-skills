@@ -17,7 +17,7 @@ Before dispatching anything, load:
 2. `../x-gemini/SKILL.md` — direct agy (Antigravity) CLI bridge (Google Search grounding via `--grounded`, gemini-3.x, `--add-dir`, `--resume`). **Load only if `agy_cli` capability is pinned**; if not pinned, drop agy-agent rows from the routing table and pick the escalation column instead.
 3. `../x-shared/mcp-toolbox.md` — plugin-local MCP decision matrix (perplexity / exa / deepwiki / context7).
 4. `gotchas.md` — known failure patterns.
-5. **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__search_notes({ query: <topic + signal keywords>, page_size: 5 })` call. Surface any prior research notes on the same topic as supplementary context for the synthesis — leads, not verdicts. **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules`.** When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+5. **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<topic + signal keywords>", page_size: 5 })` call. Surface any prior research notes on the same topic as supplementary context for the synthesis — leads, not verdicts. **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules`.** When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 
 **Bootstrap shortcut:** if the question is a Standard-Mode local-only direct read with no agent dispatch, you may skip step 1 (OMO) and step 2 (agy). Steps 3 + 4 are always required.
 

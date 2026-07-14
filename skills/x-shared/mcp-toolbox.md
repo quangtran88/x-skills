@@ -86,7 +86,7 @@ These rules apply to ALL skill bootstraps that call `search_notes` / `write_note
 
 **Placement on save.** `write_note` requires a `directory`. Route by note kind — `lessons/<project-slug>/` (gotchas, root causes, failed approaches), `decisions/<project-slug>/` (decisions + rationale), `notes/<project-slug>/` (durable facts, conventions). project-slug = basename of cwd (e.g. `x-skills`). These mirror the Basic Memory placement conventions already seeded in the store — do not invent new top-level folders.
 
-**Tag on save.** Always include the project slug and the emitting skill in `tags` (e.g. `tags: ["x-skills", "x-research", "<topic>"]`). Tags are the keyword-filter surface for future cross-project `search_notes` queries.
+**Tag on save.** Always include the project slug and the emitting skill in `tags` (e.g. `tags: ["x-skills", "x-research", "<topic>"]`). Tags are a keyword surface for ranking and cross-project lookup — **not** a recall filter (see § Memory Reflex → "Do NOT hard-filter recall by `tags`": a `tags` filter silently excludes every note that lacks the tag).
 
 **Project targeting.** Every tool takes an optional `project` and resolves a session default when omitted. Omit it normally; pass it explicitly only when the user runs multiple knowledge bases. Wrong-project writes succeed silently into the wrong store — if a recall that should hit comes back empty, check `list_memory_projects` before concluding the note was never saved.
 
@@ -103,8 +103,21 @@ Place it in the skill's Bootstrap / Pre-Flight so it fires on *every* path that 
 work, not just one mode. When `mcp.basic_memory` is pinned:
 
 ```
-mcp__basic-memory__search_notes({ query: "<skill's query hint + project slug>", page_size: 5 })
+mcp__basic-memory__search_notes({ query: "<skill's query hint>", page_size: 5 })
 ```
+
+**Keep `query` purely topical.** Never concatenate a literal repo name (e.g. `"x-skills"`)
+into it — that only matches the authoring repo and injects a noise token everywhere else.
+
+**Do NOT hard-filter recall by `tags`.** `search_notes({ tags: [...] })` is an *exclusion*
+filter, not a re-rank: any note whose frontmatter lacks that exact tag disappears from the
+results entirely. Notes written by `bm-remember` and the `memory-*` companion skills — and
+plenty of hand-written ones — carry only topical tags, so a `tags: ["<project-slug>"]` filter
+silently drops them even though they sit in `<kind>/<project-slug>/`. A missed hit is
+indistinguishable from "no prior knowledge", so the failure is invisible. Scope by *reading*
+the results instead: each hit's permalink carries its folder (`main/notes/<project-slug>/…`),
+so prefer hits under this project's `<kind>/<project-slug>/` and treat the rest as weaker
+leads. Precision is not the failure mode here — silent exclusion is.
 
 Surface hits as **leads, not verdicts** — they inform the brainstorm / plan / investigation
 but never auto-drive it (the established framing in x-research / x-bugfix). When
@@ -112,21 +125,34 @@ but never auto-drive it (the established framing in x-research / x-bugfix). When
 
 **Persist (at completion) — an always-run step, never an opt-in branch.**
 Place it in an unconditional completion step, not inside a "save on request" menu branch.
-Persist **durable output only** — decisions with rationale, root causes, confirmed findings —
-never routine run summaries or build logs. When `mcp.basic_memory` is pinned:
+
+*Durability gate (apply before writing).* Ask one question per candidate note: **is this a
+decision + rationale, a root cause, or a confirmed finding a future session would want — or a
+routine run summary / build log?** Skip the write on "routine". Persist **durable output
+only**; a successful-run outcome ("built X, tests pass") is NOT durable and must not be
+written. When a candidate passes the gate and `mcp.basic_memory` is pinned:
 
 ```
 mcp__basic-memory__write_note({ title, directory: "<kind>/<project-slug>", content, tags })
 ```
 
+*Update over duplicate.* If this run's own recall already surfaced a note on the same fact,
+update that note instead of accreting a near-duplicate:
+`mcp__basic-memory__edit_note({ identifier: "<the permalink from the recall hit — exact match, no fuzzy>", operation: "append", content })`.
+Caveat: `edit_note` takes no `tags` and no `directory` — it cannot retag or move a note. If the
+surfaced note is missing the project-slug tag or sits in the wrong folder, write a fresh note
+with the correct `directory` + `tags` rather than appending to the malformed one.
+
 Route `directory` by note kind per § Consumer rules above — `lessons/` (root causes, failed
 approaches), `decisions/` (decisions + rationale), `notes/` (durable facts, conventions).
 Tag with the project slug + emitting skill. Skip silently when not pinned.
 
-**The gate is the only skip.** No other condition suppresses the reflex; both beats fire on
-every path where the skill produces work, gated solely on the `mcp.basic_memory` pin. A recall
-reachable on only some modes, or a persist buried under "on explicit request", is the exact bug
-this contract exists to prevent.
+**The step always runs; only two things suppress a write.** Both beats fire on every path
+where the skill produces work. The recall beat is gated solely on the `mcp.basic_memory` pin.
+The persist beat always *evaluates* — the `mcp.basic_memory` pin and the durability gate above
+are the only two things that stop it from *writing*. Nothing else suppresses the reflex: a
+recall reachable on only some modes, or a persist buried under "on explicit request", is the
+exact bug this contract exists to prevent.
 
 ### Tools NOT routed through x-skills
 

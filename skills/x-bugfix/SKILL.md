@@ -64,7 +64,7 @@ Classify the bug into ONE mode:
   - **Behavioral bug?** (duplication, wrong output, timing issue — no error/stack trace exists): Capture expected vs. actual behavior as the baseline instead. Document what the user observes and what correct behavior looks like.
 - [ ] Read error messages carefully — don't skip stack traces
 - [ ] Read `gotchas.md` for known failure patterns
-- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__search_notes({ query: <symptom keywords + framework>, page_size: 5 })` call. If results include prior bug-fix lessons touching the same symptom or files, surface them in the Investigate step as candidate root-cause hypotheses (do not auto-apply — these are leads, not verdicts). **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules`.** When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<symptom keywords + framework>", page_size: 5 })` call. If results include prior bug-fix lessons touching the same symptom or files, surface them in the Investigate step as candidate root-cause hypotheses (do not auto-apply — these are leads, not verdicts). **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules`.** When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 - [ ] `git log --oneline -10 -- <affected-files>` — regression = root cause is in the diff
 
 ## Available Tools
