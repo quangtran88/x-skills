@@ -92,6 +92,42 @@ These rules apply to ALL skill bootstraps that call `search_notes` / `write_note
 
 **No chaff filter needed.** Unlike the previous agentmemory backend, basic-memory has no regex auto-importer and no confidence scores — every note is deliberately written. Treat all hits as user-curated; rank by relevance, not confidence.
 
+### Memory Reflex — the canonical recall→persist contract
+
+Every work-producing skill runs the same two-beat reflex, gated solely on `mcp.basic_memory`.
+Skills **reference this section** instead of restating the calls; each supplies only its own
+**query hint** and **note kind** (the two things that legitimately vary per skill).
+
+**Recall (before core work) — an always-run step, never an opt-in branch.**
+Place it in the skill's Bootstrap / Pre-Flight so it fires on *every* path that does real
+work, not just one mode. When `mcp.basic_memory` is pinned:
+
+```
+mcp__basic-memory__search_notes({ query: "<skill's query hint + project slug>", page_size: 5 })
+```
+
+Surface hits as **leads, not verdicts** — they inform the brainstorm / plan / investigation
+but never auto-drive it (the established framing in x-research / x-bugfix). When
+`mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory still applies.
+
+**Persist (at completion) — an always-run step, never an opt-in branch.**
+Place it in an unconditional completion step, not inside a "save on request" menu branch.
+Persist **durable output only** — decisions with rationale, root causes, confirmed findings —
+never routine run summaries or build logs. When `mcp.basic_memory` is pinned:
+
+```
+mcp__basic-memory__write_note({ title, directory: "<kind>/<project-slug>", content, tags })
+```
+
+Route `directory` by note kind per § Consumer rules above — `lessons/` (root causes, failed
+approaches), `decisions/` (decisions + rationale), `notes/` (durable facts, conventions).
+Tag with the project slug + emitting skill. Skip silently when not pinned.
+
+**The gate is the only skip.** No other condition suppresses the reflex; both beats fire on
+every path where the skill produces work, gated solely on the `mcp.basic_memory` pin. A recall
+reachable on only some modes, or a persist buried under "on explicit request", is the exact bug
+this contract exists to prevent.
+
 ### Tools NOT routed through x-skills
 
 `canvas`, `list_directory`, `move_note`, `delete_note`, project management (`list_memory_projects` outside the empty-recall check, `create_memory_project`, `delete_project`, `list_workspaces`), schema tools (`schema_validate`, `schema_infer`, `schema_diff`), ChatGPT-compat `search`/`fetch`, `cloud_info`, `release_notes` — user-driven curation and lifecycle flows, owned by the upstream `basic-memory` plugin skills (`bm-remember`, `bm-setup`) and the `memory-*` companion skills.

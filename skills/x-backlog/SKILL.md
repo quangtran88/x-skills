@@ -26,6 +26,12 @@ Before walking, load:
 No capability-loading / OMO / agy dispatch is needed. x-backlog is Claude-native: it
 drafts and writes a markdown file. It never delegates to sub-agents.
 
+The one exception is the **Memory Reflex** (`../x-shared/mcp-toolbox.md § Memory Reflex`): its
+recall (step 2) and persist (step 6) are gated on `mcp.basic_memory` being present in the
+injected `[x-skills/capabilities]` snapshot line. Read that snapshot for the gate only — no
+full capability-loading, no sub-agent dispatch. When basic_memory is absent, both beats skip
+silently and x-backlog behaves exactly as before.
+
 ## Anti-Triggers
 
 If the request is closer to one of these, route there instead and stop:
@@ -59,6 +65,7 @@ the only pause is the blocker checkpoint in step 3, and only when a blocker actu
 - Announce: `Backlog doc: docs/backlog/<slug>.md (new | update).`
 
 ### 2. Harvest from context
+- [ ] **Memory recall** (only when `mcp.basic_memory` is present in the injected `[x-skills/capabilities]` snapshot — see the Bootstrap note): one `mcp__basic-memory__search_notes({ query: "<feature slug/name> x-skills", page_size: 5 })` call over prior `decisions/<project-slug>/` notes BEFORE drafting — surface cross-session contradictions with earlier decisions as leads for the step-3 blocker checkpoint (blocker #1 Contradiction), not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not present.
 - Scan the current conversation for the material that fills the CORE sections and any
   modules: the problem, the chosen solution, decisions made and alternatives rejected,
   scope boundaries, features, integrations, contracts, use cases, open questions.
@@ -111,6 +118,7 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
 - Fresh-eyes pass on the written file: any leftover `<placeholder>`, contradiction between
   sections (e.g. a scope bullet that fights a decision), or vague acceptance criterion?
   Fix inline. No re-review loop — fix and move on.
+- [ ] **Persist Key Decisions** (only when `mcp.basic_memory` is present in the injected `[x-skills/capabilities]` snapshot — see the Bootstrap note): for each decision block drafted in step 4, one `mcp__basic-memory__write_note({ title: "<slug>: <decision title>", directory: "decisions/<project-slug>", content: "<decision + rationale + rejected alternative>", tags: ["<project-slug>", "x-backlog", "<slug>"] })` call (project-slug = basename of cwd). Persist the decision + rationale only — not the whole doc. Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not present.
 - Report the path, status, a one-screen summary of what was drafted, and any Open Questions
   recorded — then invite edits and offer the downstream handoff:
 

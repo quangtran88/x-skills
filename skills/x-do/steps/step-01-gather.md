@@ -46,7 +46,7 @@ Agent (subagent_type=Explore, parallel):
 
 Pin the returned directories as `DESIGN_DIR` and `PLAN_DIR` for the rest of the task.
 
-- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): in the same parallel batch, one `mcp__basic-memory__search_notes({ query: <task keywords + project name>, page_size: 5 })` call. Surface prior similar tasks as leads for the brainstorming / planning steps — do NOT auto-apply. **Apply consumer rules from `../../x-shared/mcp-toolbox.md § Consumer rules`.** When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+- [ ] **Memory recall** — already fired in the always-run Pre-Flight checklist (`../SKILL.md § Pre-Flight Checklist`), which covers Mode A/B/D uniformly. Do NOT re-issue `search_notes` here — reuse the leads surfaced at Pre-Flight for the brainstorming / planning steps. Reflex definition: `../../x-shared/mcp-toolbox.md § Memory Reflex`.
 
 ### 2. Research gate (optional — only when warranted)
 

@@ -159,6 +159,7 @@ Before starting any mode, complete ALL of these checks:
   - `specs_dir` — uncommitted design docs → offer to continue
   - Draft plan files (`spec-wip.md`) → offer to continue
 - [ ] **Gotchas:** Read `gotchas.md` for known failure patterns before starting
+- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<task keywords> x-skills", page_size: 5 })` call BEFORE mode classification, so Mode A and Mode D recall too — not just the Mode B `steps/step-01-gather.md` path. Surface prior similar tasks as leads, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
 
 ## Routing Signals (3 axes — replaces Depth Calibration)
 

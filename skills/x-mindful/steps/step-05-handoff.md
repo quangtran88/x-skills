@@ -68,6 +68,14 @@ The user picks. If they pick (1), build a handoff context per `../x-shared/conte
 
 Then invoke `Skill: x-skills:x-do` with that handoff in args.
 
+## Persist Architectural Lessons (always-run, gated)
+
+This fires on **every** completion path — after the envelope is rendered and the user picks
+ANY menu option (including option 1, the x-do handoff, and option 4, stop) — not only the
+"Save envelope" branch. Gated solely on the `mcp.basic_memory` pin.
+
+- [ ] **Persist arch lesson** (only when `mcp.basic_memory` pinned in the bootstrap-active set): for each envelope item flagged as a new architectural lesson confirmed or rejected by the walkthrough, one `mcp__basic-memory__write_note({ title: "<slug> arch lesson", directory: "lessons/<project-slug>", content: "<one-sentence arch lesson confirmed/rejected by walkthrough>", tags: ["<project-slug>", "x-mindful", "architecture"] })` call (project-slug = basename of cwd). Persist confirmed/rejected architectural lessons only — not the whole envelope. Placement + tagging per `../../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
+
 ## Persistence (only on explicit request)
 
 If the user picks (3):
@@ -78,8 +86,6 @@ If the user picks (3):
 4. Confirm the path back to the user
 
 Do NOT write `progress.json` or any state beyond the single `IMPACTS.md`. Persistence is a one-shot export, not a session.
-
-- [ ] **Persist arch lesson** (only when `mcp.basic_memory` pinned): for each envelope item flagged as a new architectural lesson confirmed or rejected by the walkthrough, one `mcp__basic-memory__write_note({ title: "<slug> arch lesson", directory: "lessons/<project-slug>", content: "<one-sentence arch lesson confirmed/rejected by walkthrough>", tags: ["<project-slug>", "x-mindful", "architecture"] })` call (project-slug = basename of cwd — see `../../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
 
 ## Verifier Slot
 

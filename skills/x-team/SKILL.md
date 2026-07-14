@@ -39,6 +39,8 @@ Before any phase:
 
 Per `references/decomposition-rules.md`:
 
+- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<request keywords> x-skills", page_size: 5 })` call BEFORE decomposition — surface prior failed-feature root causes / blocker verdicts as leads, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
+
 1. Read user request.
 2. If `--features <N>` not given: use native `Grep` / OMO `explore` to scan project, propose feature split, ask user via `AskUserQuestion` (header: "Feature split"). Allow edit/cancel.
 3. For each feature, generate:
@@ -171,6 +173,10 @@ Feature map: .x-skills/x-team/teams/<slug>/feature-map.json
 ```
 
 If `--auto-merge` and any merges failed (conflict, protected branch): list separately with reasons.
+
+## Persist Lessons (always-run, gated)
+
+- [ ] **Persist run lessons** (only when `mcp.basic_memory` pinned in the bootstrap-active set): for each **failed** feature, one `mcp__basic-memory__write_note` to `lessons/<project-slug>/` capturing the root cause (from its `qa_report`); for each human-resolved **blocker**, one `write_note` to `decisions/<project-slug>/` capturing the verdict + rationale. project-slug = basename of cwd; tag each with the project slug + `x-team`. Persist durable output only — root causes and blocker verdicts, never per-feature run summaries. Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
 
 ## Hard Requirements
 

@@ -41,6 +41,10 @@ Append to `GUIDE.md`:
 
 Skip the "Where this lives in the codebase" section for `url`, `paste`, or `vague` sources unless the ingest yielded concrete file references.
 
+## Persist Takeaways (always-run, gated)
+
+- [ ] **Persist takeaways** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__write_note({ title: "<slug> — guide takeaways", directory: "notes/<project-slug>", content: "<the Key takeaways bullets + Where-this-lives refs>", tags: ["<project-slug>", "x-guide", "<slug>"] })` call (project-slug = basename of cwd). Persist the durable takeaways/glossary only — not the full guide body. Placement + tagging per `../../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
+
 ## Suggest Next
 
 Show the user a short list of natural follow-ups in chat (NOT in the file):
