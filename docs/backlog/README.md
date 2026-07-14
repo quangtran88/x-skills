@@ -5,4 +5,5 @@ not the low-level "how" (that's the implementation plan).
 
 | Doc | Status | Updated | Summary |
 |---|---|---|---|
-| [Memory Reflex Contract](memory-reflex-contract.md) | done | 2026-07-14 | One canonical basic-memory recall+persist reflex in x-shared; wire the 4 missing skills + fix placement in x-do/x-mindful |
+
+_No unshipped backlog items. Shipped docs are archived to `docs/<type>/` per `../../skills/x-backlog/references/template.md` § "Archival on done" (e.g. [Memory Reflex Contract](../feature/memory-reflex-contract.md) → `docs/feature/`)._
