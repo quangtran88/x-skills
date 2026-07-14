@@ -139,7 +139,7 @@ Refer to:
 ## Run Phases
 
 1. Bootstrap (above).
-   - [ ] **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_smart_search({ query: "<test path or framework + 'flake'>", limit: 10 })` call. Surface prior flake notes as test-history context for case classification — not autopilot. **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules` — drop hits where `tags` includes `auto-import` OR `confidence < 0.5` before treating them as precedent.** When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+   - [ ] **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<test path or framework + 'flake'>", page_size: 10 })` call. Surface prior flake notes as test-history context for case classification — not autopilot. **Apply consumer rules from `../x-shared/mcp-toolbox.md § Consumer rules`.** When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 2. Auto-doctor (skippable via `--skip-doctor`).
 3. **Classify intent.** Run `scripts/classify-intent.sh "{{ARGUMENTS}}"`, persist to `<run-dir>/intent.json`. If `confidence == "low"` OR multiple candidates surface, ask the user ONE question per `references/intent-detection.md § Ask-When-Ambiguous`, then rewrite intent.json with `confidence: high`.
 4. Resolve target from intent: `service` → entry name; `branch`/`pr` → PR-surface derivation (`references/pr-surface-derivation.md`); `spec`/`artifact`/`artifact-dir`/`prose` → trigger Phase 5 (Scout). Refuse if resolved entry's `type != http` (v1 limitation).
@@ -213,7 +213,7 @@ If invoked by user: print envelope + path to `QA_REPORT.md` + summary table.
 On `fail`: surface offer to route into `/x-skills:x-bugfix` with the failed cases as input.
 Confirmed exploratory findings (`EXPLORE_CONFIRMED > 0`) are also offered to `/x-skills:x-bugfix`, each carrying its minted case as the reproduction.
 
-- [ ] **Persist test pattern** (only when `mcp.agentmemory` pinned): one `mcp__plugin_agentmemory_agentmemory__memory_save({ content: "<test pattern or flake observation>", type: "lesson", concepts: "x-qa,<framework>,<pattern-kind>,slot:test-plan" })` call. The `slot:` token in `concepts` substitutes for the upstream slot-store API (not present in agentmemory v0.9.21 — convention, not contract; `memory_save` silently drops unknown top-level fields, so a `category` arg would be invisible — verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:104-114`). Skip silently when not pinned.
+- [ ] **Persist test pattern** (only when `mcp.basic_memory` pinned): one `mcp__basic-memory__write_note({ title: "<pattern-kind>: <one-line>", directory: "lessons/<project-slug>", content: "<test pattern or flake observation>", tags: ["<project-slug>", "x-qa", "<framework>", "test-plan"] })` call (placement + tagging per `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
 
 ## Dependencies
 

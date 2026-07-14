@@ -10,6 +10,12 @@
 [submodule "research/yeachan-heo/oh-my-claudecode"]
 	path = research/yeachan-heo/oh-my-claudecode
 	url = https://github.com/yeachan-heo/oh-my-claudecode
-[submodule "research/rohitg00/agentmemory"]
-	path = research/rohitg00/agentmemory
-	url = https://github.com/rohitg00/agentmemory
+[submodule "research/DeusData/codebase-memory-mcp"]
+	path = research/DeusData/codebase-memory-mcp
+	url = https://github.com/DeusData/codebase-memory-mcp
+[submodule "research/oraios/serena"]
+	path = research/oraios/serena
+	url = https://github.com/oraios/serena
+[submodule "research/basicmachines-co/basic-memory"]
+	path = research/basicmachines-co/basic-memory
+	url = https://github.com/basicmachines-co/basic-memory

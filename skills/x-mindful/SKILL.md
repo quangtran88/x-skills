@@ -32,7 +32,7 @@ Before any phase, load:
 
 0. `../x-shared/capability-loading.md` — pin the active capability set for this session. Trust the bootstrap-pinned set; do not re-verify per dispatch.
 1. `gotchas.md` — known failure patterns. Read once at start.
-2. **Memory recall** (only when `mcp.agentmemory` pinned in bootstrap-active set): one `mcp__plugin_agentmemory_agentmemory__memory_recall({ query: "<plan-slug + architectural keywords>", token_budget: 1500 })` call. Surface prior architectural lessons relevant to this plan as context for the extraction phase — leads, not verdicts. When `mcp.agentmemory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
+2. **Memory recall** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<plan-slug + architectural keywords>", page_size: 5 })` call. Surface prior architectural lessons relevant to this plan as context for the extraction phase — leads, not verdicts. When `mcp.basic_memory` is not pinned, **skip silently** — Claude's native auto-memory file still applies.
 
 Lazy-load only when the phase needs it:
 - `references/extraction-prompts.md` — when Phase 2 dispatches extraction.

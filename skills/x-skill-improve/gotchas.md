@@ -30,4 +30,4 @@ Known pitfalls when running session alignment analysis. Update this when you enc
 
 - **Bloating SKILL.md.** Resist adding lengthy new sections. Prefer adding to gotchas.md or references/ files. SKILL.md should stay under ~120 lines.
 - **Over-generalizing from one session.** One session where a gate was awkward doesn't mean the gate should be removed. Consider whether the finding represents a pattern or an outlier. Note confidence in the recommendation.
-- **agentmemory two-tier dependency.** When wiring agentmemory calls in this skill, the standalone-vs-proxy mode behavior is canonical in `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` and `../x-shared/mcp-toolbox.md § agentmemory`. Do not duplicate; do not work around the capability gate.
+- **basic-memory project targeting.** When wiring basic-memory calls in this skill, tool selection and placement/tagging conventions are canonical in `../x-shared/mcp-toolbox.md § basic-memory`. Tools take an optional `project` — omit for the session default; wrong-project writes succeed silently into the wrong store. Do not duplicate; do not work around the capability gate.

@@ -112,7 +112,7 @@ Quality-gate thresholds are static in `TEST_PLAN.yml` or `profile.json.gates.def
 
 `references/fallback-contract.md` defines `FallbackResponse` NOW for a tier that wires LATER. If the wiring lands and the contract has drifted (new field added without versioning, types changed), runner outputs will silently miscompile. Bump the schema header from `fallback.v0` to `fallback.v1` BEFORE the first wiring PR, and reject runner outputs whose top-level keys don't match.
 
-- **agentmemory two-tier dependency.** When wiring agentmemory calls in this skill, the standalone-vs-proxy mode behavior is canonical in `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` and `../x-shared/mcp-toolbox.md § agentmemory`. Do not duplicate; do not work around the capability gate.
+- **basic-memory project targeting.** When wiring basic-memory calls in this skill, tool selection and placement/tagging conventions are canonical in `../x-shared/mcp-toolbox.md § basic-memory`. Tools take an optional `project` — omit for the session default; wrong-project writes succeed silently into the wrong store. Do not duplicate; do not work around the capability gate.
 
 ## Channels
 

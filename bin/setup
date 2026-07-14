@@ -769,8 +769,8 @@ check_mcp "context7"    "library API docs" \
   "claude mcp add --transport http context7 https://mcp.context7.com/mcp" || true
 check_mcp "gitnexus"    "code knowledge graph (impact / context / rename / route_map)" \
   "npm install -g gitnexus" || true
-check_mcp "agentmemory" "persistent memory + replay (rohitg00/agentmemory)" \
-  "/plugin marketplace add rohitg00/agentmemory && /plugin install agentmemory  # or: npx -y @agentmemory/mcp" || true
+check_mcp "basic-memory" "persistent markdown knowledge base (basicmachines-co/basic-memory)" \
+  "claude mcp add basic-memory -- uvx basic-memory mcp  # or: /plugin marketplace add basicmachines-co/basic-memory && /plugin install basic-memory@basicmachines-co" || true
 
 # --- 4. Peer Plugins ---
 header "4. Peer Plugins"
@@ -902,7 +902,7 @@ manifest = {
             "exa":        cap("$(cap_get mcp_exa)"),
             "context7":   cap("$(cap_get mcp_context7)"),
             "gitnexus":   cap("$(cap_get mcp_gitnexus)"),
-            "agentmemory": cap("$(cap_get mcp_agentmemory)"),
+            "basic_memory": cap("$(cap_get mcp_basic-memory)"),
         },
         "cli": {
             "gitnexus": cap("$(cap_get cli_gitnexus)"),

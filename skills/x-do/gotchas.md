@@ -10,7 +10,7 @@ Known failure patterns specific to x-do. For shared OMO patterns, see `../x-shar
 - **`--model gpt` blocker-finder sometimes flags non-issues as blockers.** Cross-reference with your own judgment — if a "blocker" is actually a known constraint, proceed.
 - **Don't force the planning pipeline on small tasks.** A single rename or config change doesn't need `oracle` pre-plan → `--model gpt` plan → `--model gpt` blocker-finder. Use Mode D.
 - **Mechanical batch detection:** A task qualifies as a "mechanical batch" when ALL changes follow the same structural pattern (e.g., delete import + remove call site in N files). Test: if you could describe the change as a template applied N times, it's mechanical. If any file requires unique logic or decisions, it's NOT mechanical — use full ceremony.
-- **agentmemory two-tier dependency.** When wiring agentmemory calls in this skill, the standalone-vs-proxy mode behavior is canonical in `../x-shared/capability-loading.md § Shared agentmemory.server_up Probe` and `../x-shared/mcp-toolbox.md § agentmemory`. Do not duplicate; do not work around the capability gate.
+- **basic-memory project targeting.** When wiring basic-memory calls in this skill, tool selection and placement/tagging conventions are canonical in `../x-shared/mcp-toolbox.md § basic-memory`. Tools take an optional `project` — omit for the session default; wrong-project writes succeed silently into the wrong store. Do not duplicate; do not work around the capability gate.
 
 ## Review Feedback Misclassified (was: as Mode F)
 

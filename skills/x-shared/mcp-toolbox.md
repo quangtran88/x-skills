@@ -66,64 +66,36 @@ Code-intelligence MCP server (`npm install -g gitnexus`). Provides precomputed c
 - Tools in the **correctness-sensitive** class: a stale index produces silently-wrong symbol/flow mappings — **hard-degrade to the Fallback row**. Do not use stale graph output.
 - Tools in the **advisory** class: proceed using the stale index but **append a one-line staleness note** (e.g. `(index N commits stale — results may lag HEAD)`) to the surfaced result. Stale search beats no search; the user reads raw results.
 
-## agentmemory (optional, when `mcp.agentmemory` pinned)
+## basic-memory (optional, when `mcp.basic_memory` pinned)
 
-Persistent memory MCP from `rohitg00/agentmemory`. Two tiers — standalone (7 tools exposed through MCP, work without a running server) and server (46 more tools, reachable ONLY via the agentmemory HTTP backend at `${AGENTMEMORY_URL:-http://localhost:3111}`; server-tier tools are NOT registered through the MCP transport — see the `agentmemory.server_up` probe defined in `capability-loading.md`). License: Apache-2.0.
+Persistent markdown knowledge base from `basicmachines-co/basic-memory` (vendored at `research/basicmachines-co/basic-memory`). Local-first: notes are plain markdown files indexed into SQLite; the MCP server runs single-process over stdio (`uvx basic-memory mcp`) — no separate backend, no health probe, **one tier** (see `capability-loading.md § basic-memory: single-tier, no derived probe`). Tool prefix: `mcp__basic-memory__*`. License: AGPL-3.0.
 
-### Standalone tier (always available when `mcp.agentmemory` pinned)
-
-| Need | Primary tool | Fallback (when `mcp.agentmemory` not pinned) |
+| Need | Primary tool | Fallback (when `mcp.basic_memory` not pinned) |
 |---|---|---|
-| Recall prior decisions/observations on a topic | `agentmemory` → `memory_smart_search` (`{ query, limit }`) | Native Claude memory (`~/.claude/projects/<proj>/memory/MEMORY.md`) |
-| Targeted recall with format + token budget | `agentmemory` → `memory_recall` (`{ query, format: 'compact', token_budget }`) | Native Claude memory grep |
-| Save an insight, decision, or lesson | `agentmemory` → `memory_save` (`{ content, type, concepts, files }`) | Append to native Claude memory |
-| List sessions for replay | `agentmemory` → `memory_sessions` | Manual `ls ~/.claude/projects/` |
+| Recall prior decisions/lessons on a topic | `basic-memory` → `search_notes` (`{ query, page_size }`) | Native Claude memory (`~/.claude/projects/<proj>/memory/MEMORY.md`) |
+| Traverse related notes from a known hit | `basic-memory` → `build_context` (`{ url: "memory://<permalink>", depth, timeframe }`) | Native Claude memory grep |
+| Save an insight, decision, or lesson | `basic-memory` → `write_note` (`{ title, directory, content, tags }`) | Append to native Claude memory |
+| What changed recently (cross-session context) | `basic-memory` → `recent_activity` (`{ timeframe: "7d" }`) | Manual `ls ~/.claude/projects/` |
+| Read / patch one known note | `basic-memory` → `read_note` / `edit_note` | n/a |
 
-> **Asymmetry in proxy mode:** When the shim is in proxy mode, the upstream's `tools/list` does NOT include `memory_audit`, `memory_export`, or `memory_governance_delete` — empirically verified against agentmemory v0.9.21. If you need user-driven export / audit / delete, the upstream `agentmemory:forget` and `agentmemory:export` skills (separate plugin) own those flows over HTTP. The standalone tier is the source of truth for these three tools; proxy mode is a NEAR-superset, not strict.
+> Tool schemas accept common aliases (`limit` for `page_size`, `folder`/`dir` for `directory`, `q` for `query`) — verified in the vendored source at `src/basic_memory/mcp/tools/`. Prefer the canonical names above.
 
-### Consumer rules — quality filtering & cross-project tagging
+### Consumer rules — placement & cross-project tagging
 
-These rules apply to ALL skill bootstraps that call `memory_smart_search` / `memory_save`. They address two issues empirically observed in cross-project queries (912 lessons / 240 crystals / 1000 insights across the active store):
+These rules apply to ALL skill bootstraps that call `search_notes` / `write_note`:
 
-**Filter on query side.** `memory_smart_search` returns lessons emitted by the upstream `replay.ts` LESSON_PATTERNS regex auto-importer — stamped with `tags: ["auto-import"]` and `confidence: 0.4`. These are regex-extracted fragments from JSONL traces, not crystallized insights; in practice ~9 of 10 top lesson hits on a broad query are auto-import noise. When consuming results, **drop lessons where `tags` contains `"auto-import"` OR `confidence < 0.5`** before treating them as leads. Manual `memory_save` and `crystallize` entries (0.6–0.85 confidence) are the signal layer; everything below that threshold is regex chaff and must not be cited as prior precedent.
+**Placement on save.** `write_note` requires a `directory`. Route by note kind — `lessons/<project-slug>/` (gotchas, root causes, failed approaches), `decisions/<project-slug>/` (decisions + rationale), `notes/<project-slug>/` (durable facts, conventions). project-slug = basename of cwd (e.g. `x-skills`). These mirror the Basic Memory placement conventions already seeded in the store — do not invent new top-level folders.
 
-**Tag on save side.** When calling `memory_save`, prefix the project slug into the `concepts` string (e.g., `concepts: "x-skills:x-research,<signal>,<topic>"`). The daemon already records the project path automatically as a field on the record, but `concepts` is the keyword-indexed surface used by `memory_smart_search` — prefixing makes future cross-project queries filter-friendly (`memory_smart_search "x-skills:x-research"` then narrows to this project's saves). The prefix is additive; keep the human-readable concept tokens after it.
+**Tag on save.** Always include the project slug and the emitting skill in `tags` (e.g. `tags: ["x-skills", "x-research", "<topic>"]`). Tags are the keyword-filter surface for future cross-project `search_notes` queries.
 
-### Server tier (gated by `agentmemory.server_up` — extended MCP toolset, proxy-forwarded)
+**Project targeting.** Every tool takes an optional `project` and resolves a session default when omitted. Omit it normally; pass it explicitly only when the user runs multiple knowledge bases. Wrong-project writes succeed silently into the wrong store — if a recall that should hit comes back empty, check `list_memory_projects` before concluding the note was never saved.
 
-When the agentmemory backend is reachable, the `@agentmemory/mcp` shim enters **proxy mode** (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:354-415`): `tools/list` returns the upstream server's curated tool list, and any unknown tool call is forwarded to `/agentmemory/mcp/call`. The proxy-mode tool list is **NOT a strict superset** of the standalone tools — empirically (against agentmemory v0.9.21 with `AGENTMEMORY_FORCE_PROXY=1`) the shim exposes 8 MCP tools total, three of the standalone seven disappear, and several documented "server-tier" capabilities remain HTTP-only. Direct HTTP routes are listed as the canonical interface for those.
-
-#### MCP-callable in proxy mode (4 server-tier additions on top of 4 standalone survivors)
-
-| Need | Primary MCP tool (proxy-forwarded when server up) | Direct HTTP route (fallback / non-MCP consumers) | Fallback when server down |
-|---|---|---|---|
-| Run health checks across all subsystems | `memory_diagnose({ categories? })` | n/a — proxy-only | n/a |
-| Run the 4-tier memory consolidation pipeline | `memory_consolidate({ tier? })` | n/a — proxy-only | n/a |
-| Save a lesson with confidence scoring | `memory_lesson_save({ content, confidence?, context?, project?, tags? })` | n/a — proxy-only | Skip — use `memory_save` instead |
-| Traverse the knowledge graph and synthesize higher-order insights | `memory_reflect({ project?, maxClusters? })` | n/a — proxy-only | Skip — no fallback |
-
-#### HTTP-only when server up (NOT exposed through MCP proxy)
-
-| Need | Direct HTTP route | Fallback when server down |
-|---|---|---|
-| Past observations about specific files (regression hunt) | `POST ${AGENTMEMORY_URL}/agentmemory/file-context` (body: `{ files: ["..."], sessionId? }`) | `git log -p -- <file>` |
-| Find the session that produced a commit | `GET ${AGENTMEMORY_URL}/agentmemory/session/by-commit?commit=<sha>` | `git show <sha>` + manual reconstruction |
-| Recent commits with session linkage | `GET ${AGENTMEMORY_URL}/agentmemory/commits` | `git log --oneline` |
-| Recurring patterns across sessions | `POST ${AGENTMEMORY_URL}/agentmemory/patterns` | Skip — manual review |
-| Chronological observations around an anchor | `POST ${AGENTMEMORY_URL}/agentmemory/timeline` | `git log --since/--until` |
-| Knowledge-graph traversal | `POST ${AGENTMEMORY_URL}/agentmemory/graph/query` | Skip — no fallback |
-| Typed-dimension filtering | `POST ${AGENTMEMORY_URL}/agentmemory/facets/query` | Skip — manual triage |
-| Image-similarity search (UI regression) | `POST ${AGENTMEMORY_URL}/agentmemory/vision-search` | Manual visual diff |
-| Health probe (used for `server_up` derivation) | `GET ${AGENTMEMORY_URL}/agentmemory/livez` | n/a |
-
-> Empirically verified set; backend versions other than 0.9.21 may expose different curations. Re-test with: ToolSearch `+memory agentmemory` after `memory_diagnose` succeeds, and grep `(.tools // []) | map(.name)` against `${AGENTMEMORY_URL}/agentmemory/mcp/tools`.
-
-> Consumers should resolve the canonical request/response shape for each endpoint against the vendored upstream at `research/rohitg00/agentmemory`. MCP tool schemas live in `src/mcp/tools-registry.ts`; function_id ↔ HTTP route mapping lives in `src/triggers/api.ts`; the MCP→function_id dispatcher lives in `src/mcp/server.ts`. The endpoint paths above mirror the upstream's published REST routes (verified `grep -rn '"/agentmemory/' src/triggers/api.ts`).
+**No chaff filter needed.** Unlike the previous agentmemory backend, basic-memory has no regex auto-importer and no confidence scores — every note is deliberately written. Treat all hits as user-curated; rank by relevance, not confidence.
 
 ### Tools NOT routed through x-skills
 
-`memory_action_*`, `memory_sketch_*`, `memory_lease`, `memory_signal_*`, `memory_team_*`, `memory_mesh_sync`, `memory_routine_run`, `memory_sentinel_*`, `memory_checkpoint`, `memory_claude_bridge_sync` — workflow/multi-agent coordination overlapping with TodoWrite + `x-team` + `oh-my-claudecode:team`. Auto-deletion tools (`memory_governance_delete`, `memory_export`, `memory_obsidian_export`, `memory_audit`) — user-driven, owned by the upstream `agentmemory:forget` skill.
+`canvas`, `list_directory`, `move_note`, `delete_note`, project management (`list_memory_projects` outside the empty-recall check, `create_memory_project`, `delete_project`, `list_workspaces`), schema tools (`schema_validate`, `schema_infer`, `schema_diff`), ChatGPT-compat `search`/`fetch`, `cloud_info`, `release_notes` — user-driven curation and lifecycle flows, owned by the upstream `basic-memory` plugin skills (`bm-remember`, `bm-setup`) and the `memory-*` companion skills.
 
-### Disambiguation: agentmemory vs Claude's auto-memory file
+### Disambiguation: basic-memory vs Claude's auto-memory file
 
-Claude Code already injects `~/.claude/projects/<proj>/memory/MEMORY.md` into every session. That file is best for **the user's stable preferences and project facts**. agentmemory is best for **per-session observations, decisions, and file-touch history** that's too granular for MEMORY.md and benefits from semantic search. Use both — they don't compete.
+Claude Code already injects `~/.claude/projects/<proj>/memory/MEMORY.md` into every session. That file is best for **the user's stable preferences and project facts**. basic-memory is best for **durable lessons, decisions with rationale, and cross-session knowledge** that benefits from full-text search and graph traversal (`memory://` links). Use both — they don't compete; never duplicate the same fact into both.

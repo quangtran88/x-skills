@@ -36,7 +36,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
       "exa": true,
       "context7": true,
       "gitnexus": true,
-      "agentmemory": true
+      "basic_memory": true
     },
     "cli": {
       "gitnexus": true
@@ -118,48 +118,13 @@ The probe yields BOTH indexed-set membership AND freshness from this one respons
 
 **With `mcp.gitnexus` NOT pinned in the bootstrap-active set, this probe is a no-op** — it is never run, nothing is derived or pinned, and consumers fall straight to their fallback rows. Non-gitnexus sessions have **zero behavior change**; the probe adds no calls and no branching on those paths.
 
-## Shared agentmemory.server_up Probe (session-pinned, derived state)
+## basic-memory: single-tier, no derived probe
 
-Same shape as the GitNexus probe above — solves the same problem (a single capability boolean cannot distinguish "MCP wired" from "remote backend reachable") for a different MCP.
+Unlike GitNexus above, `mcp.basic_memory` needs **no runtime-derived probe**. The basic-memory MCP server (`uvx basic-memory mcp`) is single-process over stdio — plain markdown files plus a local SQLite index, no separate HTTP backend to reach (verified at `research/basicmachines-co/basic-memory/src/basic_memory/cli/commands/mcp.py:28`, default transport `stdio`). One boolean answers everything:
 
-### Capability key vs. derived probe
+- `mcp.basic_memory` — boolean capability key written by `bin/setup`. When pinned, all routed tools (`search_notes`, `write_note`, `build_context`, `recent_activity`, `read_note`, `edit_note`) are callable as `mcp__basic-memory__*`. When not pinned, consumers fall straight to their non-memory fallback rows (native Claude auto-memory). Sessions without basic-memory have **zero behavior change**.
 
-- `mcp.agentmemory` — boolean capability key written by `bin/setup`. Answers "is the agentmemory MCP transport available?" When true, the 7 **standalone tools** (`memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_audit`, `memory_export`, `memory_governance_delete`) are callable.
-- `agentmemory.server_up` — runtime-derived session pin. Answers "is the agentmemory HTTP backend reachable at `${AGENTMEMORY_URL:-http://localhost:3111}`?" When true, the MCP shim enters **proxy mode** — `tools/list` returns the upstream's **curated** MCP tool list (empirically against v0.9.21 with `AGENTMEMORY_FORCE_PROXY=1`: 4 standalone survivors + 4 server-tier additions = 8 tools total — `memory_smart_search`, `memory_save`, `memory_recall`, `memory_sessions`, `memory_diagnose`, `memory_consolidate`, `memory_lesson_save`, `memory_reflect`). NOTE: `tools/list` does NOT include `memory_audit`/`memory_export`/`memory_governance_delete` in proxy mode (they're standalone-only — verify with `agentmemory:forget` skill if needed), and the proxy MCP catalog does NOT include the file/commit/patterns/timeline/graph/facet/vision tools (those remain HTTP-only at `/agentmemory/<route>` per `mcp-toolbox.md`). Unknown MCP tool calls are forwarded to `/agentmemory/mcp/call` per `standalone.ts:354-357`. When false, only the 7 IMPLEMENTED_TOOLS work locally — every other `memory_*` MCP call returns `Unknown tool`.
-
-The probe is gated by `mcp.agentmemory` being pinned. Without the capability key, no probe runs.
-
-**Important:** The shim has TWO modes, controlled by backend reachability (verified at `research/rohitg00/agentmemory/src/mcp/standalone.ts:343-415`):
-- **Standalone mode** (backend NOT reachable): only the 7 IMPLEMENTED_TOOLS at `standalone.ts:16-24` are callable via MCP. Server-tier tools return `Unknown tool`.
-- **Proxy mode** (backend reachable): `tools/list` returns the upstream's curated MCP catalog (empirically 8 tools against v0.9.21, NOT a strict superset of standalone — see the tool enumeration above), AND any non-standalone tool call is forwarded to `/agentmemory/mcp/call`. Server-tier tools that ARE in that curation (`memory_diagnose`, `memory_consolidate`, `memory_lesson_save`, `memory_reflect`) become callable as `mcp__plugin_agentmemory_agentmemory__*`. Server-tier tools that are NOT (file_history, commit_lookup, patterns, timeline, graph_query, facet_query, vision_search) are reachable ONLY via direct HTTP per `mcp-toolbox.md`.
-
-Direct HTTP access to `${AGENTMEMORY_URL}/agentmemory/<route>` is also possible (routes live under `/agentmemory/*`, never `/api/*`; verified at `src/triggers/api.ts`), and is documented in `mcp-toolbox.md` as a fallback for non-MCP consumers (CLI scripts, integration tests). The probe itself MUST use HTTP `/agentmemory/livez` (not MCP) because the probe runs before the MCP shim's mode is settled.
-
-### Derivation (run once, then session-pinned)
-
-At the first Bootstrap (across any x-skill that needs server-tier memory tools) in a session:
-
-1. **Gate:** `mcp.agentmemory` must be in the bootstrap-active set. If not, **skip entirely** — `agentmemory.server_up = false`, all server-tier rows fall through to their fallback.
-2. Probe out-of-band via HTTP — do NOT use an MCP tool call:
-
-   ```bash
-   curl -fsS --max-time 3 "${AGENTMEMORY_URL:-http://localhost:3111}/agentmemory/livez"
-   ```
-
-   Why HTTP and not MCP: `memory_diagnose` is server-tier-only and is never registered in the MCP transport (see "Important" note above). The `livez` endpoint is the upstream's own server-health convention, returns `{"service":"agentmemory","status":"ok"}` in ~3 ms when reachable, and works without any env vars when the backend is on its default port.
-3. Pin the result for the rest of the session.
-   - HTTP 2xx with `status: "ok"` in the body ⇒ `agentmemory.server_up = true`.
-   - Non-zero curl exit, timeout, or any non-ok body ⇒ `agentmemory.server_up = false`.
-4. **It runs exactly once per session.** All consuming skills read the pinned record.
-
-### Use-class asymmetry
-
-- **Correctness-sensitive consumers** (e.g., `x-bugfix` regression bisect via `memory_commit_lookup`) **hard-degrade to fallback** when `agentmemory.server_up = false`. Never call server-tier endpoints speculatively.
-- **Advisory consumers** (e.g., `x-research` enrichment via `memory_patterns`) proceed with a one-line note: `[x-skills] agentmemory server not reachable; standalone tools only.`
-
-### Unpinned no-op
-
-With `mcp.agentmemory` NOT pinned in the bootstrap-active set, this probe is a no-op — never run, nothing derived. Consumers fall straight to their non-memory fallback rows. Sessions without agentmemory have **zero behavior change**.
+A tool error despite the pin is ordinary setup drift — handle via § Drift Handling below, not a probe. The one runtime dimension a boolean cannot capture is **project targeting** (which knowledge base a call lands in when multiple are configured) — conventions for that live in `mcp-toolbox.md § basic-memory`.
 
 ## Drift Handling
 
