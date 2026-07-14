@@ -125,6 +125,11 @@ Skip this gate for 1-2 task routes and Mode D (overhead > value).
 
 6. **Recompose commits** (see "Commit Recomposition" below) — runs after verification passes, before branch finish.
 
+6.5. **Archive backlog doc** (only when the Mode A source doc lives under `docs/backlog/`) —
+   move to the type folder, flip `status: done`, remove the index row, commit as `docs:`.
+   Full procedure: `../SKILL.md` § "Backlog Doc Lifecycle (Mode A)" step 3. Runs after
+   recomposition so the archival commit stays atomic and outside the recompose range.
+
 7. **Finish branch** — `superpowers:finishing-a-development-branch` to decide merge/PR/keep/discard.
 
 ## Commit Recomposition (executor / ralph routes)

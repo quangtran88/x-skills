@@ -14,6 +14,7 @@ Fill every section with real content harvested from the conversation. Never ship
 ---
 title: <Feature name>
 slug: <kebab-slug>
+type: feat               # feat | fix | chore | refactor | … — drives x-worktree branch naming (<type>/<slug>) and the archival folder on done
 status: backlog          # backlog | ready | in-progress | done — set ready only when Acceptance is grounded in real conversation material
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
@@ -114,5 +115,23 @@ not the low-level "how" (that's the implementation plan).
 
 - **backlog** — idea captured, not yet fleshed out enough to build (conversation too thin).
 - **ready** — CORE complete + acceptance criteria **grounded in real conversation material** (not invented from thin context); safe to hand to writing-plans / x-do. A completed walk that had to invent Acceptance stays `backlog`.
-- **in-progress** — implementation started (set by hand or by the downstream skill).
-- **done** — shipped; kept as a reference record.
+- **in-progress** — implementation started (set by hand or by the downstream skill — x-do Mode A flips this when it picks the doc up).
+- **done** — shipped; archived out of `docs/backlog/` per "Archival on done" below. Kept as a reference record.
+
+## Archival on done
+
+When implementation completes (x-do Mode A finishes on this doc), the doc leaves the
+backlog: `git mv` it out of `docs/backlog/` into the folder matching its `type`, flip
+frontmatter to `status: done` + fresh `updated`, and delete its row from
+`docs/backlog/README.md` — the backlog index lists only unshipped work.
+
+| `type` | Destination |
+|---|---|
+| `feat` | `docs/feature/` |
+| `fix` | `docs/bugs/` |
+| anything else (`chore`, `refactor`, `perf`, …) | `docs/<type>/` |
+
+Create the destination folder if absent. Commit the move as
+`docs: archive <slug> — done, moved to <destination>`. When `type` is missing from
+frontmatter (docs predating this field), derive it via the detection order in
+`../../x-worktree/references/doc-naming.md` (H1 prefix → filename prefix → fallback `feat`).

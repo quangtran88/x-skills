@@ -97,6 +97,9 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
 ### 5. Write the doc
 - Render `docs/backlog/<slug>.md` from `references/template.md` with the drafted content.
   Include only the modules that passed triage.
+- Set `type` in frontmatter from the nature of the work: `fix` for bug specs, `refactor`,
+  `chore`, etc. as appropriate, `feat` otherwise. Downstream skills consume it: x-worktree
+  derives the branch name `<type>/<slug>` and x-do picks the archival folder on completion.
 - Populate `related` with any research docs, PRs, plans, or tickets referenced in the
   conversation (leave `[]` if none).
 - Set `status`: `ready` **only if the Acceptance criteria are grounded in real conversation
@@ -113,7 +116,19 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
 
   > Backlog doc written to `docs/backlog/<slug>.md` (status: <status>).
   > Tell me what to change and I'll update it in place.
-  > Ready to plan the build? **[P]** `superpowers:writing-plans` · **[D]** `/x-do` · **[N]** stop here.
+  > Next → **[C]** commit doc on current branch · **[W]** worktree + implement (`/x-worktree <doc>`) ·
+  > **[P]** plan first (`superpowers:writing-plans`) · **[D]** `/x-do <doc>` here · **[N]** stop.
+
+  Handoff behavior per letter:
+  - **[C]** — commit only this doc + the index: `docs(backlog): add <slug>` (or `update <slug>`
+    on a re-run). Then re-offer **[W] / [D] / [N]** once — capture-and-park is a valid end state.
+  - **[W]** — dispatch `Skill: x-skills:x-worktree docs/backlog/<slug>.md`. Works from either
+    state: an uncommitted doc is migrated + committed inside the new worktree; a committed doc
+    is inherited via the base branch. Note the difference in one line when offering: [C] then
+    [W] keeps the doc on the current branch too; [W] alone carries it only on the new branch
+    until merge. On x-worktree's success envelope, follow its `/x-do` handoff suggestion.
+  - **[D]** — dispatch `Skill: x-skills:x-do docs/backlog/<slug>.md` in the current dir
+    (x-do Mode A; it applies its Backlog Doc Lifecycle — status flip, archival on completion).
 
 ## References
 

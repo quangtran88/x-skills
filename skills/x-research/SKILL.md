@@ -132,7 +132,13 @@ Max Mode: same rules + reconciliation template in `references/max-mode.md`.
 If research was preparation for implementation:
 
 > Research complete. Ready to act?
-> **[Y]** Start `/x-do` **[P]** Plan first (`superpowers:writing-plans`) **[N]** More research
+> **[Y]** Start `/x-do` **[B]** Capture as backlog doc (`/x-backlog`) **[P]** Plan first (`superpowers:writing-plans`) **[N]** More research
+
+Offer **[B]** prominently when the research produced a decision or solution shape worth
+persisting before build (architecture choice, feature spec, bug root-cause with a chosen
+fix) — x-backlog harvests this conversation autonomously, and the resulting doc then drives
+the rest of the chain (`/x-worktree <doc>` → `/x-do <doc>`, see
+`../x-shared/workflow-chains.md` § Backlog Lifecycle).
 
 **Quick-action exception:** when research surfaces a single obvious small fix (<10 lines, one file, no ambiguity) and the user approves inline ("ok", "do it"), apply directly. TS/JS still needs tsc + eslint.
 

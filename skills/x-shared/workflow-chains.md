@@ -12,6 +12,21 @@ Common sequences across x-skills. Not every task needs a full chain — use judg
 | **Quick Fix** | `/x-do` (Mode D: quick task) → `/x-review` (Target C: last commit) |
 | **Architecture Decision** | `/x-research` (Type C: architecture) → `/x-do` (Mode B: implement decision) |
 | **Plan Gate (high-risk)** | plan/spec → `/x-mindful` (extract + walkthrough) → revised plan → `/x-do` (Mode A) → `/x-review` → merge |
+| **Backlog Lifecycle** | brainstorm / `/x-research` → `/x-backlog` (doc + commit) → `/x-worktree <doc>` (branch `<type>/<slug>`, doc migrated + committed, cwd switched) → `/x-do <doc>` (Mode A) → doc archived `docs/backlog/` → `docs/<type-folder>/` → `/x-review` → merge |
+
+## Backlog Lifecycle — handoff points
+
+Each skill in the chain ends by offering the next link; no step assumes the user remembers
+the chain. The doc is the baton — every handoff passes its path.
+
+1. `/x-research` close → offers `[B]` capture as backlog doc.
+2. `/x-backlog` close → offers `[C]` commit · `[W]` `/x-worktree <doc>` · `[D]` `/x-do <doc>` here.
+3. `/x-worktree` success envelope (doc runs) → suggests `/x-do <doc>` in the new worktree.
+4. `/x-do` Mode A on a `docs/backlog/` doc → flips `status: in-progress` at start, archives the
+   doc on completion (move + `status: done` + index-row removal + `docs:` commit) per
+   `../x-do/SKILL.md` § "Backlog Doc Lifecycle (Mode A)".
+
+Archival folder mapping lives in `../x-backlog/references/template.md` § "Archival on done".
 
 ## When to Chain vs. Skip
 

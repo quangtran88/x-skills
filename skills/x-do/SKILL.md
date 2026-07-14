@@ -193,6 +193,33 @@ See `references/mode-guidance.md` for detailed per-mode instructions. Key rules:
 - **C: Delegate to `/x-bugfix`** — uses `systematic-debugging` gate + `debugger` agent + TDD failing test before fix.
 - **D: Direct execution** via native `Edit`/`Write`, still verify.
 
+## Backlog Doc Lifecycle (Mode A)
+
+Applies when the Mode A plan/spec path is under `docs/backlog/` (an x-backlog doc). The
+frontmatter edits and file move below are mechanical bookkeeping — an explicit exception to
+the router forbid, same class as Mode D.
+
+1. **Worktree suggestion (once, before executing).** If no `--wt` flag was passed AND cwd is
+   the main checkout (`[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ]`),
+   offer once via AskUserQuestion: `(1) isolate — new worktree from this doc (recommended)` /
+   `(2) continue in current dir`. On (1), dispatch `Skill: x-skills:x-worktree <doc-path>` and
+   honor the same envelope rules as Pre-Flight `--wt` steps 3–6 (pin `WORKTREE_PATH`,
+   `ISOLATE_APPLIED` handling). Already inside a linked worktree → skip silently.
+2. **Status flip at start.** Set frontmatter `status: in-progress` + `updated: <today>` before
+   dispatching executors. No separate commit — it rides with the implementation commits.
+3. **Archive on completion.** After verification passes and commits are recomposed
+   (`steps/step-04-execute.md` § Execution step 6.5), archive the doc:
+   - Destination from frontmatter `type` per `../x-backlog/references/template.md`
+     § "Archival on done": `feat` → `docs/feature/`, `fix` → `docs/bugs/`, anything else →
+     `docs/<type>/`. Missing `type` → derive via `../x-worktree/references/doc-naming.md`
+     detection order.
+   - `git mv docs/backlog/<slug>.md docs/<dest>/<slug>.md` (create the folder if absent);
+     set `status: done` + `updated: <today>`; delete the doc's row from `docs/backlog/README.md`.
+   - Commit: `docs: archive <slug> — done, moved to <dest>`.
+
+Skip all three silently for plans that are not backlog docs — this section adds nothing to
+plain `writing-plans` output or ad-hoc specs.
+
 ## Complexity Scaling
 
 The 3-axis Routing Signals above replace previous file-count and depth heuristics. `references/delegation-and-scaling.md` is retained for its agent fallback table and escalation rules — ignore any scaling guidance in it that contradicts the 3-axis model.

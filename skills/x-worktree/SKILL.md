@@ -142,6 +142,17 @@ Env: `XWI_AUTO_ISOLATE=0` disables auto-isolate persistently for the shell sessi
    ISOLATE_HINT=<one-line>                    # only when false
    ```
 
+8. **Handoff suggestion (doc runs only).** When `DOCS[]` was non-empty and no `DOCS_ERROR`
+   was emitted, print ONE line AFTER the envelope (sibling callers parse only `KEY=` lines,
+   so a trailing suggestion is safe):
+   ```
+   Next → [D] /x-do <primary-doc-relpath> — implement it here (cwd already switched) · [N] stop
+   ```
+   `<primary-doc-relpath>` = `DOCS[0]` relative to `WORKTREE_PATH`. If the user picks [D],
+   dispatch `Skill: x-skills:x-do <primary-doc-relpath>` — x-do Mode A picks the doc up and,
+   for `docs/backlog/` docs, runs its Backlog Doc Lifecycle. Skip this step entirely when
+   `DOCS[]` was empty or doc migration failed (surface the failure instead).
+
 ## Error envelope (unified)
 
 Every failure path emits this exact shape — no other error formats:
