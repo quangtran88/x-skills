@@ -27,9 +27,11 @@ No capability-loading / OMO / agy dispatch is needed. x-backlog is Claude-native
 drafts and writes a markdown file. It never delegates to sub-agents.
 
 The one exception is the **Memory Reflex** (`../x-shared/mcp-toolbox.md § Memory Reflex`): its
-recall (step 2) and persist (step 6) are gated on `mcp.basic_memory` being present in the
-injected `[x-skills/capabilities]` snapshot line. Read that snapshot for the gate only — no
-full capability-loading, no sub-agent dispatch. When basic_memory is absent, both beats skip
+recall (step 2) and persist (step 6) are gated on `mcp.basic_memory` being in the
+bootstrap-active capability set — the `[x-skills/capabilities]` snapshot line, or its
+`~/.config/x-skills/capabilities.json` fallback (per `../x-shared/capability-loading.md`) when
+the line isn't in context. Consult the pinned set for this gate only — no full
+capability-loading walk, no sub-agent dispatch. When basic_memory is absent, both beats skip
 silently and x-backlog behaves exactly as before.
 
 ## Anti-Triggers
@@ -65,7 +67,7 @@ the only pause is the blocker checkpoint in step 3, and only when a blocker actu
 - Announce: `Backlog doc: docs/backlog/<slug>.md (new | update).`
 
 ### 2. Harvest from context
-- [ ] **Memory recall** (only when `mcp.basic_memory` is present in the injected `[x-skills/capabilities]` snapshot — see the Bootstrap note): one `mcp__basic-memory__search_notes({ query: "<feature slug/name> x-skills", page_size: 5 })` call over prior `decisions/<project-slug>/` notes BEFORE drafting — surface cross-session contradictions with earlier decisions as leads for the step-3 blocker checkpoint (blocker #1 Contradiction), not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not present.
+- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set — see the Bootstrap note): one `mcp__basic-memory__search_notes({ query: "<feature slug/name>", page_size: 5 })` call over prior `decisions/<project-slug>/` notes BEFORE drafting — surface cross-session contradictions with earlier decisions as leads for the step-3 blocker checkpoint (blocker #1 Contradiction), not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
 - Scan the current conversation for the material that fills the CORE sections and any
   modules: the problem, the chosen solution, decisions made and alternatives rejected,
   scope boundaries, features, integrations, contracts, use cases, open questions.
@@ -111,14 +113,16 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
   conversation (leave `[]` if none).
 - Set `status`: `ready` **only if the Acceptance criteria are grounded in real conversation
   material** — criteria you had to invent from thin context are not ready, so use `backlog`.
-- Create or update `docs/backlog/README.md` — add this doc's row, or **replace** the existing
+- Create or update `docs/backlog/README.md` — if the index is in its empty state, delete the
+  "no unshipped backlog items" line as you add the first row back (see `references/template.md`
+  § "Index file" → Empty-state line). Then add this doc's row, or **replace** the existing
   row matched by slug (never append a duplicate).
 
 ### 6. Self-review & close
 - Fresh-eyes pass on the written file: any leftover `<placeholder>`, contradiction between
   sections (e.g. a scope bullet that fights a decision), or vague acceptance criterion?
   Fix inline. No re-review loop — fix and move on.
-- [ ] **Persist Key Decisions** (only when `mcp.basic_memory` is present in the injected `[x-skills/capabilities]` snapshot — see the Bootstrap note): for each decision block drafted in step 4, one `mcp__basic-memory__write_note({ title: "<slug>: <decision title>", directory: "decisions/<project-slug>", content: "<decision + rationale + rejected alternative>", tags: ["<project-slug>", "x-backlog", "<slug>"] })` call (project-slug = basename of cwd). Persist the decision + rationale only — not the whole doc. Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not present.
+- [ ] **Persist Key Decisions** (only when `mcp.basic_memory` pinned in the bootstrap-active set — see the Bootstrap note): for each decision block drafted in step 4, one `mcp__basic-memory__write_note({ title: "<slug>: <decision title>", directory: "decisions/<project-slug>", content: "<decision + rationale + rejected alternative>", tags: ["<project-slug>", "x-backlog", "<slug>"] })` call (project-slug = basename of cwd). Persist the decision + rationale only — not the whole doc; if this run's recall already surfaced a note for the same decision, `edit_note` it rather than writing a duplicate — per the *Update over duplicate* shape in § Memory Reflex (the recall hit's **permalink** as `identifier`, `operation: "append"`; it cannot retag or move a note, so write fresh if the surfaced note is misfiled). Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
 - Report the path, status, a one-screen summary of what was drafted, and any Open Questions
   recorded — then invite edits and offer the downstream handoff:
 
@@ -130,11 +134,21 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
   Handoff behavior per letter:
   - **[C]** — commit only this doc + the index: `docs(backlog): add <slug>` (or `update <slug>`
     on a re-run). Then re-offer **[W] / [D] / [N]** once — capture-and-park is a valid end state.
-  - **[W]** — dispatch `Skill: x-skills:x-worktree docs/backlog/<slug>.md`. Works from either
-    state: an uncommitted doc is migrated + committed inside the new worktree; a committed doc
-    is inherited via the base branch. Note the difference in one line when offering: [C] then
-    [W] keeps the doc on the current branch too; [W] alone carries it only on the new branch
-    until merge. On x-worktree's success envelope, follow its `/x-do` handoff suggestion.
+  - **[W]** — dispatch `Skill: x-skills:x-worktree docs/backlog/<slug>.md`. Two doc states carry
+    cleanly: an untracked new doc is migrated + committed inside the new worktree; a committed
+    clean doc is inherited via the base branch. **The third state does not:** an *update* run
+    (step 1 re-rendered an already-committed doc) leaves it tracked + modified, which x-worktree
+    step 2.5 hard-rejects — so on an update run, do **[C] first** to commit the change, then [W].
+    Note the difference in one line when offering: [C] then [W] keeps the doc on the current
+    branch too; [W] alone carries only the doc to the new branch until merge. The `README.md`
+    index row from step 5 is a *separate* modified file x-worktree does not migrate — prefer
+    [C] first so doc + index travel together; with bare [W] the row stays on the current branch
+    and the archival row-deletion on the worktree branch harmlessly no-ops. On x-worktree's
+    success envelope, follow its `/x-do` handoff suggestion.
+  - **[P]** — dispatch `superpowers:writing-plans` on the doc. This path does **not** run x-do
+    Mode A, so nothing auto-flips `status` or archives the doc: flip `status: in-progress` by hand
+    when the build starts, and archive per `references/template.md` § "Archival on done" when it
+    ships — otherwise the doc silently rots in `docs/backlog/` after implementation.
   - **[D]** — dispatch `Skill: x-skills:x-do docs/backlog/<slug>.md` in the current dir
     (x-do Mode A; it applies its Backlog Doc Lifecycle — status flip, archival on completion).
 

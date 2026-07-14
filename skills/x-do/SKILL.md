@@ -158,8 +158,9 @@ Before starting any mode, complete ALL of these checks:
   - `ralph_state` — incomplete stories → offer to resume
   - `specs_dir` — uncommitted design docs → offer to continue
   - Draft plan files (`spec-wip.md`) → offer to continue
+  - `docs/backlog/*.md` with frontmatter `status: in-progress` — a backlog doc abandoned mid-implementation (Mode A flipped it, the run never finished) → offer to resume it before starting anything new
 - [ ] **Gotchas:** Read `gotchas.md` for known failure patterns before starting
-- [ ] **Memory recall** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__search_notes({ query: "<task keywords> x-skills", page_size: 5 })` call BEFORE mode classification, so Mode A and Mode D recall too — not just the Mode B `steps/step-01-gather.md` path. Surface prior similar tasks as leads, not verdicts, per `../x-shared/mcp-toolbox.md § Memory Reflex`. Skip silently when not pinned.
+- [ ] **Memory recall** — § Memory Reflex recall beat (`../x-shared/mcp-toolbox.md`): `search_notes({ query: "<task keywords>", page_size: 5 })`, fired BEFORE mode classification so Mode A and Mode D recall too — not just the Mode B `steps/step-01-gather.md` path. Prior similar tasks are leads, not verdicts. Gate: `mcp.basic_memory` pinned in the bootstrap-active set — otherwise skip silently.
 
 ## Routing Signals (3 axes — replaces Depth Calibration)
 
@@ -201,13 +202,20 @@ frontmatter edits and file move below are mechanical bookkeeping — an explicit
 the router forbid, same class as Mode D.
 
 1. **Worktree suggestion (once, before executing).** If no `--wt` flag was passed AND cwd is
-   the main checkout (`[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ]`),
+   the main checkout (`[ "$(git rev-parse --absolute-git-dir)" = "$(git rev-parse --path-format=absolute --git-common-dir)" ]`
+   — both sides MUST be absolute: the plain `--git-dir`/`--git-common-dir` forms return
+   mixed absolute/relative paths from a subdirectory and false-negative there),
    offer once via AskUserQuestion: `(1) isolate — new worktree from this doc (recommended)` /
    `(2) continue in current dir`. On (1), dispatch `Skill: x-skills:x-worktree <doc-path>` and
    honor the same envelope rules as Pre-Flight `--wt` steps 3–6 (pin `WORKTREE_PATH`,
    `ISOLATE_APPLIED` handling). Already inside a linked worktree → skip silently.
 2. **Status flip at start.** Set frontmatter `status: in-progress` + `updated: <today>` before
    dispatching executors. No separate commit — it rides with the implementation commits.
+   **Do NOT roll this back on abort.** A doc left at `in-progress` is not a bug — it is the
+   resume signal: the Pre-Flight resume-detection bullet scans for exactly this state and
+   offers to pick the work back up. Reverting `status` to `backlog` / `ready` would make an
+   abandoned run byte-indistinguishable from one never started, and silently defeat that scan.
+   Only step 3 (archive on completion) clears `in-progress`.
 3. **Archive on completion.** After verification passes and commits are recomposed
    (`steps/step-04-execute.md` § Execution step 6.5), archive the doc:
    - Destination from frontmatter `type` per `../x-backlog/references/template.md`

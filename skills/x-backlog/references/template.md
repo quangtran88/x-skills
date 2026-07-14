@@ -109,6 +109,11 @@ not the low-level "how" (that's the implementation plan).
 | [<title>](<slug>.md) | <status> | <YYYY-MM-DD> | <one-line> |
 ```
 
+**Empty-state line.** When archival removes the last row, leave the table header in place and
+add one italic line beneath it noting there are no unshipped items and where shipped docs went.
+That line is mutually exclusive with rows: **delete it the moment a row is added back**, or the
+index will claim the backlog is empty while listing work.
+
 ## Status lifecycle
 
 `backlog` → `ready` → `in-progress` → `done`
@@ -131,6 +136,9 @@ frontmatter to `status: done` + fresh `updated`, and delete its row from
 | `fix` | `docs/bugs/` |
 | anything else (`chore`, `refactor`, `perf`, …) | `docs/<type>/` |
 
+`feat` and `fix` are the two exceptions — they map to the pre-existing `docs/feature/` and
+`docs/bugs/` folders this repo already uses, rather than the literal `docs/feat/` / `docs/fix/`
+the fall-through rule would produce. Every other `type` uses `docs/<type>/` verbatim.
 Create the destination folder if absent. Commit the move as
 `docs: archive <slug> — done, moved to <destination>`. When `type` is missing from
 frontmatter (docs predating this field), derive it via the detection order in
