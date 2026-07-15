@@ -120,28 +120,11 @@ Trigger rule: if ANY of the following hold, dispatch `Skill: x-skills:x-research
 
 x-research owns the signal taxonomy and tool selection — do NOT re-classify here. When it completes, it will offer to hand off to x-do; use its envelope to skip `step-01-gather.md` (requirements already collected).
 
-**Return path:** If x-research just completed in the same session and provided findings/context, skip this gate entirely. Proceed directly to Detection. This includes cases where x-research's quick-action exception applied a small fix inline.
-
-## Detection (pattern-match, no LLM judgment)
-
-Classify into ONE of 4 modes via observable signals:
-
-| Mode | Detect When | Key Signals |
-|------|------------|-------------|
-| **A: Existing Plan** | Prompt references an existing plan/spec/doc file path | `.md` file path that exists, "implement the plan", "execute the spec", numbered feedback list on a prior commit |
-| **B: New Work** | Build / add / create / refactor with no plan referenced | Creative/new work, structural changes, no plan path in prompt |
-| **C: Bug Fix** | Error, stack trace, or failure described | "fix", "bug", "error", "broken", "crash", "failing", stack trace text |
-| **D: Quick Task** | Trivial single-file change, ≤ 10 lines, no ambiguity | Rename, typo, config tweak, comment fix, one-line edit |
-
-**Modes E (Visual) and F (Refactor) collapsed:**
-- Visual input (image / PDF / screenshot) → Claude is multimodal; read the artifact inside Mode B brainstorming.
-- Refactor **with** plan ref → Mode A. Refactor **without** plan ref → Mode B (still goes through brainstorm + writing-plans).
-
-**Review feedback → Mode A:** When the user provides numbered/enumerated feedback on an existing commit or implementation, the feedback list IS the plan.
+**Return path:** If x-research just completed in the same session and provided findings/context, skip this gate entirely. Continue to the Pre-Flight Checklist, then Detection. This includes cases where x-research's quick-action exception applied a small fix inline.
 
 ## Pre-Flight Checklist (MANDATORY)
 
-Before starting any mode, complete ALL of these checks:
+Complete ALL of these checks BEFORE Detection (mode classification) below:
 
 - [ ] **`--wt` flag detection:** Scan the user prompt for `--wt` (with optional `<target_branch>` and optional `<new_branch>`). Also scan for `--wt-no-isolate` (caller-side flag — translates to passing `--no-isolate` through to x-worktree, suppressing auto-isolation). If present:
   1. Strip the entire `--wt …` segment AND any `--wt-no-isolate` token from the prompt — mode classification must NOT see them.
@@ -161,6 +144,23 @@ Before starting any mode, complete ALL of these checks:
   - `docs/backlog/*.md` with frontmatter `status: in-progress` — a backlog doc abandoned mid-implementation (Mode A flipped it, the run never finished) → offer to resume it before starting anything new
 - [ ] **Gotchas:** Read `gotchas.md` for known failure patterns before starting
 - [ ] **Memory recall** — § Memory Reflex recall beat (`../x-shared/mcp-toolbox.md`): `search_notes({ query: "<task keywords>", page_size: 5 })`, fired BEFORE mode classification so Mode A and Mode D recall too — not just the Mode B `steps/step-01-gather.md` path. Prior similar tasks are leads, not verdicts. Gate: `mcp.basic_memory` pinned in the bootstrap-active set — otherwise skip silently.
+
+## Detection (pattern-match, no LLM judgment)
+
+Classify into ONE of 4 modes via observable signals:
+
+| Mode | Detect When | Key Signals |
+|------|------------|-------------|
+| **A: Existing Plan** | Prompt references an existing plan/spec/doc file path | `.md` file path that exists, "implement the plan", "execute the spec", numbered feedback list on a prior commit |
+| **B: New Work** | Build / add / create / refactor with no plan referenced | Creative/new work, structural changes, no plan path in prompt |
+| **C: Bug Fix** | Error, stack trace, or failure described | "fix", "bug", "error", "broken", "crash", "failing", stack trace text |
+| **D: Quick Task** | Trivial single-file change, ≤ 10 lines, no ambiguity | Rename, typo, config tweak, comment fix, one-line edit |
+
+**Modes E (Visual) and F (Refactor) collapsed:**
+- Visual input (image / PDF / screenshot) → Claude is multimodal; read the artifact inside Mode B brainstorming.
+- Refactor **with** plan ref → Mode A. Refactor **without** plan ref → Mode B (still goes through brainstorm + writing-plans).
+
+**Review feedback → Mode A:** When the user provides numbered/enumerated feedback on an existing commit or implementation, the feedback list IS the plan.
 
 ## Routing Signals (3 axes — replaces Depth Calibration)
 
@@ -202,15 +202,21 @@ frontmatter edits and file move below are mechanical bookkeeping — an explicit
 the router forbid, same class as Mode D.
 
 1. **Worktree suggestion (once, before executing).** If no `--wt` flag was passed AND cwd is
-   the main checkout (`[ "$(git rev-parse --absolute-git-dir)" = "$(git rev-parse --path-format=absolute --git-common-dir)" ]`
-   — both sides MUST be absolute: the plain `--git-dir`/`--git-common-dir` forms return
-   mixed absolute/relative paths from a subdirectory and false-negative there),
+   the main checkout (`[ "$(cd "$(git rev-parse --git-dir)" && pwd)" = "$(cd "$(git rev-parse --git-common-dir)" && pwd)" ]`
+   — canonicalize both sides via `cd`+`pwd`: the plain forms return mixed absolute/relative
+   paths from a subdirectory and false-negative there, and `--path-format=absolute` needs
+   git ≥ 2.31, above x-worktree's documented git ≥ 2.5 floor),
    offer once via AskUserQuestion: `(1) isolate — new worktree from this doc (recommended)` /
    `(2) continue in current dir`. On (1), dispatch `Skill: x-skills:x-worktree <doc-path>` and
    honor the same envelope rules as Pre-Flight `--wt` steps 3–6 (pin `WORKTREE_PATH`,
-   `ISOLATE_APPLIED` handling). Already inside a linked worktree → skip silently.
+   `ISOLATE_APPLIED` handling). Already inside a linked worktree → skip silently. Also skip
+   (without asking) when this dispatch came from x-backlog's close menu **[D]** (`/x-do <doc>`
+   here) — the user just chose to stay in the current dir; re-offering a worktree would negate
+   that choice.
 2. **Status flip at start.** Set frontmatter `status: in-progress` + `updated: <today>` before
-   dispatching executors. No separate commit — it rides with the implementation commits.
+   dispatching executors, and flip the doc's row Status cell in `docs/backlog/README.md` to
+   `in-progress` in the same edit — the index must mirror frontmatter for the whole
+   implementation window. No separate commit — both ride with the implementation commits.
    **Do NOT roll this back on abort.** A doc left at `in-progress` is not a bug — it is the
    resume signal: the Pre-Flight resume-detection bullet scans for exactly this state and
    offers to pick the work back up. Reverting `status` to `backlog` / `ready` would make an
@@ -222,8 +228,11 @@ the router forbid, same class as Mode D.
      § "Archival on done": `feat` → `docs/feature/`, `fix` → `docs/bugs/`, anything else →
      `docs/<type>/`. Missing `type` → derive via `../x-worktree/references/doc-naming.md`
      detection order.
-   - `git mv docs/backlog/<slug>.md docs/<dest>/<slug>.md` (create the folder if absent);
-     set `status: done` + `updated: <today>`; delete the doc's row from `docs/backlog/README.md`.
+   - `git mv docs/backlog/<slug>.md docs/<dest>/<slug>.md` (create the folder if absent;
+     destination already occupied → stop and ask per `../x-backlog/references/template.md`
+     § "Archival on done"); set `status: done` + `updated: <today>`; delete the doc's row from
+     `docs/backlog/README.md` (when that was the last row, add the empty-state line per the
+     same file's § "Index file").
    - Commit: `docs: archive <slug> — done, moved to <dest>`.
 
 Skip all three silently for plans that are not backlog docs — this section adds nothing to

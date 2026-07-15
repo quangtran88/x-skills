@@ -11,11 +11,12 @@ For the primary doc, run these probes in order. The first probe that yields BOTH
 ```yaml
 ---
 type: feat
+slug: add-user-auth
 title: Add user auth
 ---
 ```
 
-Parse only the leading `---` … `---` block (lines 1..N up to the second `---`). Look for `^type:\s*(\S+)\s*$` and `^title:\s*(.+?)\s*$`. Slug = `<title>`.
+Parse only the leading `---` … `---` block (lines 1..N up to the second `---`). Look for `^type:\s*(\S+)\s*$`, `^slug:\s*(\S+)\s*$`, and `^title:\s*(.+?)\s*$`. If `slug:` is present, Slug = `<slug>` — it is the author-chosen kebab slug that also names the doc file (`docs/backlog/<slug>.md` for x-backlog docs), so using it keeps the branch `<type>/<slug>` aligned with the doc filename, which a freeform `title:` does not guarantee. Otherwise Slug = `<title>`. Either value still passes Slug normalization below.
 
 ### 2. H1 line
 
@@ -87,4 +88,5 @@ If the primary doc yields no usable name (all probes fail), but a later doc woul
 | `BACKLOG.md` (no metadata) | `feat/backlog` (fallback) |
 | `fix_login_crash.md` | `fix/login-crash` |
 | Front-matter `type: refactor`, `title: Extract auth module` | `refactor/extract-auth-module` |
+| Front-matter `type: feat`, `slug: user-billing-portal`, `title: User Billing Portal v2` | `feat/user-billing-portal` (`slug:` wins over `title:`) |
 | `Feature - User onboarding.md` (no H1, no front-matter) | `feat/feature-user-onboarding` (fallback) |

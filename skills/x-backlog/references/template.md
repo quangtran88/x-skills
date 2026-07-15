@@ -136,10 +136,15 @@ frontmatter to `status: done` + fresh `updated`, and delete its row from
 | `fix` | `docs/bugs/` |
 | anything else (`chore`, `refactor`, `perf`, …) | `docs/<type>/` |
 
-`feat` and `fix` are the two exceptions — they map to the pre-existing `docs/feature/` and
-`docs/bugs/` folders this repo already uses, rather than the literal `docs/feat/` / `docs/fix/`
+`feat` and `fix` are the two exceptions — they map to the conventional `docs/feature/` and
+`docs/bugs/` folder names, rather than the literal `docs/feat/` / `docs/fix/`
 the fall-through rule would produce. Every other `type` uses `docs/<type>/` verbatim.
-Create the destination folder if absent. Commit the move as
-`docs: archive <slug> — done, moved to <destination>`. When `type` is missing from
+Create the destination folder if absent — none of these folders is guaranteed to exist yet.
+**Destination collision:** if `docs/<dest>/<slug>.md` already exists (a previously shipped doc
+with the same slug), do NOT overwrite and do NOT let `git mv` fail unhandled — stop and surface
+both paths to the user; the usual resolutions are merging into the existing doc or archiving
+under a suffixed name (`<slug>-2.md`), their call. Commit the move as
+`docs: archive <slug> — done, moved to <destination>`. If the deleted row was the index's last,
+add the empty-state line per § "Index file" above. When `type` is missing from
 frontmatter (docs predating this field), derive it via the detection order in
 `../../x-worktree/references/doc-naming.md` (H1 prefix → filename prefix → fallback `feat`).

@@ -153,6 +153,12 @@ Env: `XWI_AUTO_ISOLATE=0` disables auto-isolate persistently for the shell sessi
    for `docs/backlog/` docs, runs its Backlog Doc Lifecycle. Skip this step entirely when
    `DOCS[]` was empty or doc migration failed (surface the failure instead).
 
+   **Who acts on the suggestion:** on a standalone (user-invoked) run, present it to the user
+   and wait. When a sibling skill dispatched x-worktree, the caller owns the next step —
+   x-backlog `[W]` follows the suggestion per its close-menu guidance; x-do (Pre-Flight `--wt`
+   or its own worktree suggestion) ignores it and simply continues its own workflow in the new
+   cwd — it is already the implementing skill, so re-dispatching x-do would nest it.
+
 ## Error envelope (unified)
 
 Every failure path emits this exact shape — no other error formats:

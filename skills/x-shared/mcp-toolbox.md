@@ -84,7 +84,7 @@ Persistent markdown knowledge base from `basicmachines-co/basic-memory` (vendore
 
 These rules apply to ALL skill bootstraps that call `search_notes` / `write_note`:
 
-**Placement on save.** `write_note` requires a `directory`. Route by note kind — `lessons/<project-slug>/` (gotchas, root causes, failed approaches), `decisions/<project-slug>/` (decisions + rationale), `notes/<project-slug>/` (durable facts, conventions). project-slug = basename of cwd (e.g. `x-skills`). These mirror the Basic Memory placement conventions already seeded in the store — do not invent new top-level folders.
+**Placement on save.** `write_note` requires a `directory`. Route by note kind — `lessons/<project-slug>/` (gotchas, root causes, failed approaches), `decisions/<project-slug>/` (decisions + rationale), `notes/<project-slug>/` (durable facts, conventions). project-slug = basename of the **main checkout root** (e.g. `x-skills`). In the main checkout that is just the cwd basename — but inside a linked worktree the cwd basename is the worktree directory (wrong slug), so resolve it worktree-safely: `basename "$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"` (git ≥ 2.5). Wrong-project writes succeed silently, so a misderived slug is invisible. These mirror the Basic Memory placement conventions already seeded in the store — do not invent new top-level folders.
 
 **Tag on save.** Always include the project slug and the emitting skill in `tags` (e.g. `tags: ["x-skills", "x-research", "<topic>"]`). Tags are a keyword surface for ranking and cross-project lookup — **not** a recall filter (see § Memory Reflex → "Do NOT hard-filter recall by `tags`": a `tags` filter silently excludes every note that lacks the tag).
 
@@ -142,10 +142,20 @@ update that note instead of accreting a near-duplicate:
 Caveat: `edit_note` takes no `tags` and no `directory` — it cannot retag or move a note. If the
 surfaced note is missing the project-slug tag or sits in the wrong folder, write a fresh note
 with the correct `directory` + `tags` rather than appending to the malformed one.
+**Same-kind only.** Append only when the surfaced note's kind folder (visible in its permalink —
+`<kind>/<project-slug>/…`) matches the kind you are persisting. A cross-kind hit — e.g. a
+`decisions/` note surfaced while persisting a lesson — is *not* "the same fact": never append to
+it. Write a fresh note of the correct kind, or skip the write when the other-kind note already
+records the fact (a decision that states the lesson needs no duplicate lesson).
 
 Route `directory` by note kind per § Consumer rules above — `lessons/` (root causes, failed
 approaches), `decisions/` (decisions + rationale), `notes/` (durable facts, conventions).
 Tag with the project slug + emitting skill. Skip silently when not pinned.
+
+*Chained skills link, don't restate.* When a chain touches one topic across kinds
+(x-research → `notes/`, x-backlog → `decisions/`, x-do → `lessons/`), a later persist cites the
+earlier note's permalink in its `content` instead of restating its substance — a chain should
+leave one linked cluster, not three orphan near-duplicates.
 
 **The step always runs; only two things suppress a write.** Both beats fire on every path
 where the skill produces work. The recall beat is gated solely on the `mcp.basic_memory` pin.

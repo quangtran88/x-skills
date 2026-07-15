@@ -56,7 +56,7 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 4. **Cite sources** — attribute each finding to its reviewer (Claude, GPT, Gemini, etc.)
 5. **Mark verified** — indicate which findings were confirmed against actual code
 6. **Tag NEEDS_DIRECTION** — mark any finding that requires user input before fixing (see criteria below)
-7. **Persist lesson** (only when `mcp.basic_memory` pinned): for each CRITICAL or HIGH finding ONLY, one `mcp__basic-memory__write_note({ title: "<severity>: <finding summary>", directory: "lessons/<project-slug>", content: "<finding summary> → <recommendation>\n\nFiles: <files cited in finding>", tags: ["<project-slug>", "x-review", "<severity>", "<area>"] })` call (project-slug = basename of cwd — see `../../x-shared/mcp-toolbox.md § Consumer rules`). Skip MEDIUM and LOW findings. Skip silently when not pinned.
+7. **Persist lesson** (only when `mcp.basic_memory` pinned): for each CRITICAL or HIGH finding ONLY (the severity filter IS this beat's durability gate — see § Memory Reflex), one `mcp__basic-memory__write_note({ title: "<severity>: <finding summary>", directory: "lessons/<project-slug>", content: "<finding summary> → <recommendation>\n\nFiles: <files cited in finding>", tags: ["<project-slug>", "x-review", "<severity>", "<area>"] })` call (placement and *Update over duplicate* — same-kind only — per `../../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip MEDIUM and LOW findings. Skip silently when not pinned.
 
 ## Tag NEEDS_DIRECTION (MANDATORY — narrow criteria)
 

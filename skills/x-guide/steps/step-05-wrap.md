@@ -43,7 +43,7 @@ Skip the "Where this lives in the codebase" section for `url`, `paste`, or `vagu
 
 ## Persist Takeaways (always-run, gated)
 
-- [ ] **Persist takeaways** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__write_note({ title: "<slug> — guide takeaways", directory: "notes/<project-slug>", content: "<the Key takeaways bullets + Where-this-lives refs>", tags: ["<project-slug>", "x-guide", "<slug>"] })` call (project-slug = basename of cwd). Persist the durable takeaways/glossary only — not the full guide body. Placement + tagging per `../../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
+- [ ] **Persist takeaways** (only when `mcp.basic_memory` pinned in the bootstrap-active set): one `mcp__basic-memory__write_note({ title: "<slug> — guide takeaways", directory: "notes/<project-slug>", content: "<the Key takeaways bullets + Where-this-lives refs>", tags: ["<project-slug>", "x-guide", "<slug>"] })` call (project-slug per § Consumer rules). Persist the durable takeaways/glossary only — not the full guide body. If the Phase-1 recall already surfaced a guide note on the same target, apply *Update over duplicate* (append via its permalink — same-kind only) instead of writing a second one. Placement, tagging, and dedup per `../../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
 
 ## Suggest Next
 

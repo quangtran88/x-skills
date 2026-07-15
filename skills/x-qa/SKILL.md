@@ -213,7 +213,7 @@ If invoked by user: print envelope + path to `QA_REPORT.md` + summary table.
 On `fail`: surface offer to route into `/x-skills:x-bugfix` with the failed cases as input.
 Confirmed exploratory findings (`EXPLORE_CONFIRMED > 0`) are also offered to `/x-skills:x-bugfix`, each carrying its minted case as the reproduction.
 
-- [ ] **Persist test pattern** (only when `mcp.basic_memory` pinned): one `mcp__basic-memory__write_note({ title: "<pattern-kind>: <one-line>", directory: "lessons/<project-slug>", content: "<test pattern or flake observation>", tags: ["<project-slug>", "x-qa", "<framework>", "test-plan"] })` call (placement + tagging per `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
+- [ ] **Persist test pattern** (only when `mcp.basic_memory` pinned): apply the § Memory Reflex durability gate first (a reusable test pattern or real flake root cause, not a routine run summary), then one `mcp__basic-memory__write_note({ title: "<pattern-kind>: <one-line>", directory: "lessons/<project-slug>", content: "<test pattern or flake observation>", tags: ["<project-slug>", "x-qa", "<framework>", "test-plan"] })` call (durability gate, placement, and *Update over duplicate* — same-kind only — per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip silently when not pinned.
 
 ## Dependencies
 

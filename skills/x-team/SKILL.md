@@ -176,7 +176,7 @@ If `--auto-merge` and any merges failed (conflict, protected branch): list separ
 
 ## Persist Lessons (always-run, gated)
 
-- [ ] **Persist run lessons** (only when `mcp.basic_memory` pinned in the bootstrap-active set): for each **failed** feature, one `mcp__basic-memory__write_note` to `lessons/<project-slug>/` capturing the root cause (from its `qa_report`); for each human-resolved **blocker**, one `write_note` to `decisions/<project-slug>/` capturing the verdict + rationale. project-slug = basename of cwd; tag each with the project slug + `x-team`. Persist durable output only — root causes and blocker verdicts, never per-feature run summaries. Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
+- [ ] **Persist run lessons** (only when `mcp.basic_memory` pinned in the bootstrap-active set): for each **failed** feature, one `mcp__basic-memory__write_note` to `lessons/<project-slug>/` capturing the root cause (from its `qa_report`); for each human-resolved **blocker**, one `write_note` to `decisions/<project-slug>/` capturing the verdict + rationale. project-slug per § Consumer rules; tag each with the project slug + `x-team`. Persist durable output only — root causes and blocker verdicts, never per-feature run summaries. When the Phase-1 recall already surfaced a note on the same root cause / blocker, apply *Update over duplicate* (append via its permalink — same-kind only: a failed-feature lesson appends only onto a `lessons/` hit, a blocker verdict only onto a `decisions/` hit). Placement, tagging, and dedup per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
 
 ## Hard Requirements
 

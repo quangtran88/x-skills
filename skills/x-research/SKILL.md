@@ -119,7 +119,7 @@ Role agents (catalog in `../x-omo/SKILL.md`) cover 95% of needs. Use `omo-agent 
 Standard Mode: see `references/synthesis-rules.md`.
 Max Mode: same rules + reconciliation template in `references/max-mode.md`.
 
-- [ ] **Persist insight** (only when `mcp.basic_memory` pinned): one `mcp__basic-memory__write_note({ title: "<topic-token>", directory: "notes/<project-slug>", content: "<one-line synthesis takeaway>", tags: ["<project-slug>", "x-research", "<signal>"] })` call (project-slug = basename of cwd, e.g. `x-skills`, `oneclaw` — see `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
+- [ ] **Persist insight** (only when `mcp.basic_memory` pinned): apply the § Memory Reflex durability gate first (a durable synthesis takeaway worth a future session, not a routine search log), then one `mcp__basic-memory__write_note({ title: "<topic-token>", directory: "notes/<project-slug>", content: "<one-line synthesis takeaway>", tags: ["<project-slug>", "x-research", "<signal>"] })` call (durability gate, placement, and *Update over duplicate* — same-kind only — per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip silently when not pinned.
 
 ## Follow-Up Rounds
 

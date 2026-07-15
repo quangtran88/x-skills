@@ -165,7 +165,7 @@ Append the root cause summary to `debug-log.jsonl` in the skill's state director
 ## Post-Fix Verification (MANDATORY)
 
 In TS/JS projects: `npx tsc --noEmit` + `npx eslint <changed-files>` + full test suite. Fix all errors before claiming done.
-- [ ] **Persist lesson** (only when `mcp.basic_memory` pinned): one `mcp__basic-memory__write_note({ title: "<symptom-token>", directory: "lessons/<project-slug>", content: "<one-sentence root cause> → <one-sentence fix>\n\nFiles: <touched paths>", tags: ["<project-slug>", "x-bugfix", "<area>"] })` call (project-slug = basename of cwd — see `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
+- [ ] **Persist lesson** (only when `mcp.basic_memory` pinned): apply the § Memory Reflex durability gate first (persist a real root cause, not a routine-fix summary), then one `mcp__basic-memory__write_note({ title: "<symptom-token>", directory: "lessons/<project-slug>", content: "<one-sentence root cause> → <one-sentence fix>\n\nFiles: <touched paths>", tags: ["<project-slug>", "x-bugfix", "<area>"] })` call (durability gate, placement, and *Update over duplicate* — same-kind only — per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip silently when not pinned.
 
 ## After This Skill
 

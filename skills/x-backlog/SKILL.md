@@ -122,7 +122,7 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
 - Fresh-eyes pass on the written file: any leftover `<placeholder>`, contradiction between
   sections (e.g. a scope bullet that fights a decision), or vague acceptance criterion?
   Fix inline. No re-review loop — fix and move on.
-- [ ] **Persist Key Decisions** (only when `mcp.basic_memory` pinned in the bootstrap-active set — see the Bootstrap note): for each decision block drafted in step 4, one `mcp__basic-memory__write_note({ title: "<slug>: <decision title>", directory: "decisions/<project-slug>", content: "<decision + rationale + rejected alternative>", tags: ["<project-slug>", "x-backlog", "<slug>"] })` call (project-slug = basename of cwd). Persist the decision + rationale only — not the whole doc; if this run's recall already surfaced a note for the same decision, `edit_note` it rather than writing a duplicate — per the *Update over duplicate* shape in § Memory Reflex (the recall hit's **permalink** as `identifier`, `operation: "append"`; it cannot retag or move a note, so write fresh if the surfaced note is misfiled). Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
+- [ ] **Persist Key Decisions** (only when `mcp.basic_memory` pinned in the bootstrap-active set — see the Bootstrap note): for each decision block drafted in step 4, one `mcp__basic-memory__write_note({ title: "<slug>: <decision title>", directory: "decisions/<project-slug>", content: "<decision + rationale + rejected alternative>", tags: ["<project-slug>", "x-backlog", "<slug>"] })` call (project-slug per § Consumer rules). Persist the decision + rationale only — not the whole doc; if this run's recall already surfaced a note for the same decision, `edit_note` it rather than writing a duplicate — per the *Update over duplicate* shape in § Memory Reflex (the recall hit's **permalink** as `identifier`, `operation: "append"`; it cannot retag or move a note, so write fresh if the surfaced note is misfiled — and never append across kinds, e.g. onto a `notes/` research note on the same topic: cite its permalink in `content` instead, per § Memory Reflex "Chained skills link, don't restate"). Placement + tagging per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules. Skip silently when not pinned.
 - Report the path, status, a one-screen summary of what was drafted, and any Open Questions
   recorded — then invite edits and offer the downstream handoff:
 
@@ -143,7 +143,10 @@ and proceed. Default when unsure: record it under Handoff Notes / Open Questions
     branch too; [W] alone carries only the doc to the new branch until merge. The `README.md`
     index row from step 5 is a *separate* modified file x-worktree does not migrate — prefer
     [C] first so doc + index travel together; with bare [W] the row stays on the current branch
-    and the archival row-deletion on the worktree branch harmlessly no-ops. On x-worktree's
+    and the archival row-deletion on the worktree branch harmlessly no-ops. On a bare [W] with
+    an **untracked** doc, also revert the step-5 README row in the source checkout after the
+    migration (the doc no longer exists on this branch, so a committed row would dangle at a
+    moved-away file); the index re-syncs when the branch merges. On x-worktree's
     success envelope, follow its `/x-do` handoff suggestion.
   - **[P]** — dispatch `superpowers:writing-plans` on the doc. This path does **not** run x-do
     Mode A, so nothing auto-flips `status` or archives the doc: flip `status: in-progress` by hand

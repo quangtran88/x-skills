@@ -147,7 +147,7 @@ After presenting the report, append a summary line to `data/alignment-log.jsonl`
 
 This enables cross-session pattern tracking — recurring compliance gaps signal systemic issues.
 
-- [ ] **Persist lesson** (only when `mcp.basic_memory` pinned): one `mcp__basic-memory__write_note({ title: "<skill-name>: <improvement-class>", directory: "lessons/<project-slug>", content: "<improvement applied to skill X>", tags: ["<project-slug>", "x-skill-improve", "<skill-name>", "<improvement-class>"] })` call (project-slug = basename of cwd — see `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
+- [ ] **Persist lesson** (only when `mcp.basic_memory` pinned): apply the § Memory Reflex durability gate first (a reusable improvement pattern, not a routine edit summary), then one `mcp__basic-memory__write_note({ title: "<skill-name>: <improvement-class>", directory: "lessons/<project-slug>", content: "<improvement applied to skill X>", tags: ["<project-slug>", "x-skill-improve", "<skill-name>", "<improvement-class>"] })` call (durability gate, placement, and *Update over duplicate* — same-kind only — per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip silently when not pinned.
 
 ## After This Skill
 

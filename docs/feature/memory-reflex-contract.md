@@ -20,11 +20,13 @@ actually *use* those dependencies. The "recall from basic-memory before you rese
 fix / plan, and persist durable knowledge afterward" behavior is re-implemented by hand
 inside each skill, and `workflow-chains.md` does not mandate it.
 
-The result is inconsistent coverage. The recall→persist pattern is correct in 5 skills
-(x-research, x-review, x-qa, x-design, x-skill-improve), half-wired in 2 (x-do, x-mindful),
-and entirely absent in 4 skills that produce exactly the durable knowledge basic-memory
-exists to hold (x-guide, x-team, x-backlog, x-api-pentest). Because every skill copies the
-step, the copies have already drifted, and new skills inherit no default.
+The result is inconsistent coverage. The recall→persist pattern is correct in 6 skills
+(x-research, x-review, x-qa, x-design, x-skill-improve, x-bugfix), half-wired in 2 (x-do,
+x-mindful), and entirely absent in 4 skills that produce exactly the durable knowledge
+basic-memory exists to hold (x-guide, x-team, x-backlog, x-api-pentest). The remaining 6 are
+N-A-by-design (x-worktree, x-worktree-isolate, x-upstream, x-verify, x-omo, x-gemini) — 18 in
+all. Because every skill copies the step, the copies have already drifted, and new skills
+inherit no default.
 
 One reassuring finding scopes this work: **gating discipline is uniform and correct**
 everywhere the pattern exists — every call already checks the `mcp.basic_memory` pin and

@@ -96,7 +96,7 @@ Read these files before routing any request:
 
    Never modify any other content in `CLAUDE.md`.
 
-   - [ ] **Persist design decision** (only when `mcp.basic_memory` pinned in bootstrap-active set): one `mcp__basic-memory__write_note({ title: "<area> design decision", directory: "decisions/<project-slug>", content: "<one-line design decision + rationale>", tags: ["<project-slug>", "x-design", "<area>"] })` call (placement + tagging per `../x-shared/mcp-toolbox.md § Consumer rules`). Skip silently when not pinned.
+   - [ ] **Persist design decision** (only when `mcp.basic_memory` pinned in bootstrap-active set): apply the § Memory Reflex durability gate first (a real decision + rationale, not a routine run note), then one `mcp__basic-memory__write_note({ title: "<area> design decision", directory: "decisions/<project-slug>", content: "<one-line design decision + rationale>", tags: ["<project-slug>", "x-design", "<area>"] })` call (durability gate, placement, and *Update over duplicate* — same-kind only — per `../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip silently when not pinned.
 
 ## Quick Reference
 
