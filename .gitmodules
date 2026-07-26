@@ -19,3 +19,12 @@
 [submodule "research/basicmachines-co/basic-memory"]
 	path = research/basicmachines-co/basic-memory
 	url = https://github.com/basicmachines-co/basic-memory
+[submodule "research/infina-pfa/claudekit"]
+	path = research/infina-pfa/claudekit
+	url = https://github.com/infina-pfa/claudekit
+[submodule "research/mattpocock/skills"]
+	path = research/mattpocock/skills
+	url = https://github.com/mattpocock/skills
+[submodule "research/addyosmani/agent-skills"]
+	path = research/addyosmani/agent-skills
+	url = https://github.com/addyosmani/agent-skills
