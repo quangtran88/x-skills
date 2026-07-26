@@ -28,3 +28,9 @@
 [submodule "research/addyosmani/agent-skills"]
 	path = research/addyosmani/agent-skills
 	url = https://github.com/addyosmani/agent-skills
+[submodule "research/DietrichGebert/ponytail"]
+	path = research/DietrichGebert/ponytail
+	url = https://github.com/DietrichGebert/ponytail
+[submodule "research/JuliusBrussee/caveman"]
+	path = research/JuliusBrussee/caveman
+	url = https://github.com/JuliusBrussee/caveman
