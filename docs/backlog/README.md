@@ -5,5 +5,4 @@ not the low-level "how" (that's the implementation plan).
 
 | Doc | Status | Updated | Summary |
 |---|---|---|---|
-
-_No unshipped backlog items. Shipped docs are archived to `docs/<type>/` per `../../skills/x-backlog/references/template.md` § "Archival on done" (e.g. [Memory Reflex Contract](../feature/memory-reflex-contract.md) → `docs/feature/`)._
+| [x-skills v3 — consult / record / implement](x-skills-v3.md) | ready | 2026-07-27 | Collapse 19 interdependent skills into 3, dependency-free. Sufficiency as slot arithmetic, derived status enum, serial vertical slices. |
