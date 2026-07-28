@@ -113,3 +113,13 @@ This project is indexed by GitNexus as **x-skills** (160141 symbols, 241800 rela
 ### GitNexus Fallback
 
 When `mcp.gitnexus` is NOT pinned in the active capability set, the "Always Do" / "Never Do" rules above are best-effort guidance, not enforced gates. The impact-gating in `skills/x-mindful` and the route-map preflight in `skills/x-api-pentest` fall back per the documented Fallback column in `skills/x-shared/mcp-toolbox.md § GitNexus (optional)` (typically native `Grep` or `git diff` + manual analysis). No skill becomes unavailable; gitnexus-grounded checks become best-effort. The MANDATORY language in the auto-managed block above applies only when `mcp.gitnexus` is pinned AND the current repo has a fresh GitNexus index.
+
+### Own-coverage carve-out — working on x-skills itself
+
+**The `impact` / `detect_changes` MUSTs above do not apply to edits inside this repo's own `skills/`, `bin/`, `hooks/` or `docs/` trees.** They are unsatisfiable here, and a gate that cannot be satisfied trains itself as ignorable.
+
+Measured 2026-07-28 (`docs/research/2026-07-28-v3-round4-audit.md` §1): GitNexus indexes **2,231 of this repo's own symbols against 153,719 vendored — 1.4%**; **zero** own symbols appear in any of its 300 execution flows; the only 18 indexed functions sit under `skills/x-worktree-isolate/scripts/`; and **zero of 113 tracked `.sh` files** produce a callable symbol. This repo is markdown and shell, which the indexer does not model — so `impact({target})` on anything you are likely to edit here returns "symbol not found", not a blast radius.
+
+Use instead: native `Grep` / `git grep` for call sites, `git diff` for change scope. `query` and `context` remain useful for the **vendored `research/` corpus**, which is what the index actually covers.
+
+This carve-out is scoped to x-skills' own development. When x-skills *operates on a target repo*, the rules above apply normally — subject to the freshness condition in the Fallback section. Rationale and the general rule (gitnexus is advisory, never a gate) are in `docs/backlog/x-skills-v3-decisions.md` DEC-017.
