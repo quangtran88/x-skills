@@ -4,13 +4,13 @@ slug: x-skills-v3-decisions
 type: refactor
 status: ready
 created: 2026-07-28
-updated: 2026-07-28
+updated: 2026-07-29
 related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit]
 ---
 
 # x-skills v3 — decision record
 
-The twenty accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
+The twenty-two accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
 Alternatives / Consequences + a status line), append-only, addressed by stable `DEC-00n` IDs.
 
 **Split out of the design doc on 2026-07-28**, at 1,114 lines. The design doc's own settled rule
@@ -23,7 +23,7 @@ firing, not a fresh judgement call.
 statement, the disposition table, the contracts, the build order and the acceptance list — that is
 the review surface. Citations resolve to `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
-`[R4]` = `2026-07-28-v3-round4-audit.md`.
+`[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`.
 
 Superseded blocks move to a **Superseded** section at the foot of this file, never inline —
 content marked as excluded still biases readers at roughly twice the rate of obsolete items
@@ -184,6 +184,11 @@ present (DEC-009). IDs keep resolving.
   ships that prompt-side fix: the admission predicate. **Falsifier for the cap:** a run that
   terminates *at* the cap with every question still admissible is evidence the cap is wrong, not
   evidence it worked.
+- **Amended 2026-07-29 (R5):** DEC-022 extends the recipe — an altitude rule (no code-level
+  identifiers in the question or options; options carry a one-line user-visible implication), a
+  `decision:` infinitive opener, a `reversibility:` class that gates ask-vs-decide mid-run, and a
+  `scope:` tag on any answer recorded as a rule. The 3-slot core, admission predicate, budget,
+  stakes-descending order and D-option are unchanged.
 - **Status:** accepted
 
 ### DEC-006 — Close with examples that become the frozen oracle
@@ -463,6 +468,16 @@ present (DEC-009). IDs keep resolving.
   (`package.json` scripts → per-language config → *"mark `<tool>: no-config` and continue. Do NOT
   invent a command"*). Port both rather than re-deriving them — the do-not-invent rule is the part
   most likely to be lost in a rewrite from memory.
+- **Amended 2026-07-29 (R5):** three additions land here from DEC-021/022 rather than in new
+  machinery. `test-modification` joins the blocker classes — any slice edit to a pre-existing test
+  file or the frozen oracle emits `BLOCKED`, and "make the test agree with the code" is never
+  attempt 2 (measured: agents weaken assertions and delete tests to converge; oracle-gaming base
+  rate 30.4% when scoring code is visible `[R5 §2]`). 03-review gains a first-class **tamper
+  checklist** (test/grader/fixture edits, hardcoded expected outputs, special-cased inputs,
+  exit-code tricks) and the reviewer-authored **mutant probe** (DEC-021). The two-failure
+  trip-wire is unchanged and stays progress-based — the field evidence says the expensive failure
+  is grinding on infeasible work, so BLOCKED must keep firing regardless of DEC-022's
+  reversibility gate `[R5 §4]`.
 - **Status:** accepted
 
 ### DEC-012 — Thin router + phase files; one model-invoked skill
@@ -799,5 +814,169 @@ present (DEC-009). IDs keep resolving.
   files stay **one level deep** from `SKILL.md` (deeper links are partially read, e.g. `head -100`),
   and every phase-file pointer states **when** to load it, not just that it exists. Both are
   `lint-chain.sh` assertions.
+- **Status:** accepted
+
+### DEC-021 — x-implement DONE chains into x-qa; live tests derive from the oracle and the diff
+- **Choice:** Post-implementation live QA is **wiring, not new machinery** — both repo maps
+  returned the same verdict: the human-QA engine already exists inside the kept skill x-qa
+  (obligation grammar + blocking coverage gate, Domain-Research boundary/state-transition
+  derivation, failure-mode taxonomy with false-case oracles, budget-bounded exploratory hunt with
+  independent adversarial triage, KB regression lifecycle), and every gap is a missing connection
+  `[R5 §5]`. Five wires, one slice (S7):
+  1. **The chain.** x-implement DONE derives `nextStep: chain{skill: x-qa}` iff
+     `.x-skills/x-qa/profile.json` exists; else `end` as today. The retry loop is salvaged from
+     x-team's worker preamble (`worker-preamble.md:31-39` — parse `QA_VERDICT`, on `fail` re-enter
+     with the QA_REPORT failures, bounded attempts) — the only implement→QA loop this repo has
+     ever had, which otherwise dies with x-team's deletion. A chained `fail` surfaces as
+     `FAILED-GATE{gate: qa, …}` with DEC-011's constrained-retry semantics, not a bespoke channel.
+  2. **Acceptance examples become obligations.** The backlog/plan template's acceptance-examples
+     block adopts x-qa's obligation id grammar; the chained run treats the doc as spec intent, so
+     the scout marks them `source: acceptance` ⇒ `severity: required` and the coverage gate arms —
+     every consult-time example becomes a gate-blocking live test. Traceability completeness has
+     (correlational) defect-rate evidence; the vendor percentages do not `[R5 §1]`.
+  3. **The scout arms on the diff path.** Today the scout — the only place the named test-design
+     techniques run — is *skipped* on branch/pr intent (`x-qa/SKILL.md:169`), so the exact "cover
+     all the changes" run derives endpoints only, with a disarmed coverage gate `[R5 §5]`.
+     branch/pr becomes scout-eligible, fed `pr-surface-derivation`'s `touched_files`.
+  4. **A change-derivation recipe carrying the measured core, not the ISTQB catalog.** New x-qa
+     reference, injected into the planner like the gap-analyzer block: every partition touched by
+     the diff must yield explicit boundary cases (Reid: per-fault detection 0.79 BVA vs 0.33 EP —
+     boundaries carry the power, partitions are scaffolding); decision tables for branching logic
+     (the one other technique with controlled support; currently named nowhere in the repo);
+     pairwise of the changed parameter × its interacting parameters (NIST: 1–2-way interactions
+     trigger ~70–98% of field failures; efficiency claim, not magic); state-transition and
+     error-guessing as *optional* lenses — zero controlled validation in 25 years of experiments —
+     triggered only when the diff touches a state machine or a known-buggy area. Layer **two
+     different lenses** (spec-derived + diff-reading), never two passes of one. Risk *mechanically*
+     orders the cases (change-proneness × impact from git history) — Google measured that passive
+     risk labels change nothing `[R5 §1]`.
+  5. **The plan is a one-page coverage matrix, persisted.** Rows = capabilities the diff touched,
+     cells = case IDs or an explicit out-of-scope entry; framed as a **visibility aid** — a matrix
+     is a topic checklist and does not close the missing-requirement class, which is why the
+     exploratory hunt stays mandatory, not optional `[R5 §1][R5 §6.7]`. Chained runs default
+     `--persist` to a stable path and the QA verdict + coverage counters are appended to the
+     backlog doc's acceptance section, so the human review surface shows what was actually
+     live-tested (TEST_PLAN today is a gitignored run-local file).
+- **Test-authorship integrity rules (x-implement's half, S3):** the task-test author is a
+  **fresh-context subagent given the plan, the acceptance examples and public interfaces — never
+  the diff** (AgentCoder: 87.8–89.9% test accuracy blind vs 51.8–61.0% self-testing, the largest
+  single lever found; benchmark-scale caveat noted). Assertion values derive from the frozen
+  oracle or documented intent, **never from observed output** — "expected = what the code just
+  returned" encodes the bug as the oracle (68.1% bug-validating tests in the measured
+  generator) and is a lintable violation. The **mutant probe** lands in the 03-review lane, not
+  x-qa: the reviewer authors ≤1 mutant per changed hunk, `gates.sh` applies each and the task
+  tests must kill it; a surviving mutant is a review finding (Meta ACH: 277/571 valuable tests
+  invisible to line coverage; Google: ~1 mutant/changed line at review). This placement resolves
+  the round's one hard contradiction: mutation needs the repo's own suite, which x-qa's
+  real-channel contract rightly forbids — repo-suite instruments belong to x-implement,
+  real-channel instruments to x-qa `[R5 §2][R5 §6.3]`.
+- **Why:** the user's ask is "test like a human QA covering all the changes." The measured half of
+  human QA practice is exactly what the recipe encodes (boundaries, decision tables, pairwise,
+  two lenses, mechanical risk ordering, exploratory-over-scripted); the doctrinal half (IEEE 829
+  prose plans, mandatory technique catalogs, tours) is demonstrably documentation cost without
+  detection evidence and is deliberately excluded `[R5 §1]`. And the shipped agent-QA systems
+  converge on the same shape: derive scope from the diff, filter mechanically, expect ~¼ of
+  derived tests to be wrong `[R5 §2]`.
+- **Alternatives:** build a live-test phase inside x-implement — rejected: duplicates 2,605 lines
+  of shipped, self-tested machinery and breaks DEC-013's delete-don't-port discipline the other
+  way around. Make the chain unconditional — rejected: x-qa is profile-driven; without a profile
+  the chain has nothing to launch, and the capability gate is one file-exists check (DEC-017's
+  three-state pattern). Shrink the per-task full-suite gate to a change-scoped selection
+  (Facebook: ~1/3 of tests, >99.9% change recall) — **deferred**: measured against organic human
+  regressions, not an agent optimizing to pass the subset; admissible later only if the truly-full
+  suite keeps running at a boundary outside the implementing agent's control `[R5 §2]`.
+- **Consequences:** x-qa's Disposition row changes from "kept unchanged" to **kept + wired**; its
+  real-QA contract is untouched. S7 is appended to the slice order — after S6, since it modifies
+  a kept skill the cutover must first scrub. **Assumed:** the exploratory-testing evidence is
+  entirely human-subject; transfer to agent-run charters is unestablished `[R5 §6.7]`. Falsifier,
+  with an owner: the chained hunt's confirmed-finding count per probe budget, already emitted as
+  `EXPLORE_CONFIRMED` in the run envelope — if it stays 0 across 5 real chained runs, cut the
+  exploratory phase from the chain and keep the deterministic half. **Falsifier for the chain
+  itself:** if `QA_VERDICT=fail` never fires across S7's real runs while 03-review keeps finding
+  live defects, the chain is decoration and the review lane was sufficient.
+- **Status:** accepted
+
+### DEC-022 — BLOCKED carries a decision brief; reversibility gates ask-vs-decide; answers become scoped rules
+- **Choice:** the mid-run human-contact contract is rebuilt from parts the repo already owns
+  `[R5 §5]`:
+  1. **BLOCKED becomes a brief, not a report:**
+     `BLOCKED{blockerType, blocker, attempts[], feasibility, question: Question}`. `blockerType`
+     is enumerated (missing-dependency · plan-gap · unclear-instruction · repeated-failure ·
+     test-modification · infeasible — the OSS-converged classes plus this design's two).
+     `feasibility` is the agent's stated hypothesis of whether the task is possible at all — the
+     Answer.AI field report's dominant failure was days of grinding on impossible work with no
+     such statement `[R5 §4]`. The Question is DEC-005's recipe reused verbatim: evidence = the
+     failing gate's command + output pointer; options = resolution paths; myAnswer =
+     recommendation + costOfBeingWrong.
+  2. **Altitude + implication rules on every Question** (consult and mid-run): no code-level
+     identifiers in the question or options — translate to the user's observables (product
+     behavior, architectural direction); each option carries a one-line user-visible implication.
+     Both rules are harvested, not invented: x-mindful's hard rule (`SKILL.md:27`) and x-team's
+     option—implication format + done-format Shape 3's axis/decider footer. Warrant: experts
+     answer at the abstraction level their knowledge is organized at, and elicitation doctrine
+     says ask about observables, never latent parameters `[R5 §3]`. The question opens with the
+     decision as an infinitive and shows the criterion where the options actually differ (FM 6-0
+     Decision Paper shape).
+  3. **Reversibility gates ask-vs-decide.** Question gains
+     `reversibility: reversible | costly | one-way` (the DEC-002 definitions, applied mid-run).
+     Rule: **reversible + a myAnswer ⇒ the agent decides, logs a `Decision:` line, and continues —
+     no interrupt; costly/one-way ⇒ NEEDS-INPUT.** This is the round's resolution of its own
+     central tension: the interruption literature says suppress (≈23-min context switch, 27.1%
+     post-interruption error on the Trafton line), the Devin field evidence says the expensive
+     failure is under-escalation — so the ask/decide boundary is a **derived stakes predicate**,
+     not model confidence, which is advisory (commitment [5]) and demonstrably coexisted with the
+     failure it was meant to prevent `[R5 §3][R5 §4][R5 §6.4]`. DEC-011's two-failure trip-wire is
+     progress-based and is **not** softened: BLOCKED always fires regardless of reversibility.
+  4. **Elicit the criterion, scoped.** When the blocker is an instance of a class, the options are
+     framed as trade-off positions ("backward-compat outranks latency" vs the reverse), because
+     mechanical criteria + weights beat per-instance holistic verdicts in 94% of 136 studies
+     `[R5 §3]`. Every answer recorded as a rule carries `scope:` — the alternative space it was
+     elicited against — and outside that scope the agent re-asks or takes the conservative option,
+     never extrapolates (preference weights measurably do not transfer across alternative spaces;
+     Inverse Reward Design demonstrates the failure mode) `[R5 §3]`.
+  5. **Record + generalize, on existing rails.** On any NEEDS-INPUT answer or BLOCKED resolution:
+     a `Decision: <id> -> <choice> (<utterance-span>)` line in `progress.md` (resume never re-asks
+     within a run); the durable half routes by DEC-016's pointer-form rule — repo-bound ⇒ x-record
+     appends to the backlog/plan doc, repo-independent invariant ⇒ basic-memory stub — and the
+     existing 03-debate recall surfaces prior resolutions, so the class arrives pre-answered next
+     consult. Capture the *why*, not just the choice: rationale-level feedback measurably retires
+     whole classes of future questions where labels retire one `[R5 §3]`. The consult close
+     (04-close) additionally writes a **decision-authority** section into the plan template
+     (agent-decides / required-from-user / forbidden) — Devin's playbook loop; per commitment [1]
+     it reduces known-decision asks only and is never evidence the missing-decision class is
+     covered `[R5 §4]`.
+  6. **Transport semantics, minimal and explicit:** the envelope serializes to
+     `.x-skills/run/<slug>/envelope.md` and the run exits cleanly; resume reads the envelope
+     before the ledger; **an unanswered NEEDS-INPUT degrades to BLOCKED — no self-answer path
+     exists** (the July 2026 auto-continue incident: once users learn a question can self-answer,
+     they stop trusting every gate). Subagents never ask: AskUserQuestion is unavailable in
+     dispatched agents, so a blocker inside one returns as fenced data (DEC-018) and only the
+     top-level router emits. The D-option stays a *listed* option — the UI's free-text "Other" is
+     integrator behavior, not tool contract `[R5 §4][R5 §6.2]`.
+- **Why:** the user's ask is precisely the gap both maps measured: only NEEDS-INPUT carries a
+  brief today; BLOCKED — the state the ask targets — hands the human raw gate output and expects
+  them to construct the decision themselves, while every missing ingredient (altitude rule,
+  option-implications, reversibility rubric, store routing) already exists unwired in the repo
+  `[R5 §5]`. Question *selection* is where the measured value concentrates (one good question:
+  >170% ceiling; low-quality questions: worse than silence), which is why the recipe functions as
+  a rejection gate — a candidate that cannot fill `eliminates` or `myAnswer` is dropped and the
+  agent proceeds on its best guess `[R5 §3]`.
+- **Alternatives:** ~~Completed-Staff-Work default ("absent reply within X, I will do
+  myAnswer")~~ — rejected: it is the auto-continue incident in doctrine clothing, and a
+  persuasive recommendation plus a default-approve path maximizes uncritical acceptance exactly
+  where commitment [2] warns `[R5 §3]`. ~~ClarifyGPT-style convergence check licensing silent
+  proceeding~~ — rejected as a gate (self-consistency measures agreement, not correctness;
+  commitment [5]); admissible only as *additional evidence of ambiguity* when divergence occurs.
+  ~~An LLM triager suppressing escalations~~ (Codex auto-approval pattern) — inverted: filters may
+  only **add** escalations, never suppress a human-directed gate.
+- **Consequences:** S0's emit contract and `validate-emit.sh` grow: BLOCKED without a Question,
+  a question/option containing a code-level identifier, an option with no implication line, and a
+  missing reversibility class are all rejects. The altitude lint is heuristic (path-like tokens,
+  `()`, snake_case in narrative fields) — fixture-tested per DEC-019, tuned on S0's bad fixtures.
+  **Falsifier for the reversibility gate, with an owner:** count, in `metrics.md`, decisions the
+  agent self-decided as `reversible` that the human later reversed in review — >1 in 10 means the
+  classifier is optimistic and the gate tightens to costly-by-default. **Falsifier for
+  record+generalize:** if 03-debate recall never pre-answers a repeat blocker class across S3–S7,
+  the write path is ceremony — drop the basic-memory half and keep the doc append.
 - **Status:** accepted
 

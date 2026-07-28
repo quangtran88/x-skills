@@ -4,8 +4,8 @@ slug: x-skills-v3
 type: refactor
 status: ready
 created: 2026-07-27
-updated: 2026-07-28
-related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit]
+updated: 2026-07-29
+related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit, v3-qa-escalation]
 ---
 
 # x-skills v3 — consult / record / implement
@@ -15,13 +15,14 @@ Collapse 18 plugin skills into **3 new + 8 kept**, with zero runtime dependency 
 basic-memory and gitnexus.
 
 **This doc is the human review surface. Read it end to end.** It carries the problem statement, the
-disposition of every v2 skill, the contracts, the build order and the acceptance list. The twenty
-decisions and their warrants live in **[`x-skills-v3-decisions.md`](x-skills-v3-decisions.md)** —
-read a block before changing what it decided. Facts and citations live in `../research/`:
-`[FOUND]` = `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` =
-`2026-07-28-oss-skill-framework-survey.md`, `[R4]` = `2026-07-28-v3-round4-audit.md`.
+disposition of every v2 skill, the contracts, the build order and the acceptance list. The
+twenty-two decisions and their warrants live in
+**[`x-skills-v3-decisions.md`](x-skills-v3-decisions.md)** — read a block before changing what it
+decided. Facts and citations live in `../research/`: `[FOUND]` =
+`2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
+`[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`.
 
-**Four audit rounds.** R1 established the design; **R2** falsified much of it and added DEC-014/015;
+**Five audit/research rounds.** R1 established the design; **R2** falsified much of it and added DEC-014/015;
 **R3** surveyed eight OSS skill frameworks, changed the dependency scope to keep basic-memory and
 gitnexus (DEC-016/017), added DEC-018, and refuted all nine top transfer candidates as proposed —
 adopting each only in narrowed form; **R4** re-verified every repo-checkable assumption
@@ -30,7 +31,10 @@ Anthropic's published guidance and four prior-art lineages, mapped all 19 v2 ski
 fixed two build-order blockers plus ten internal contradictions. DEC-019 and DEC-020 are R4's;
 so is the **Disposition** section, which is what S6 executes. Per-decision amendment history lives
 in each block. **The direction is confirmed: the 3-skill thin-router shape is the *canonical*
-documented Agent Skills pattern, not merely a permitted one** `[R4 §3.1]`.
+documented Agent Skills pattern, not merely a permitted one** `[R4 §3.1]`. **R5** (2026-07-29,
+user-directed) researched two improvements — post-implement live QA and the blocker decision
+brief — and added DEC-021/DEC-022 plus slice S7; both verdicts were "the machinery exists,
+the wiring doesn't" `[R5 §5]`.
 
 ## Context & Problem
 
@@ -60,7 +64,7 @@ where no reward signal reaches `[FOUND §2.1]`.
 
 ## Key Decisions
 
-Twenty accepted decisions, each with its full Nygard warrant, live in
+Twenty-two accepted decisions, each with its full Nygard warrant, live in
 **[`x-skills-v3-decisions.md`](x-skills-v3-decisions.md)**. **Cite them by bare ID** (`DEC-011`) and
 let the reader grep — never by a generated heading anchor, which is derived from heading prose and
 breaks the moment a title is reworded (DEC-009's rule, applied to itself). This index is the map;
@@ -88,6 +92,8 @@ it is not a substitute for reading a block before changing what it decided.
 | DEC-018 | Every ingested payload is fenced as untrusted data | DEC-011 removed the human who would have noticed a poisoned instruction |
 | DEC-019 | Every enforcement script is wired and self-tested, or it does not ship | The corpus's dominant failure; this repo has already built two nobody runs |
 | DEC-020 | One description now carries the trigger surface of eighteen | Consolidation moves a real risk; guidance names it and prescribes the test |
+| DEC-021 | x-implement DONE chains into x-qa; live tests derive from oracle + diff | The QA engine exists and is unreachable — every gap is wiring, and the only implement→QA loop dies with x-team |
+| DEC-022 | BLOCKED is a decision brief; reversibility gates ask-vs-decide; answers become scoped rules | The state the user's ask targets hands the human raw gate output while every missing ingredient sits unwired in the repo |
 
 ## Contracts
 
@@ -99,12 +105,19 @@ TerminalEmit                        # first token, derived — never model-compo
   status   : DONE | BLOCKED | NEEDS-INPUT | FAILED-GATE
   payload  :                        # per-status, NOT a shared string (DEC-008)
     DONE        { filesWritten[], gateExitCodes[] }
-    BLOCKED     { blocker, attempts[] }          # what blocks + both attempts' raw output
+    BLOCKED     { blockerType, blocker, attempts[], feasibility, question: Question }
+                                    # a decision brief, not a report (DEC-022); blockerType ∈
+                                    #   missing-dependency | plan-gap | unclear-instruction |
+                                    #   repeated-failure | test-modification | infeasible
     NEEDS-INPUT { question: Question }           # the one admissible question
     FAILED-GATE { gate, exitCode, output }
   nextStep : chain{skill, artifactPath}          # derived from `next-skill:` frontmatter
            | remediate{command}                  # fixed table keyed on machine state (DEC-017)
-           | end                                 # chain terminus (x-implement DONE)
+           | end                                 # chain terminus
+           # x-implement DONE -> chain{x-qa} iff .x-skills/x-qa/profile.json exists, else end;
+           #   a chained QA_VERDICT=fail re-enters as FAILED-GATE{gate: qa} (DEC-021)
+  # subagents never ask: a blocker inside a dispatched agent returns as fenced data (DEC-018);
+  #   only the top-level router emits NEEDS-INPUT/BLOCKED (DEC-022)
 
 Claim
   grade   : OBSERVED | INFERRED | ASSUMED
@@ -123,11 +136,19 @@ SlotRow
            | DEFERRED{breaksIf}     # narrative
 
 Question                            # exactly one decision each
-  evidence   : pointer              # what the scout checked and failed to resolve
-  question   : string + options[A|B|C] + D:"none of these — what am I missing?"
-  eliminates : reading              # which competing reading this rules out; none => inadmissible
-  myAnswer   : recommendation + costOfBeingWrong
-  # ordered stakes-descending; no yes/no confirmations
+  evidence     : pointer            # what was checked and failed to resolve; mid-run this is the
+                                    #   consistency ladder walked before asking (DEC-022)
+  decision     : infinitive         # "To choose <x>" — the decision required, stated first
+  question     : string + options[A|B|C] + D:"none of these — what am I missing?"
+                                    # each option carries a one-line user-visible implication;
+                                    #   no code-level identifiers in question or options (DEC-022)
+  reversibility: reversible | costly | one-way   # reversible + myAnswer => agent decides and
+                                    #   logs, never interrupts; costly/one-way => ask (DEC-022)
+  scope        : alternative-space  # a recorded rule never extends past it (DEC-022)
+  eliminates   : reading            # which competing reading this rules out; none => inadmissible
+  myAnswer     : recommendation + costOfBeingWrong
+  # ordered stakes-descending; no yes/no confirmations; an unanswered NEEDS-INPUT degrades to
+  #   BLOCKED — no self-answer path exists (DEC-022)
 
 ReviewFindings → union              # DEC-014, agent-side, zero human cost
   cues[]       : user-utterance-span
@@ -139,7 +160,9 @@ ReviewFindings → union              # DEC-014, agent-side, zero human cost
 ConsultArtifact → x-record          # the gate x-record checks on disk
   tier         : 0 | 1 | 2 | 3
   slots        : SlotRow[]          # zero open REQUIRED rows to pass
-  examples     : (input → expectedOutput)[]        # becomes the frozen oracle
+  examples     : (input → expectedOutput)[]        # becomes the frozen oracle; rows carry x-qa
+                                                   #   obligation ids so the chained run's
+                                                   #   coverage gate arms (DEC-021)
   terminalState: answered | research | backlog | plan   # derived from tier, DEC-002 phase-mask
                                     # 0,1 -> answered | 2 -> research|backlog | 3 -> plan
                                     # `handoff` deleted — no DEC defined it
@@ -149,8 +172,11 @@ RunArtifacts   .x-skills/run/<slug>/               # gitignored; one dir per con
   metrics.md   : one row per instrument            # DEC-014 overlap, DEC-017 gitnexus-vs-Grep,
                                                    #   DEC-003 rework pointer — written from S2
   progress.md  : `Slice <N>: complete (<sha>)`     # resume predicate (DEC-011); line 1 names the plan
+               | `Decision: <id> -> <choice> (<span>)`  # self-decided or answered (DEC-022)
   dispatch/    : <phase>-<n>.txt, written pre-dispatch  # what S4's lint reads (DEC-012)
   attempt-1/   : stashed tree before a constrained retry  # DEC-011 falsifier's only channel
+  envelope.md  : serialized BLOCKED/NEEDS-INPUT + its answer when given — resume reads it before
+                 the ledger; the run exits cleanly on emit (DEC-022)
 
 CapabilityManifest                  # additions only; schema lives in capability-loading.md
   mcp.gitnexus  : { pinned, indexed, fresh, commitsBehind, ownCoverage }   # DEC-017
@@ -165,7 +191,9 @@ started).
 
 ## Disposition — all 19 dirs, and what S6 actually does
 
-**End state: 3 new skills + 6 kept unchanged + `x-shared/` = 10 dirs.** Round 3 never stated this
+**End state: 3 new skills + 8 kept + `x-shared/` = 12 dirs** (seven kept unchanged; x-qa kept +
+wired in S7, DEC-021 — the "6 kept / 10 dirs" this line carried until 2026-07-29 contradicted both
+the headline and this section's own table). Round 3 never stated this
 and three passages disagreed: the headline said "collapse 19 into 3", Non-Goals kept 5, and S6 said
 "retire the 19" — which read literally deleted the kept ones. Six skills had no disposition anywhere
 (x-design, x-guide, x-mindful, x-review, x-upstream, and x-research beyond its doc paths), and
@@ -181,8 +209,9 @@ by omission `[R4 §2]`. Reuse verdicts and the assets behind them are in `[R4 §
 | x-research | absorbed + harvest | MCP detection rows → `02-scout`; `synthesis-rules.md` → `templates/research.md` |
 | x-backlog | absorbed | x-record — `references/template.md` CORE skeleton is the backlog template |
 | x-mindful | absorbed + harvest | `extraction-prompts.md` → `01-questions`/`03-debate`; reversibility + severity rubric → `00-triage`. **Do not port the per-item walkthrough** |
-| x-omo · x-gemini · x-team | **deleted** | harvest first: `prompt-blocks.md` → dispatch prompts; agy exit-0 semantics → `capability-loading.md`; `blocker-escalation.md` sanitizer → `emit-contract.md` (DEC-018) |
-| x-worktree · x-worktree-isolate · x-qa · x-api-pentest · x-skill-improve · x-design · x-guide · x-upstream | **kept unchanged** | plus a mandatory scrub pass, below. x-design/x-guide/x-upstream added round 4 — orthogonal jobs with no successor in v3 |
+| x-omo · x-gemini · x-team | **deleted** | harvest first: `prompt-blocks.md` → dispatch prompts; agy exit-0 semantics → `capability-loading.md`; `blocker-escalation.md` sanitizer **+ options-with-implications render** → `emit-contract.md` (DEC-018, DEC-022); worker preamble's QA loop → the DEC-021 chain |
+| x-worktree · x-worktree-isolate · x-api-pentest · x-skill-improve · x-design · x-guide · x-upstream | **kept unchanged** | plus a mandatory scrub pass, below. x-design/x-guide/x-upstream added round 4 — orthogonal jobs with no successor in v3 |
+| x-qa | **kept + wired** | S7 (DEC-021): x-implement DONE chains in; scout armed on the branch/pr path; `references/change-derivation.md` added; TEST_PLAN persisted; real-QA contract untouched; the scrub pass still applies |
 | x-shared | rebuilt | see the outline; 14 files today, 8 survive |
 
 **S6 is not only deletion — the kept skills are not clean, and Acceptance row 1 fails on day one
@@ -213,7 +242,9 @@ skills/
     manifests/{new-requirement,read-only-question,prod-bug}.md
   x-record/                         # NEW  (was x-backlog + x-research doc paths)
     SKILL.md
-    templates/{research,backlog,plan}.md          # backlog carries Structure Outline section
+    templates/{research,backlog,plan}.md          # backlog carries Structure Outline section;
+                                    #   acceptance examples carry obligation ids (DEC-021);
+                                    #   plan carries a decision-authority section (DEC-022)
     lint-plan.sh                    # rejects any phase naming no end-to-end validation (DEC-010)
   x-implement/                      # NEW  (was x-do + x-bugfix + x-verify)
     SKILL.md
@@ -223,7 +254,8 @@ skills/
                                     #   from x-qa/scripts/lib/verdict.sh (DEC-019)
     # run dir: .x-skills/run/<slug>/ — progress.md, metrics.md, dispatch/, attempt-1/ (Contracts)
   x-shared/                         # 14 files today -> 8; every one has a verdict (DEC-013)
-    emit-contract.md                # NEW — DEC-007 + DEC-008 + DEC-018 (x-team sanitizer), one place
+    emit-contract.md                # NEW — DEC-007/008/018/022 (x-team sanitizer + escalation
+                                    #   render, altitude + implication rules), one place
     validate-emit.sh                # NEW — schema-conditional required fields; pre-judging +
                                     #   hypothesis-marker lint over dispatch/; ledger line format
     lint-chain.sh                   # NEW — reachability, enumerated chain edges, live-ref budget,
@@ -247,32 +279,40 @@ skills/
   bin/setup  hooks/inject-capabilities.sh     # MODIFIED — ownCoverage + crossModelCli probe (S3)
   x-omo/ x-gemini/ x-team/          # DELETED as bootstrap deps (DEC-013), after harvest
   x-worktree/ x-worktree-isolate/ x-qa/ x-api-pentest/ x-skill-improve/ x-design/ x-guide/
-  x-upstream/                       # KEPT — jobs v3 does not absorb; S6 scrub pass required
+  x-upstream/                       # KEPT — jobs v3 does not absorb; S6 scrub pass required;
+                                    #   x-qa additionally wired in S7 (DEC-021)
 ```
 
 Slices in order. **No slice starts before its predecessor's checkpoint passes.**
 
 | # | Slice | Verification checkpoint |
 |---|---|---|
-| S0 | `emit-contract.md` + `validate-emit.sh` | 3 good / 3 bad emits (missing status token, composed status, OBSERVED claim with no pointer) → correct verdict on all 6; `--selftest` hard-fails; wired to `npm run check` and a deliberately-broken run goes red (DEC-019) |
+| S0 | `emit-contract.md` + `validate-emit.sh` | 3 good / 5 bad emits (missing status token, composed status, OBSERVED claim with no pointer, BLOCKED without a Question, code-level identifier in a question/option — DEC-022) → correct verdict on all 8; `--selftest` hard-fails; wired to `npm run check` and a deliberately-broken run goes red (DEC-019) |
 | S1 | x-consult Tier 0 ANSWER, end to end | Real read-only question about this repo → derived status, every claim pointered, terminates without offering implementation |
 | S2 | x-consult Tier 2 + x-record backlog doc + DEC-014 review | Doc lands at immutable path with `DEC-`/`AC-` IDs, a Structure Outline section, an acceptance-examples block and a per-phase verification list; **overlap rate written to `metrics.md`** with `reviewer:` recorded; basic-memory write-time overlap lint rejects a >40-word restatement; validator passes |
 | S3 | x-implement on that doc, serial slices + gitnexus lane | Every gate prints command + exit code; status derived; the **backlog doc's** verification list extends the floor cascade; sha256 freeze fires; N/A rows print their reason; stub scan labelled over 10 real diffs; gitnexus prints `commitsBehind` when stale and prints the skip when it withholds |
 | S4 | prod-bug manifest + intent-blind scout | Every dispatch prompt lands in `dispatch/` **before** dispatch; the lint finds no pre-judging phrase and no hypothesis marker in the `02-scout` prompt; research doc is fact-only |
 | S5 | Tier 3 full chain + plan doc + `lint-plan.sh` | A plan with a phase naming no end-to-end validation is rejected; one missing a per-phase success criterion, exact file paths or an out-of-scope statement is rejected; a fully-validated plan passes |
 | S6 | Cutover — delete + harvest per the Disposition table, **scrub the 8 kept skills** | `git grep -l 'superpowers:\|oh-my-claudecode:' -- skills/ \| wc -l` → 0 **including x-qa and x-api-pentest**; `lint-chain.sh` green on the whole tree; bootstrap line count down ≥1,500; DEC-020 trigger eval passes at ≥0.5 |
+| S7 | Wire the QA chain into kept x-qa (DEC-021) + mid-run decision recording (DEC-022) | One real chained run: x-implement DONE derives `chain{x-qa}`; acceptance examples arrive as `severity: required` obligations and the coverage gate **arms on the branch/pr path**; `QA_VERDICT=fail` re-enters as `FAILED-GATE{gate: qa}`; a pass appends verdict + coverage counters to the backlog doc; one reversible decision self-decided with a `Decision:` line, one costly decision emitting NEEDS-INPUT whose options carry implications at human altitude |
 
 ## Scope & Non-Goals
 
 **In scope:** the three skills, the shared emit contract + validator, the three doc templates, the
 DEC-014 review dispatch, the DEC-015 capability-gated two-role cross-model path, the DEC-013
-deletions, and retiring the 19 v2 skills.
+deletions, the DEC-021 QA chain (S7), the DEC-022 blocker decision brief, and retiring the 19 v2
+skills.
 
-**Non-goals:** `x-worktree`, `x-qa`, `x-api-pentest`, `x-worktree-isolate`, `x-skill-improve`,
+**Non-goals:** `x-worktree`, `x-api-pentest`, `x-worktree-isolate`, `x-skill-improve`,
 and — added round 4, previously unstated anywhere — `x-design`, `x-guide`, `x-upstream`
-(orthogonal, invoked by name; see the Disposition table). Cross-model as a **general** dispatch layer (DEC-015 permits exactly
+(orthogonal, invoked by name; see the Disposition table). `x-qa` left this list on 2026-07-29:
+S7 wires it without touching its internals or its real-QA contract (DEC-021). Cross-model as a
+**general** dispatch layer (DEC-015 permits exactly
 two roles). Hook-based enforcement of consult-first. Parallel code mutation. Human stops at slice
-boundaries (DEC-011, decided against). Any ML on the rework tally.
+boundaries (DEC-011, decided against — DEC-022's reversibility gate governs mid-run *decision*
+interrupts, not slice boundaries). Notification/delivery infrastructure for blocked envelopes
+(terminal + run-dir file only, DEC-022). Change-scoped test selection in place of the per-task
+full suite (deferred, DEC-021). Any ML on the rework tally.
 
 ## Acceptance
 
@@ -315,6 +355,18 @@ boundaries (DEC-011, decided against). Any ML on the rework tally.
 - [ ] x-record prints the derived project slug and hard-fails on a slug containing a dot (DEC-016).
 - [ ] gitnexus lane prints `commitsBehind` when stale and prints the skip when it withholds the
       correctness-sensitive class; never silent either way (DEC-017).
+- [ ] `validate-emit.sh` additionally rejects: a BLOCKED without a Question, a question or option
+      containing a code-level identifier, an option missing its implication line, and a missing
+      reversibility class (DEC-022; fixtures per DEC-019).
+- [ ] A reversible-classed decision never emits NEEDS-INPUT — it is self-decided and appears as a
+      `Decision:` line in `progress.md`; an unanswered NEEDS-INPUT resumes as BLOCKED, never
+      self-answers (DEC-022).
+- [ ] The chained x-qa run arms the coverage gate on the branch/pr path with acceptance-derived
+      `severity: required` obligations, and `QA_VERDICT=fail` surfaces as `FAILED-GATE{gate: qa}`
+      with constrained-retry semantics (DEC-021, S7).
+- [ ] 03-review runs the tamper checklist and the reviewer-authored mutant probe on changed hunks;
+      an edit to a pre-existing test or the frozen oracle emits
+      `BLOCKED{blockerType: test-modification}` (DEC-011 as amended, DEC-021).
 - [ ] One full Tier 3 cycle completes on a real feature — **which has never happened in v2**.
       Human-observed; no instrument in the surveyed corpus can automate this row.
 
@@ -371,6 +423,13 @@ boundaries (DEC-011, decided against). Any ML on the rework tally.
 - **Open — DEC-015 has no read-only flag.** Neither `agy` nor `bin/agy-agent` documents one, so the
   DEC-018 requirement that the cross-model CLI run read-only currently has no implementation. Verify
   before S2 or weaken it to a tool-allowlist constraint `[R4 §4]`.
+- **Assumed — exploratory testing transfers from human testers to agent-run charters.** Every ET
+  measurement is human-subject; the agent-native mitigation is x-qa's existing bounded-probe +
+  independent-triage hunt. Falsifier: `EXPLORE_CONFIRMED` per probe budget across 5 chained runs
+  (DEC-021) `[R5 §6]`.
+- **Open — the DEC-022 altitude lint is heuristic.** "No code-level identifiers" is enforced by
+  pattern (path-like tokens, `()`, snake_case in narrative fields) and will misfire both ways;
+  tune on S0's fixtures, revisit at the S3 checkpoint.
 - **Open — DEC-020's trigger eval has no harness.** Official guidance supplies the protocol
   (~20 prompts per side, ~3 runs, 0.5 threshold) and `skill-creator` automates it, but v3 ships no
   implementation. It is the one instrument round 4 added that is unbuilt `[R4 §6]`.
