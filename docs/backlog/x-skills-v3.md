@@ -17,6 +17,11 @@ Facts and citations live in `../research/2026-07-27-x-skills-v3-foundations.md` 
 Round 2 (2026-07-28) falsified round 1's findings and researched a triangulation mechanism.
 DEC-002 through DEC-013 carry round-2 amendments; DEC-014 and DEC-015 are new.
 
+Round 3 (2026-07-28) surveyed eight OSS skill frameworks — facts in
+`../research/2026-07-28-oss-skill-framework-survey.md` (`[OSS]` below). **Dependency scope changed:
+basic-memory and gitnexus are kept** (DEC-016, DEC-017), which reopens part of DEC-013. DEC-018 is
+new. All nine top transfer candidates were refuted as proposed and adopted only in narrowed form.
+
 ## Context & Problem
 
 Three things are wrong with v2, in order of cost.
@@ -41,9 +46,12 @@ where no reward signal reaches `[FOUND §2.1]`.
 
 ## Key Decisions
 
-### DEC-001 — Three skills, dependency-free
-- **Choice:** `x-consult` (align) → `x-record` (persist) → `x-implement` (build). Nothing outside
-  this repo at runtime, except the capability-gated optional dispatch in DEC-015.
+### DEC-001 — Three skills, two kept dependencies
+- **Choice:** `x-consult` (align) → `x-record` (persist) → `x-implement` (build). No *plugin*
+  dependency at runtime. **Amended 2026-07-28:** two MCP dependencies are kept deliberately —
+  `basic-memory` (DEC-016) and `gitnexus` (DEC-017) — plus the capability-gated optional dispatch in
+  DEC-015. All three stay behind `capability-loading.md` and degrade silently; "kept" means *wired
+  and warranted*, not *assumed present*. The 101-call-site framework coupling still goes.
 - **Why:** Coupling, not dependency count, is the cost driver.
 - **Alternatives:** Trim 19 → ~8. Rejected: leaves the O(n²) documentation tax intact.
 - **Consequences:** **Round 2 counter-evidence, recorded rather than resolved.** The reference
@@ -72,11 +80,23 @@ where no reward signal reaches `[FOUND §2.1]`.
   estimate, not a measurement `[FOUND §2.4]`.
 - **Alternatives:** Mandatory full depth (the original brief) — rejected. Purely mechanical
   predicate — rejected as over-ceremonying a one-line change in a hot function.
-- **Consequences:** Top-of-skill conditional on an observable predicate. **M16's exemption-clause
-  ban is narrowed to DISCIPLINE gates** — it is about not-skipping-the-gate rules; per-phase
-  skipping at the tier-*selection* step is legitimate and is what the reference implementation
-  does. Carry the non-monotone caveat: fewer reasoning tokens also raise behavioural overthinking,
-  so the curve has a real minimum — this is not "less is always better."
+- **Escalation floor (new).** Three orthogonal signals aggregated by MAX, plus a floor no score can
+  undercut: **a change that alters a published contract, or is not cheaply reversible, is at least
+  Tier 2 regardless of file count** `[OSS §3]`. Without it a one-line migration or public-API edit
+  lands in Tier 0 — the one place the tier ladder is unsafe. Render the four tiers as a **phase-mask
+  table** naming exactly which phase files load per tier; that is what a thin router dispatches on.
+- **Consequences:** Top-of-skill conditional on an observable predicate. ~~M16's exemption-clause
+  ban is narrowed to DISCIPLINE gates~~ — **struck 2026-07-28: no narrowing was ever required.**
+  M16's own table has a fourth row for exactly this case — *"Behavior should depend on a condition →
+  Conditional keyed to an observable predicate; wrong form: unconditional rule + exemption clauses"*
+  — which prescribes DEC-002's remedy natively `[OSS §8]`. The narrowing rested on a misreading of a
+  source the foundations doc cited without pointing at. Two carry-forward rules from the same table
+  now apply repo-wide: **no nuance clauses** (appending one to a winning recipe degraded it from
+  consistent to noisy) and **exemption clauses don't scope** — *"this limit doesn't apply to code
+  blocks" still suppresses code blocks; if part of the output must be exempt, restructure so the
+  rule cannot reach it.* That second rule lands directly on DEC-007's "print only when non-empty."
+  Carry the non-monotone caveat: fewer reasoning tokens also raise behavioural overthinking, so the
+  curve has a real minimum — this is not "less is always better."
 - **Status:** accepted
 
 ### DEC-003 — A hand-authored slot manifest, justified on auditability
@@ -100,8 +120,16 @@ where no reward signal reaches `[FOUND §2.1]`.
   RESOLVED row falsifiable — a `file:line` is checkable, a tick is not. The **prose** half
   (falsifier / breaksIf) is labelled narrative and is **never evidence a row was resolved**;
   forcing per-row justification reliably produces plausible post-hoc rationalization.
+- **Better warrant, found 2026-07-28.** M16's table row 3 covers this case directly and more
+  cheaply than arguing against Urbach: *"Omits a required element from something they already
+  produce → Structural: REQUIRED field or slot in the template they fill in. Wrong form: prose
+  reminders near the template"* `[OSS §8]`. **A required template slot and a tick-box checklist are
+  different instruments** — the checklist evidence does not reach a slot the author cannot leave
+  blank. Re-warrant on row 3; keep the Urbach caveat only against the *exit gate*.
 - **Consequences:** The **rework tally is promoted from schema-only to load-bearing** — it is the
-  only falsifier this design has.
+  only falsifier this design has. **Conceded 2026-07-28:** it has no observation channel *within* a
+  run — it is detected in a later run against a different slug. It is a cross-run trend claim,
+  resolvable across runs or not at all. Do not build a per-run storage tier for it.
 - **Status:** accepted
 
 ### DEC-004 — Research questions before scouting; scout is intent-blind
@@ -153,7 +181,14 @@ where no reward signal reaches `[FOUND §2.1]`.
   recommendation to *every* question), and the pre-registered study that looked for exactly that
   anchoring effect did not detect it. Net simplification.
 - **Consequences:** The 3–5 budget is an artifact of benchmark design and does not transfer
-  cleanly `[FOUND §5]`. Treat as a house convention.
+  cleanly `[FOUND §5]`. Treat as a house convention. **Independent counter-position, recorded
+  2026-07-28:** a shipped skills repo refuses any cap on principle, from a real field report
+  ("Codex just asked me 200 questions"), on the grounds that a cap conflates *genuine
+  under-specification* (working as intended) with *redundant questions* (a prompt-quality problem)
+  — "the fix for the latter belongs in the skill prompt, not in a counter" `[OSS §8]`. v3 already
+  ships that prompt-side fix: the admission predicate. **Falsifier for the cap:** a run that
+  terminates *at* the cap with every question still admissible is evidence the cap is wrong, not
+  evidence it worked.
 - **Status:** accepted
 
 ### DEC-006 — Close with examples that become the frozen oracle
@@ -170,6 +205,15 @@ where no reward signal reaches `[FOUND §2.1]`.
   prose summary can be silently disambiguated by the human exactly as the spec was by the agent;
   an input→output example cannot. Oracle independence: 14% vs 25% fault detection, corroborated
   peer-reviewed at ICSE 2026 (47% worse on real-world code) `[FOUND M7]`.
+- **"Frozen" becomes machine-enforced (new).** `gates.sh` records the sha256 of the acceptance-examples
+  block when x-record writes the plan and re-checks it at every gate run; a mismatch is `FAILED-GATE`.
+  DEC-006 currently states the write restriction and enforces nothing — and under DEC-011 there is no
+  human reading the diff, so an implementer that quietly relaxes an example is undetectable. One shell
+  function in a file the Structure Outline already ships. **Falsifier:** if the hash never changes
+  across S3 and S5, the check has fired zero times — drop it and revert to prose. Note the read/write
+  asymmetry: this is a *write* restriction only. Withholding the examples from the implementer was
+  considered and rejected — M7's contamination runs oracle-by-code, and the examples are authored
+  before code exists, so temporal ordering already satisfies it `[OSS §3]`.
 - **Alternatives:** ~~Prose teach-back — folklore~~ — **retracted as overstated.** Teach-back has
   two systematic reviews and summarise-back-to-confirm is a named step in an empirically derived
   interview order. Keep examples as the primary close on the Kamsties mechanism, not on a folklore
@@ -206,6 +250,15 @@ where no reward signal reaches `[FOUND §2.1]`.
   termination** as the published consequence in variable-length instruments `[FOUND M6]`.
 - **Correction:** the CHI 2021 study is **not** a warrant for the ban — its winning condition *was*
   confidence display. Cite it only for the explanations finding.
+- **Schema-conditional requirement (new).** The obligation is a function of the enum value, checked
+  by the validator rather than requested in a prompt: `OBSERVED ⇒ pointer required`;
+  `ASSUMED ⇒ falsifier required`; `RESOLVED ⇒ pointer required` (DEC-003's rule, asserted in prose
+  and enforced nowhere today); and `BLOCKED`/`NEEDS-INPUT`/`FAILED-GATE` each carry a *different*
+  obligatory payload (what blocks / which question / which gate + exit code) rather than sharing one
+  `nextStep` string. Two independent repos converge on this `[OSS §3]`. Publish the schema as
+  documentation, enforce it with a hand-rolled checker whose unknown-key rejection is a set
+  difference — and keep **one** file authoritative; the source repo pays for the enum living in two
+  files nothing keeps in sync.
 - **Status:** accepted
 
 ### DEC-009 — Three docs, immutable paths, stable IDs, document precedence
@@ -232,6 +285,20 @@ where no reward signal reaches `[FOUND §2.1]`.
   reference implementation does and is a genuinely stronger fix for link rot — most links stop
   existing rather than needing immutability. **Rejected:** immutable paths plus a precedence rule
   buy the same safety more cheaply than a layout migration, and the backlog dir stays browsable.
+- **The line budget, settled 2026-07-28 — it is per file, and it needs a destination.** A three-repo
+  natural experiment says what makes an *unenforced* budget hold `[OSS §5]`: a **generous** cap with
+  a **named destination** held 24/24 (500 lines, "move detailed reference material into supporting
+  files"); a **tight** cap with no destination failed 11/14, its own authoring guide 7.6× over. The
+  unit that predicts rot is **lines per file**, not file count. So: the ~200-line target applies to
+  each **phase file**, the backlog doc's destination is `docs/research/`, and the number is either a
+  `wc -l` assertion in the same script as `validate-emit.sh` or it is deleted from this doc. An
+  unenforced number is decoration. Also: the ≥1,500-line drop becomes a **standing** measurement,
+  not a one-time cutover tick — deleted lines regrow as recovery shims and disabled-in-place code.
+- **Research template prohibition (new).** `templates/research.md` structurally excludes
+  **Recommendations** and **Risk-Matrix** sections. Once the research doc prescribes, DEC-004's
+  intent-blindness is gone downstream even if the scout dispatch was clean — and model-authored
+  High/Medium/Low likelihood attached to no evidence is DEC-008's confidence ban smuggled in as a
+  table. Observed degenerating exactly this way in the corpus `[OSS §2]`.
 - **Consequences:** **Knowing simplification recorded:** the author separates system-level
   contracts from code-shape signatures into two review passes at two altitudes; DEC-009 collapses
   both into one Structure Outline section. Nygard's four fields are a **lightweight default chosen
@@ -277,13 +344,21 @@ where no reward signal reaches `[FOUND §2.1]`.
   the implementation," plus "small uniform cycles."** The human ordering literature is null —
   granularity and uniformity predict quality, not sequencing — while the LLM
   context-contamination evidence is strong `[FOUND M7]`.
-- **Alternatives — and this is a deliberate, user-made call against the evidence.** The reference
-  implementation gates on **human confirmation at every phase boundary** ("Wait for the human to:
-  Confirm manual checks passed / Report any issues found / Give permission to continue"), and the
-  author's 2026 retraction is explicit: *"don't read the plans. Please, read the code"; "You should
-  not outsource the thinking. Read and own the code"* `[FOUND §2]`. **Rejected by the user on
-  2026-07-28** in favour of full autonomy: attention is spent entirely upstream, per the leverage
-  gradient (a bad line of research costs thousands of lines of code).
+- **Alternatives — the evidence is SPLIT, not unanimous (corrected 2026-07-28).** One reference
+  implementation gates on **human confirmation at every phase boundary**, and its author's 2026
+  retraction is explicit: *"don't read the plans. Please, read the code"* `[FOUND §2]`. But a
+  second shipped, eval-tested implementation does **deliberate full autonomy** and says so at the
+  top: *"Do not pause to check in with your human partner between tasks… 'Should I continue?'
+  prompts and progress summaries waste their time"* `[OSS §8]`. Round 2 recorded this decision as
+  "against the evidence," which overstated a unanimity that does not exist. **The user's 2026-07-28
+  choice of full autonomy is corroborated prior art, not a lone bet.**
+- **What makes the autonomous side survivable — and v3 has neither half yet.** It is not a
+  per-phase gate; it is an **enumerated stop set** (BLOCKED you cannot resolve · ambiguity that
+  genuinely prevents progress · all tasks complete — *not* the word "escalate"), a **per-status
+  control branch** with a distinct handling path each, and a hard prohibition: **never re-dispatch
+  the same model unchanged after a failure** — change the context, change the model, or split the
+  task. Adopt the routing table; do **not** adopt its status enum, which is model-asserted. Derive
+  the token per DEC-007.
 - **Consequences — residual risk, accepted knowingly:** the design's success metric is "my mental
   model matches the code," and it is now carried **entirely by the upstream artifacts** (backlog
   doc + structure outline + acceptance examples). Acceptance criterion S3 can pass with no human
@@ -292,6 +367,38 @@ where no reward signal reaches `[FOUND §2.1]`.
 - **"Two failures = stop" is a house threshold.** Evidence brackets rather than fixes it — most
   achievable repair gains land inside the first three to four iterations, while the counter-argument
   says budget is better spent on fresh samples.
+- **The retry is constrained, not re-run (new).** On a gate failure the second attempt receives the
+  failing gate's command, exit code and captured output **verbatim** (not the condensed form), plus
+  the pre-change state of the files the gate named, and is scoped: *fix only what the gate output
+  names; do not regenerate the slice; do not touch a file no gate named.* Re-run the named gate plus
+  the cascade downstream of it. Two independent repos converge on exactly these prohibitions
+  `[OSS §3]`. **Falsifier:** diff attempt 1's tree against attempt 2's — if attempt 2 confined
+  itself already, the constraint is decoration and gets deleted.
+- **Resume predicate (new, and it is a correctness mechanism, not an instrument).** x-implement
+  appends one line per slice to `.x-skills/run/<plan-slug>/progress.md`, first line naming the plan
+  as identity. *A slice is done iff it has a `Slice <N>: complete (<sha>)` line; resume at the first
+  slice without one; a ledger whose first line names a different plan is not yours.* Warranted on
+  MAST **FM-1.3 step repetitions 15.7%** — a figure `[FOUND M1]` already cites and spends on
+  nothing — plus the strongest field observation in the corpus: *"controllers that lost their place
+  have re-dispatched entire completed task sequences — the single most expensive failure observed"*
+  `[OSS §3]`. DEC-011 removed the human who would have noticed. Writer and reader are the same skill,
+  so this adds zero inter-skill edges; `.x-skills/` is already gitignored as "run artifacts."
+  **Falsifier:** clear context mid-run — if it resumes correctly from `git log` plus the plan's own
+  checkboxes alone, delete the ledger.
+- **Stub scan (new), ported with its preconditions or not at all.** One more row in the floor
+  cascade: reject completion-blocking patterns (`TODO`, `not implemented`, `pass  # stub`, …) in the
+  slice's own diff. It attacks DEC-011's accepted residual with a machine check at zero human cost.
+  But the six regexes are safe only because of ~100 lines of surrounding scaffolding, so port all
+  three preconditions: **(1) added lines only** (`git diff --unified=0`), **(2) an extension
+  allowlist**, **(3) string- and regex-literal stripping before matching.** Bare regexes in bash
+  would first hit S0's deliberately-bad fixtures and `gates.sh`'s own pattern literals — and a gate
+  that false-positives on the repo shipping it gets muted, which is worse than no gate.
+  **Falsifier:** >1 false positive in 10 on a real diff → ship nothing.
+- **What fail-fast cannot express is *inapplicable*, not *unrun*.** No typecheck configured, no
+  build script, no smoke target — a cascade that silently omits those records nothing in
+  `gateExitCodes[]` and reads as green. If a real S3 run shows ≥2 floor gates producing no entry at
+  all, `gates.sh` needs an explicit N/A row printing the reason. A `gates.sh` output change, not a
+  schema change.
 - **Status:** accepted
 
 ### DEC-012 — Thin router + phase files; one model-invoked skill
@@ -307,6 +414,25 @@ where no reward signal reaches `[FOUND §2.1]`.
   copy-pasteable next-step string** naming the next skill and the artifact path. This plus the
   per-task file convention is what lets the reference implementation run 16 skills at near-zero
   coupling `[FOUND §6]`.
+- **`nextStep` is derived, not composed (amended 2026-07-28).** It is the one field DEC-012 makes
+  load-bearing and the one field nothing derives or checks, while `status` beside it *is* derived.
+  Declare `next-skill:` in x-consult's and x-record's frontmatter and generate the string from it,
+  so a rename cannot break the chain silently at runtime.
+- **Coupling has no instrument, and that is the regression v3 exists to prevent.** The
+  `superpowers:|oh-my-claudecode:` grep measures dependency strings and the ~1,500-line drop measures
+  volume; neither would detect x-consult starting to document x-implement's internals. Add one
+  ~40-line stdlib script in S6, self-tested in-file: assert the three-edge chain; resolve every path
+  and skill name mentioned in any skill body against disk; **bidirectional reachability** — every
+  file a router names exists, every file under `phases/`/`manifests/`/`templates/` is named by a
+  router, exemptions carrying a written reason; and budget live refs so **a phase file may name at
+  most its immediate successor.** v2 produced exactly the unreachable-file failure this catches
+  (`slot-schema.md`'s "v2 reference — not shipped"; `completion-cascade.md`'s six Deferred rows). Do
+  not copy the corpus's `exit(0)` ending — a validator that cannot fail is Urbach in software `[OSS §2]`.
+- **No pre-judging in dispatch prompts.** Nothing today stops the primary writing the verdict into
+  the dispatch prompt, which defeats separation while satisfying it on paper. The tell is a fixed
+  phrase list — *"do not flag", "don't treat X as a defect", "at most Minor", "the plan chose"* —
+  so the composed prompt is greppable. This is also the cheapest way to make S4's "no hypothesis"
+  and S2's review-isolation checks mechanical rather than a human reading a prompt `[OSS §3]`.
 - **Consequences:** Ordering enforced structurally — x-record refuses to write until the consult
   artifact exists on disk with its open-required-slots row resolved. Nothing stops a user who never
   invokes x-consult; accepted rather than papered over with a hook dependency we just removed.
@@ -315,9 +441,12 @@ where no reward signal reaches `[FOUND §2.1]`.
 ### DEC-013 — Delete, don't port
 - **Choice:** Drop `slot-schema.md` + slot resolution, `reactions-vocabulary.md`, the 9-layer
   *instruction*-precedence ladder, the `send_message` section, the letter-namespace map,
-  `x-omo`/`x-gemini` as bootstrap deps, `x-team`, and the GitNexus freshness contract. Keep
-  `capability-loading.md` and the SessionStart hook nearly verbatim, minus `plugin.omc` and
-  `plugin.superpowers`.
+  `x-omo`/`x-gemini` as bootstrap deps, and `x-team`. Keep `capability-loading.md` and the
+  SessionStart hook nearly verbatim, minus `plugin.omc` and `plugin.superpowers`.
+- **Amended 2026-07-28:** the GitNexus freshness contract is **no longer deleted** — DEC-017 keeps
+  gitnexus. What dies is its *shape*: 45 lines restated per skill become ~10 lines in one place
+  (`mcp-toolbox.md`'s use-class index plus the probe section). The deletion target was duplication,
+  and that target is still met.
 - **Why:** ~1,700 lines the model reads at bootstrap and cannot act on `[FOUND §4]`.
 - **Consequences:** DEC-009's *document*-precedence rule replaces the deleted *instruction*-
   precedence ladder for the one job that was load-bearing. `capability-loading.md` survives and is
@@ -353,6 +482,16 @@ where no reward signal reaches `[FOUND §2.1]`.
     difference among perspectives in detection rate, defects/hour, or coverage.
   - *Probing the human from multiple angles, reverse-worded items, repertory grid* — all cost the
     scarce resource and are counter-evidenced.
+- **The overlap predicate is mechanical, and the decision rule is pre-registered (new).** Two
+  questions are **the same iff their `eliminates:` reading strings match** — a field the Question
+  contract already carries and already hangs inadmissibility off, which makes overlap an integer
+  ratio a script computes rather than a prose judgement. And the consequence is written down *now*,
+  before the number exists: **if overlap ≥ 80%, DEC-014's claim narrows** from "doubles ambiguity
+  yield" to "catches DEC-005 prohibition violations" — the third of its three jobs, which needs no
+  independence. Logging a threshold with no pre-declared consequence is how a falsifier becomes
+  furniture `[OSS §3]`. **Falsifier for the predicate itself:** if `eliminates:` cannot yield a
+  deterministic same/different verdict on 10 hand-built question pairs, the overlap row is
+  unmeasurable and the honest move is to delete it, not to add a second unmeasurable comparison.
 - **Consequences:** A same-base-model review is a **monomethod block; MTMM predicts it will
   UNDER-flag.** The overlap rate against the ~26% human baseline is the health metric and must be
   logged from S2. **The review may flag only cues present in the human's actual words** —
@@ -375,9 +514,98 @@ where no reward signal reaches `[FOUND §2.1]`.
 - **Alternatives:** Keep it a non-goal and instrument only — rejected by the user on 2026-07-28,
   on the grounds that the two roles are exactly where the evidence is specific. Resurrect x-omo —
   rejected; that is the 1,084-line bootstrap tax DEC-013 exists to delete.
+- **Silence is a bootstrap property, not an output property (amended 2026-07-28).** An independent
+  repo states the opposite rule three times — *"Skipping is fine; silent skipping is not"* — and the
+  tension is also internal: DEC-014's overlap rate is uninterpretable if you cannot tell which mode
+  produced it `[OSS §8]`. So: `ReviewFindings` gains `reviewer: same-model | cross-model:<cli>`,
+  recorded on the overlap row. **Announce in the machine channel, stay silent in the human one.**
+  Zero bootstrap cost, and it makes DEC-014's falsifier well-defined.
 - **Consequences:** The two roles must degrade cleanly to same-model, so neither may *depend* on
   cross-model being present. This is the one place v3 reaches outside itself, and it is optional
-  by construction.
+  by construction. Per DEC-018 the prompt is piped on stdin, never interpolated into a shell argument.
+- **Status:** accepted
+
+### DEC-016 — basic-memory for cross-repo transferables only
+- **Choice:** Kept as a first-class dependency, wired at exactly three points. **Recall** at
+  `01-questions` (`search_notes`, topical query, never the repo name, never `tags` — it is an
+  exclusion filter, so a miss is indistinguishable from no prior knowledge); hits enter as
+  `ASSUMED`-grade Claims. **Stub write** in x-record after `docs/` lands: the transferable
+  generalization plus a backlink to `docs/<kind>/<slug>.md @ <commit-sha>` — never the DEC body.
+  **Persist** at x-implement `04-report`, on a *derived* precondition: at least one gate went RED
+  then GREEN this run. A fully-green run writes nothing.
+- **The routing rule is the pointer form**, which DEC-008 already forces every claim to carry:
+  `file:line | commit-sha | doc-anchor` → `docs/`. `command+output`, or a repo-independent
+  invariant → basic-memory. A user-utterance-span *about the user* → `MEMORY.md`, which x-skills
+  never writes. One-line form for a phase file: *"if checking out a different commit would make
+  this line wrong, it belongs in `docs/`; if a session in a different repo six months from now
+  would want it and could not cheaply re-derive it, it belongs in basic-memory."*
+- **Why:** cross-repo recall is the one job `docs/` structurally cannot do — x-skills runs inside
+  *other* checkouts, so a gotcha learned while implementing in another repo has no home in either
+  repo's `docs/`. Already OBSERVED in the live store `[OSS §4]`. It is also the only one of the
+  three stores that is droppable, so it must earn its keep on that alone.
+- **Contract change:** DEC-008's pointer enum gains a sixth form, `memory://<permalink>`. Without
+  it a recalled note cannot be cited at all. A memory hit is never `OBSERVED` — it is not an
+  observation of the current code; it upgrades to `INFERRED` only once the scout corroborates it.
+- **Prohibitions (each closing an OBSERVED failure `[OSS §4]`):** recall output **must not** reach
+  the intent-blind scout — a note is a hypothesis, and DEC-004's evidence says partial withholding
+  fails. No basic-memory in `03b-review` (contaminates DEC-014's monomethod control and inflates
+  its only falsifier). No `recent_activity` at session start — a recency feed, not a relevance
+  query. No `sessions/` auto-capture; ~18 such notes already exist, titled from raw first user
+  messages. x-record **prints the derived project slug** and hard-fails on a slug containing a dot:
+  three worktree-named folders already exist in the store, written silently.
+- **Consequences:** no new plumbing — `mcp.basic_memory` already flows through `bin/setup:905` and
+  `hooks/inject-capabilities.sh:50`. **Open risk:** "link, don't restate" is prose, and this
+  design's own diagnosis is that prose contracts do not self-enforce. Falsifier: after S2/S3, diff
+  every note under `decisions/x-skills/` against the doc it cites — any note carrying >~40
+  contiguous duplicated words means the rule failed and the overlap check must become a write-time lint.
+- **Status:** accepted
+
+### DEC-017 — gitnexus is advisory, never a gate
+- **Choice:** Kept, and scoped to what it can actually do. `query` + `context` in `02-scout` for
+  unfamiliar **code** repos. `impact` (`summaryOnly:true`) and `detect_changes` in x-implement as
+  **recorded evidence only** — two integers (direct callers at d=1, affected-process count) as an
+  `OBSERVED` Claim with `commitsBehind` printed on the same line. Never control flow. The
+  LOW/MEDIUM/HIGH/CRITICAL label is never consulted — it is a composed label, and DEC-007 bans
+  composed status. x-record uses `context` to verify Structure Outline symbols exist, **downgrading**
+  an unresolvable row to `ASSUMED` rather than rejecting it.
+- **Three deterministic states, no model judgement:** (1) not pinned / not indexed / own-coverage
+  false → lane absent, native `Grep`, silent. (2) indexed + fresh → all classes usable.
+  (3) indexed + **stale** → advisory class usable *with `commitsBehind` printed*; correctness-sensitive
+  class not consulted, and **the skip is printed**. Never silent either way. Never auto-run
+  `analyze` — emit the command as DEC-012's copy-pasteable next step.
+- **Why — measured, and it inverts the assumption `[OSS §4]`:** on this repo gitnexus indexes
+  **2,231 own nodes against 153,719 vendored (1.4%)**, **0 own symbols in any of 300 Processes**,
+  18 Functions all under an explicit non-goal directory, and **zero of 111 `.sh` files** produce a
+  Function node. `list_repos` shows **7 of 8 repos stale**, with no incremental analyze. So the
+  correctness-sensitive class is near-dead by default, and a design that gates on freshness has a
+  decorative gitnexus path. gitnexus is a dependency for the **target repos x-skills operates on**,
+  not for x-skills' own development.
+- **Alternatives:** `impact` as a hard gate (the current `CLAUDE.md` "MUST"). **Rejected on three
+  grounds:** 7/8 repos stale would make it routinely bypassed — the NEJM surgical-checklist failure
+  this design already cites; DEC-011's autonomy leaves no human to escalate to, so the gate
+  degenerates into self-approval, which M8 forbids; and DEC-007 has no status for "advisory looked
+  risky." Also rejected: `rename` for the 19→3 collapse (markdown and shell — the S6 `grep` is the
+  right tool), `route_map`/`api_impact`/`shape_check` (belong to x-api-pentest, a non-goal), and
+  `cypher` in any phase file (needs schema knowledge, unbounded output).
+- **Consequences:** one capability-manifest addition — `ownCoverage: bool` on the *existing*
+  session-pinned probe, because "indexed" is the wrong question. **`CLAUDE.md`'s "MUST run impact
+  before editing any symbol" needs a self-development carve-out** or it will be violated on every
+  v3 slice and thereby trained as ignorable. **Falsifier:** across the first 10 x-implement slices
+  in a real code repo, count those where `impact`/`detect_changes` actually ran *and* returned a
+  d=1 caller `Grep` had not already found. Zero of 10 → cut gitnexus from both skills and leave it
+  a human-invoked tool.
+- **Status:** accepted
+
+### DEC-018 — Every ingested payload is fenced as untrusted data
+- **Choice:** All four dispatch sites that ingest text an attacker could have written — DEC-004's
+  scout (arbitrary repo file content), DEC-014's reviewer, DEC-006's oracle, DEC-012's judging pass —
+  fence the payload with BEGIN/END markers and state that its contents are data, never instructions.
+  A directive found inside a payload is **a finding, not a command**: it becomes a pointered Claim
+  under DEC-008. For DEC-015's cross-model path, the prompt is written to a file and piped on
+  stdin — never interpolated into a shell argument — and the CLI is invoked with its read-only flag.
+- **Why:** verified zero coverage — `grep -niE 'untrusted|prompt.?inject|treat as data'` over both v3
+  docs returns nothing, while DEC-011 removes the human who would notice. A poisoned instruction in
+  a source file currently reaches a mutating agent with no supervisor.
 - **Status:** accepted
 
 ## Contracts
@@ -391,6 +619,9 @@ TerminalEmit                        # first token, derived — never model-compo
 Claim
   grade   : OBSERVED | INFERRED | ASSUMED
   pointer : file:line | command+output | commit-sha | doc-anchor | user-utterance-span
+          | memory://<permalink>     # DEC-016 — never OBSERVED; INFERRED only once scouted
+  # pointer form also routes the store: file:line|commit-sha|doc-anchor -> docs/
+  #                                     command+output|repo-independent  -> basic-memory
 
 SlotRow
   name     : string
@@ -410,6 +641,8 @@ ReviewFindings → union              # DEC-014, agent-side, zero human cost
   cues[]       : user-utterance-span
   questions[]  : Question           # unioned + deduped with primary's, never reconciled
   downgraded[] : OBSERVED → INFERRED
+  reviewer     : same-model | cross-model:<cli>    # DEC-015 — machine channel only
+  overlap      : |same| / |union|   # same iff eliminates: strings match; >=0.80 narrows DEC-014
 
 ConsultArtifact → x-record          # the gate x-record checks on disk
   tier         : 0 | 1 | 2 | 3
@@ -445,10 +678,14 @@ skills/
   x-implement/                      # NEW  (was x-do + x-bugfix + x-verify)
     SKILL.md
     phases/{01-slice,02-gates,03-review,04-report}.md
-    gates.sh                        # floor cascade + plan's own verification list; prints cmd+exit
+    gates.sh                        # floor cascade + plan's verification list; cmd+exit; sha256
+                                    #   acceptance freeze (DEC-006); stub scan (DEC-011)
+    # ledger: .x-skills/run/<plan-slug>/progress.md — gitignored, resume predicate (DEC-011)
   x-shared/
-    emit-contract.md                # NEW — DEC-007 + DEC-008, one place
-    validate-emit.sh                # NEW — mechanical enforcement
+    emit-contract.md                # NEW — DEC-007 + DEC-008 + DEC-018, one place
+    validate-emit.sh                # NEW — mechanical enforcement; schema-conditional required
+                                    #   fields; pre-judging phrase list; ledger line format
+    lint-chain.sh                   # NEW — S6 reachability + 3-edge chain + live-ref budget
     capability-loading.md           # MODIFIED — drop plugin.omc/superpowers; carries DEC-015 gate
     done-format.md                  # MODIFIED — keep shapes 1-3, cut letter-namespace map
     invocation-guide.md             # MODIFIED — keep handoff/assign only
@@ -498,8 +735,18 @@ boundaries (DEC-011, decided against). Any ML on the rework tally.
       from S2 — the falsifier for the monomethod risk.
 - [ ] DEC-015's two roles degrade silently to same-model when no cross-model CLI is present.
 - [ ] No doc path changes on completion; no inbound link breaks at `status: done`.
-- [ ] Bootstrap-path line count drops by ≥1,500 vs v2.
+- [ ] Bootstrap-path line count drops by ≥1,500 vs v2, **measured on every release, not once**.
+- [ ] `lint-chain.sh` rejects: a router naming a missing file, a `phases/` file no router names, and
+      a phase file naming a skill more than one hop downstream.
+- [ ] Every gate script is **wired to `npm run check`** — the corpus's dominant failure is an
+      instrument nothing consumes, and this repo has already built two that nothing runs `[OSS §2]`.
+- [ ] Every enforcement script ships **good/bad fixture pairs and a `--selftest` that hard-fails**
+      before it is trusted — not just S0's emit fixtures.
+- [ ] x-record prints the derived project slug and hard-fails on a slug containing a dot (DEC-016).
+- [ ] gitnexus lane prints `commitsBehind` when stale and prints the skip when it withholds the
+      correctness-sensitive class; never silent either way (DEC-017).
 - [ ] One full Tier 3 cycle completes on a real feature — **which has never happened in v2**.
+      Human-observed; no instrument in the surveyed corpus can automate this row.
 
 ## Handoff Notes / Open Questions
 
@@ -518,13 +765,29 @@ boundaries (DEC-011, decided against). Any ML on the rework tally.
   "the requirement nobody thought of" when it lives outside both your words and the codebase —
   and three inspection studies say a topic checklist does not close it either. Stated, not solved.
 - **Gotcha:** nothing stops a user who never invokes x-consult. Accepted, not solved.
-- **Gotcha — this doc is 527 lines against its own DEC-009 target of ~200, and the gap widened
-  from 337 after one audit round.** "Three skills, so the cap is per unit of work" no longer
-  explains a 2.6× overrun. Two real readings: the cap is wrong for decision-dense docs, or a doc
-  that absorbs its own research audit has stopped being the human review surface DEC-009 says it
-  is. **Falsifier: whether you actually read this one end to end.** If you skimmed it, the cap is
-  right and the citations belong in `[FOUND]` refs only. Settle before S2 renders the template.
+- **Resolved 2026-07-28 — the doc-length gotcha.** The question was "is the cap wrong or has this
+  stopped being a review surface"; the corpus answered a better one: an unenforced cap holds when it
+  is generous *and names a destination*, fails when it is tight and names none `[OSS §5]`. Both
+  halves are now fixed in DEC-009 — the budget is **per phase file**, this doc's destination is
+  `docs/research/`, and the number is asserted by `wc -l` or deleted. This doc stays long because it
+  is a decision record with 18 blocks; the phase files are what must stay small.
 - **Read before S3:** HumanLayer's `rpi` plugin v0.18.1 (16 skills) — **not** the pre-QRSPI
   `create_plan.md` set, which prescribes the exact horizontal ordering DEC-010 bans `[FOUND §6]`.
   Cite behaviour; do not vendor text (All Rights Reserved). The `implementer-agent` prompt — the
   closest prior art to x-implement's slice executor — is unpublished and remains unavailable.
+  **Now partly superseded:** `[OSS §7]` names six readable files covering the same ground, including
+  the constrained-repair and instrument-selftest prior art, with no licensing constraint.
+- **Assumed — gitnexus earns its place.** Measured own-coverage is 1.4% and 7 of 8 repos are stale,
+  so both lanes are near-dead exactly where DEC-017 gates them in. Falsifier: 10 x-implement slices
+  in a real code repo with zero `impact` calls that beat `Grep` → cut it to a human-invoked tool.
+- **Assumed — the basic-memory durability gate binds.** It is already being ignored in the live
+  store (a green-run note the contract bans; ~18 session notes). DEC-016 replaces model discretion
+  with a derived precondition. Falsifier: >1 non-durable note in 6 across S1–S6.
+- **Open — recall placement may violate DEC-004.** A memory hit is a low-precision anchor delivered
+  *before* scouting, to the agent that writes the research questions, and DEC-004's own evidence
+  says anchoring does not decrease with lower anchor precision. Falsifier: any single consult where
+  a recalled claim was contradicted by the scout *and* the drafted questions still presupposed it →
+  move recall after `02-scout`, consumed only at `03-debate`.
+- **Gotcha — `CLAUDE.md` contradicts DEC-017.** Its "MUST run impact analysis before editing any
+  symbol" is unsatisfiable on this repo (1.4% own coverage, 0 own processes). Needs a
+  self-development carve-out before S0, or it trains itself as ignorable.
