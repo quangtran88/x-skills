@@ -4,13 +4,13 @@ slug: x-skills-v3-decisions
 type: refactor
 status: ready
 created: 2026-07-28
-updated: 2026-07-29
-related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit]
+updated: 2026-07-30
+related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit, v2-skill-reuse-audit]
 ---
 
 # x-skills v3 — decision record
 
-The twenty-two accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
+The twenty-four accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
 Alternatives / Consequences + a status line), append-only, addressed by stable `DEC-00n` IDs.
 
 **Split out of the design doc on 2026-07-28**, at 1,114 lines. The design doc's own settled rule
@@ -23,7 +23,8 @@ firing, not a fresh judgement call.
 statement, the disposition table, the contracts, the build order and the acceptance list — that is
 the review surface. Citations resolve to `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
-`[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`.
+`[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`,
+`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`.
 
 Superseded blocks move to a **Superseded** section at the foot of this file, never inline —
 content marked as excluded still biases readers at roughly twice the rate of obsolete items
@@ -554,6 +555,14 @@ present (DEC-009). IDs keep resolving.
   (5 of 7 slots "not emitted in v1", 3 banned dependency strings, a "v2 reference — not shipped"
   section) become `lint-chain.sh`'s two bad-case fixtures: the cheapest possible proof that
   bidirectional reachability catches real rot `[R4 §4]`.
+- **Amended 2026-07-30 — the deletion has a binary the plan never named `[R6 §2]`.**
+  `bin/omo-agent` is byte-identical to `skills/x-omo/omo-agent`; `bin/setup:505-515` is its
+  binding and **hard-fails at `:509`** when it is missing; `bin/find-plugin-dir:22-25` resolves
+  the plugin dir through its `~/.local/bin/omo-agent` symlink; and `bin/setup:454-455` advertises
+  it as enabling four skills v3 absorbs or keeps. Neither plan doc mentioned it (`grep -c
+  omo-agent` → 0 in both). Fate, per DEC-024: **binary + setup §1 + the find-plugin-dir symlink
+  branch are deleted together in S6** — a fresh install must never hard-fail on a binary whose
+  consumers no longer exist.
 - **Consequences:** DEC-009's *document*-precedence rule replaces the deleted *instruction*-
   precedence ladder for the one job that was load-bearing. `capability-loading.md` survives and is
   what DEC-015 rides on.
@@ -645,9 +654,19 @@ present (DEC-009). IDs keep resolving.
   So the lane re-derives a real exit code from empty stdout plus the log tail before recording any
   overlap row, and **serializes** cross-model calls (concurrent invocations contend on a
   per-invocation gRPC language server and hang). Harvest these into `capability-loading.md` when
-  x-gemini is deleted; they are the only record of them. **Open:** DEC-015 requires a read-only
-  flag and neither `agy` nor `bin/agy-agent` documents one — verify before S2 or drop the
-  requirement to "no write tools in the prompt's tool allowlist."
+  x-gemini is deleted; they are the only record of them — and the harvest is the **full agy
+  operational envelope**, not exit-0 alone (amended 2026-07-30): the 600s timeout floor + "agy
+  buffers output to the end, a short timeout truncates to 0 bytes" (`x-gemini/SKILL.md:118,:148`),
+  never `--add-dir` a large tree, auth-noise-is-not-auth-failure, `quota_error → flash-low`, the
+  model-alias table and env vars. Kept x-qa is the last agy consumer and currently resolves all of
+  these through the deleted dir `[R6 §3.8]`.
+- **Amended 2026-07-30 — the preferred backend for the two roles is now the codex lane
+  (DEC-024).** When `plugin.codex`/the `codex` binary is pinned, the interview reviewer and the
+  acceptance oracle dispatch to Codex (`codex exec`, prompt on stdin per DEC-018); `agy` remains a
+  valid fallback backend where installed, and same-model remains the terminal fallback with
+  `reviewer: same-model` recorded. The open read-only question transfers to the codex binary:
+  verify a read-only/sandbox mode on the installed `codex` before S2, or constrain via the
+  prompt's tool allowlist.
 - **Status:** accepted
 
 ### DEC-016 — basic-memory for cross-repo transferables only
@@ -894,6 +913,13 @@ present (DEC-009). IDs keep resolving.
   exploratory phase from the chain and keep the deterministic half. **Falsifier for the chain
   itself:** if `QA_VERDICT=fail` never fires across S7's real runs while 03-review keeps finding
   live defects, the chain is decoration and the review lane was sufficient.
+- **Amended 2026-07-30 — the chain has a fail edge the wiring missed `[R6 §2]`.** x-qa's
+  after-skill routing sends failed cases and confirmed exploratory findings to
+  `/x-skills:x-bugfix` (`SKILL.md:213-214`, `references/explore-team.md:46`) and special-cases
+  "invoked by x-team" (`:211`) — a deleted skill on both counts. S7 re-points both: the fail
+  offer targets **x-implement's prod-bug intake** (the failed cases + minted repro stubs are the
+  manifest's error evidence), and the machine-caller identity becomes the DEC-021 chain itself.
+  This is S7 wiring work, not generic S6 scrub.
 - **Status:** accepted
 
 ### DEC-022 — BLOCKED carries a decision brief; reversibility gates ask-vs-decide; answers become scoped rules
@@ -978,5 +1004,65 @@ present (DEC-009). IDs keep resolving.
   classifier is optimistic and the gate tightens to costly-by-default. **Falsifier for
   record+generalize:** if 03-debate recall never pre-answers a repeat blocker class across S3–S7,
   the write path is ceremony — drop the basic-memory half and keep the doc append.
+- **Status:** accepted
+
+### DEC-023 — x-review is kept standalone; 03-review harvests it, not the other way round
+- **Choice:** x-review's Disposition changes from *absorbed + harvest* to **kept + harvest**. It
+  ships in v3 as a standalone, independently-invocable multi-model code-review skill. x-implement's
+  `03-review` still harvests, inline: the Scope Contract, `scope-guard.md`'s SCOPE body, the
+  verify-each-finding pass, the **synthesis-side scope filter** (`steps/step-03-synthesize.md:11-36`
+  — `:13` records that reviewers return out-of-scope findings *even with* the prompt-side guard)
+  and the >30%-findings-fail-verification unreliability threshold (`:49`). The
+  options-with-implications render in `emit-contract.md` is built from x-review's
+  `step-03-synthesize.md:105-151` — the developed **original** of the two copies DEC-022 cited —
+  with its six labelled Impact-line fixtures (`:120-132`) becoming the DEC-022 altitude lint's
+  calibration set `[R6 §3.4, §4.4]`.
+- **Why:** User-directed 2026-07-30: a standalone multi-model review pass is useful outside the
+  consult→record→implement chain (reviewing a PR you didn't build, a teammate's branch, a vendor
+  diff). The R6 audit independently found the render provenance runs through this skill — keeping
+  the source alive keeps one copy canonical instead of two harvested descendants.
+- **Alternatives:** Absorb fully (the R4 disposition) — rejected by the user. Keep it but skip the
+  harvest — rejected: 03-review runs inside x-implement's autonomous loop and may not depend on a
+  sibling skill at dispatch time (DEC-012's one-hop rule); the machinery must live inline.
+- **Consequences:** End state becomes **3 new + 9 kept + x-shared = 13 dirs**. x-review joins the
+  S6 scrub with real work: 20 framework strings across 4 files, 8 dead-skill refs, and
+  `scope-guard.md:3`'s reviewer roster (omo-agent oracle / `omo-agent --model gpt` /
+  `agy-agent --model pro`) re-pointed to the DEC-024 codex lane, capability-gated with same-model
+  fallback. Acceptance row 1 and the dead-name sweep now cover 9 kept dirs. `done-format.md:49-58`'s
+  distilled copy of the render dies with the rest of that file's deletions — `emit-contract.md`
+  is the single survivor.
+- **Status:** accepted
+
+### DEC-024 — codex-plugin-cc replaces OMO as the in-session cross-model lane
+- **Choice:** The optional cross-model dependency is **`openai/codex-plugin-cc`** (official
+  OpenAI; Apache-2.0; installed via the Claude Code plugin marketplace), replacing everything the
+  deleted x-omo/OMO stack provided. The capability manifest gains two pins: `plugin.codex` (plugin
+  installed) and `tool.codex` (global `codex` binary present). **Machine channel** — DEC-015's two
+  roles, x-review's reviewer lane, and the 02-gates ladder's fresh-perspective rung dispatch via
+  `codex exec` with the prompt piped on stdin (DEC-018); **human channel** — the plugin's
+  `/codex:review`, `/codex:adversarial-review` and `/codex:rescue` commands are the user-facing
+  surface. Absent either pin, every consumer degrades to same-model, silent in the human channel
+  and recorded in the machine channel (DEC-015).
+- **Why:** User-directed 2026-07-30: x-omo's original intent was multi-model *within* a Claude
+  session, and that intent survives — its 1,084-line bootstrap dir, bespoke `bin/omo-agent` binary
+  and hard-failing setup section do not. The plugin is the official replacement shape: marketplace
+  distribution, Apache-2.0 (no PolyForm/AGPL-style constraint on consumers), ~30.4k stars, wraps
+  the Codex app server through the global `codex` binary `[R6 §5]`. This also closes R6's
+  highest-consequence orphan: `bin/omo-agent` + `bin/setup` §1 + the `find-plugin-dir` symlink
+  branch die together in S6 (DEC-013 as amended), and `bin/setup` instead *prints* the marketplace
+  install commands as an optional step — never a hard requirement.
+- **Alternatives:** Keep OMO — rejected: the DEC-013 bootstrap tax plus an unowned binary that
+  hard-fails fresh installs. Ship no in-session cross-model lane — rejected: forfeits DEC-015's
+  measured critic-strength effect and the user's stated intent. Drive the `codex` binary with no
+  plugin — half-adopted: the machine channel *does* use the binary directly (stdin, serialized,
+  re-derived exit codes per DEC-015's agy lesson until the binary's semantics are probed); the
+  plugin is the human-channel surface and the distribution vehicle.
+- **Consequences:** Requires Node ≥18.18 and a ChatGPT subscription or OpenAI API key — a
+  *user-supplied* credential v3 never assumes, so every consumer keeps a same-model path
+  (DEC-015). agy remains the Gemini lane for kept x-qa (DEC-021) with its envelope harvested into
+  `capability-loading.md`. **Open, inherited from DEC-015:** probe the installed binary's
+  read-only/sandbox mode and `codex exec` stdin semantics before S2 — until probed, the lane is
+  spec, not capability. Falsifier: if the S2 probe finds no non-interactive read-only invocation,
+  the machine channel drops to agy-else-same-model and the plugin stays human-channel only.
 - **Status:** accepted
 
