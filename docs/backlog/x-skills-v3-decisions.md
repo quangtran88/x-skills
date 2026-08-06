@@ -10,7 +10,7 @@ related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-r
 
 # x-skills v3 — decision record
 
-The twenty-five accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
+The twenty-seven accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
 Alternatives / Consequences + a status line), append-only, addressed by stable `DEC-00n` IDs.
 
 **Split out of the design doc on 2026-07-28**, at 1,114 lines. The design doc's own settled rule
@@ -673,6 +673,11 @@ present (DEC-009). IDs keep resolving.
   The exit-code re-derivation + serialization discipline survives, re-keyed to the codex lane
   (DEC-024's amendment): re-derive from empty output + log tail until S2 exercises a real
   failure case.
+- **Amended 2026-08-06 (DEC-026/027):** the `plugin.codex` pin never ships — the lane is
+  binary-only (`tool.codex` + `tool.opencode`, driven directly). The **serialization rule is
+  re-scoped per-backend**: it was the agy gRPC-contention lesson and agy is gone; parallel is the
+  default and the S2 probe includes a per-backend 3-concurrent contention check (DEC-027). The
+  `reviewer:` field records `<backend>/<model>` per lane.
 - **Status:** accepted
 
 ### DEC-016 — basic-memory for cross-repo transferables only
@@ -1037,6 +1042,9 @@ present (DEC-009). IDs keep resolving.
   fallback. Acceptance row 1 and the dead-name sweep now cover 9 kept dirs. `done-format.md:49-58`'s
   distilled copy of the render dies with the rest of that file's deletions — `emit-contract.md`
   is the single survivor.
+- **Amended 2026-08-06 (DEC-027):** the roster re-point is superseded by **externalization** —
+  `scope-guard.md:3`'s hardcoded roster becomes the `models.json` config; the S6 work is deleting
+  the hardcoded list and wiring the config read, not re-pointing strings.
 - **Status:** accepted
 
 ### DEC-024 — codex-plugin-cc replaces OMO as the in-session cross-model lane
@@ -1087,6 +1095,9 @@ present (DEC-009). IDs keep resolving.
 - **Amended 2026-08-06 (DEC-025):** "agy remains the Gemini lane for kept x-qa" no longer holds —
   agy is removed entirely. x-qa's runner lane re-points to this DEC's canonical invocation with
   same-model fallback, and `bin/agy-agent` + `bin/setup` §1h die alongside `bin/omo-agent`.
+- **Amended 2026-08-06 (DEC-026):** the plugin half is dropped entirely — no marketplace-install
+  print, no `plugin.codex` pin; the human channel is the in-repo `x-delegate` skill. The
+  canonical machine invocation and the 2026-08-06 probe results stand unchanged.
 - **Status:** accepted
 
 ### DEC-025 — agy removed entirely; codex → same-model is the only chain
@@ -1119,5 +1130,68 @@ present (DEC-009). IDs keep resolving.
   (DEC-015), and the DEC-014 overlap metric is the instrument that will price that loss if it
   matters. Falsifier: if overlap on same-model runs persistently exceeds ~26% while codex-backed
   runs sit below it, the second backend earned its keep and this decision gets revisited.
+- **Status:** accepted
+
+### DEC-026 — Zero plugin dependencies: one thin in-repo skill drives both CLIs
+- **Choice:** v3 ships **no Claude Code plugin dependency at all**. The cross-model lane is two
+  user-supplied binaries driven directly — `codex` (DEC-024's canonical invocation, probed) and
+  `opencode` (`opencode run`, envelope probe pending) — pinned as `tool.codex` + `tool.opencode`;
+  `plugin.codex` never ships and `bin/setup` prints no marketplace install. The human channel is
+  a **new thin skill `x-delegate`** (`review | ask | delegate`, `--backend codex|opencode`,
+  roster-aware per DEC-027) wrapping the *same* canonical invocations the machine channel uses,
+  with `disable-model-invocation: true` — invoked by name only. The chain extends DEC-025's:
+  **codex → opencode → same-model**, which also softens DEC-025's accepted no-diversity risk.
+- **Why:** User-directed 2026-08-06 ("no dependencies at all — write our own skill that uses the
+  CLI directly"). One envelope shared by both channels: each candidate plugin speaks a different
+  transport (codex app-server JSON-RPC; community opencode bridges over HTTP/SSE or bespoke
+  runners), so any adoption means two behaviors to debug whenever a CLI updates. The 2026-08-06
+  research found **no official OpenCode plugin exists**; the community field is 0–88★ —
+  tasict/opencode-plugin-cc 12★ Apache-2.0 stale since Mar 31, greenpolo/cc-multi-cli-plugin 88★
+  active but single-maintainer, two candidates unlicensed.
+- **Alternatives:** official codex-plugin-cc + cherry-picked greenpolo `opencode` plugin (the
+  in-review recommendation) — declined for zero-dependency; full greenpolo swap — declined (a
+  single-maintainer reimplementation of the official ASP transport); tasict mirror — stale
+  against opencode's weekly release cadence.
+- **Consequences:** This is the x-omo *shape* with the x-omo failure modes designed out: no
+  bespoke binary in `bin/`, no bootstrap cost (name-invoked; DEC-020's
+  `disable-model-invocation` acceptance row already covers it), `lint-chain.sh` budgets apply,
+  DEC-018 built in — codex takes the prompt on stdin; opencode has **no stdin path** (probed
+  2026-08-06: opaque server error), so its payload rides the file-attach path, where `-f`
+  greedily consumes following positionals — message-first ordering is load-bearing. Gives up the
+  official plugin's session multiplexing and background-job commands; background delegation
+  reuses the repo's existing job-dir pattern. End state: **3 chain skills + x-delegate + 9 kept +
+  x-shared = 14 dirs**. **Probe before S2:** opencode read-only enforcement (`--agent plan` or
+  permission config), `--format json` parsing, `-f` ordering, per-backend concurrency (DEC-027),
+  the 64KB pipe-truncation gotcha — and `--pure` is unusable under the user's plugin-routed auth
+  (probed: `UnknownError` with `--pure`, clean `OC-PROBE-OK` exit 0 without).
+- **Status:** accepted
+
+### DEC-027 — The reviewer roster is user config; x-review launches every entry in parallel
+- **Choice:** The multi-model review roster is **config, not code**:
+  `~/.config/x-skills/models.json`, project override `.x-skills/models.json` (override wins —
+  the capability-manifest precedence, reused). Entries are
+  `{backend: codex | opencode | claude, model: <free-form string>}` — e.g. codex
+  `gpt-5.6-terra`, opencode `kimi-k3`, claude `fable-5`. Every x-review run launches **all**
+  roster entries **in parallel** — reviews are read-only, so DEC-010's concurrent-mutation ban
+  does not reach them — and each lane records `reviewer: <backend>/<model>` (DEC-015's field,
+  widened). A lane whose backend pin is absent is skipped with a printed reason (DEC-015's
+  announce rule, applied per lane); no roster file → default roster = one lane per available
+  backend plus the same-model lane; `claude`-backend entries dispatch as native subagents with
+  the model param. x-review's synthesis machinery (verify-each-finding, the >30% unreliability
+  threshold) is already N-reviewer-shaped and is unchanged.
+- **Why:** User-directed 2026-08-06. The measured warrant is DEC-014's: 56.8% of defects found
+  by exactly one model and a second family lifts coverage ~47%→~72% — a third family is the same
+  bet at declining marginal cost, now priced at a config line instead of a skill edit. And the
+  hardcoded roster is exactly what DEC-023 had queued for re-pointing; externalizing kills the
+  class — model names churn monthly, and this repo already carries two stale-alias postmortems.
+- **Alternatives:** hardcode codex+opencode+claude — rejected (the churn class above); per-run
+  flags only — rejected: the ask is a standing preference, and flags remain as overrides.
+- **Consequences:** DEC-015's serialization rule is re-scoped per-backend (see its 2026-08-06
+  amendment); the S2 probe includes a 3-concurrent contention check per backend, and a backend
+  that contends gets a per-backend serialization row in `capability-loading.md`, never a global
+  one. Validation: unknown backend or malformed entry → skipped, printed; an all-skipped roster
+  degrades to same-model with `reviewer: same-model` recorded. **Falsifier, extending
+  DEC-014's:** per-lane unique-finding rate in x-review's synthesis — a lane contributing zero
+  unique findings across 10 runs is dead weight and leaves the default roster.
 - **Status:** accepted
 

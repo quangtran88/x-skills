@@ -10,15 +10,16 @@ related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit, v3-qa
 
 # x-skills v3 — consult / record / implement
 
-Collapse 18 plugin skills into **3 new + 9 kept**, with zero runtime dependency on
-`obra/superpowers` or `yeachan-heo/oh-my-claudecode`. Two MCP dependencies are kept deliberately —
-basic-memory and gitnexus — plus one optional plugin: `openai/codex-plugin-cc`, the
-capability-gated cross-model lane that replaces OMO (DEC-024) and, since 2026-08-06, the agy /
-Gemini backend too: **codex → same-model is v3's only cross-model chain** (DEC-025).
+Collapse 18 plugin skills into **4 new + 9 kept**, with zero runtime dependency on
+`obra/superpowers` or `yeachan-heo/oh-my-claudecode` — and **zero plugin dependencies**
+(DEC-026). Two MCP dependencies are kept deliberately — basic-memory and gitnexus — plus two
+optional user-supplied CLI backends driven directly, `codex` and `opencode`:
+**codex → opencode → same-model is v3's cross-model chain** (DEC-024/025/026), with a
+user-configurable reviewer roster that x-review dispatches in parallel (DEC-027).
 
 **This doc is the human review surface. Read it end to end.** It carries the problem statement, the
 disposition of every v2 skill, the contracts, the build order and the acceptance list. The
-twenty-five decisions and their warrants live in
+twenty-seven decisions and their warrants live in
 **[`x-skills-v3-decisions.md`](x-skills-v3-decisions.md)** — read a block before changing what it
 decided. Facts and citations live in `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
@@ -43,7 +44,10 @@ every disposition held on the merits, but 9 duplication clusters, 12 unnamed har
 95-hit dead-reference sweep forced the S6 scrub's redefinition; the user kept x-review standalone
 (DEC-023) and swapped OMO for `codex-plugin-cc` (DEC-024) `[R6]`. The **2026-08-06 pre-build
 review** discharged the codex probe early (DEC-024 as amended), re-confirmed DEC-011 autonomy and
-the DEC-020 harness, and removed agy entirely on the user's direction (DEC-025).
+the DEC-020 harness, and removed agy entirely on the user's direction (DEC-025); after a
+plugin-field survey (no official OpenCode plugin; community 0–88★), the user then dropped the
+plugin dependency for an in-repo thin wrapper over both CLIs (DEC-026) and made x-review's
+reviewer roster user config, dispatched in parallel (DEC-027).
 
 ## Context & Problem
 
@@ -73,7 +77,7 @@ where no reward signal reaches `[FOUND §2.1]`.
 
 ## Key Decisions
 
-Twenty-five accepted decisions, each with its full Nygard warrant, live in
+Twenty-seven accepted decisions, each with its full Nygard warrant, live in
 **[`x-skills-v3-decisions.md`](x-skills-v3-decisions.md)**. **Cite them by bare ID** (`DEC-011`) and
 let the reader grep — never by a generated heading anchor, which is derived from heading prose and
 breaks the moment a title is reworded (DEC-009's rule, applied to itself). This index is the map;
@@ -104,8 +108,10 @@ it is not a substitute for reading a block before changing what it decided.
 | DEC-021 | x-implement DONE chains into x-qa; live tests derive from oracle + diff | The QA engine exists and is unreachable — every gap is wiring, and the only implement→QA loop dies with x-team |
 | DEC-022 | BLOCKED is a decision brief; reversibility gates ask-vs-decide; answers become scoped rules | The state the user's ask targets hands the human raw gate output while every missing ingredient sits unwired in the repo |
 | DEC-023 | x-review kept standalone; `03-review` harvests it inline | User-directed; it is also the *original* of the DEC-022 options render |
-| DEC-024 | `codex-plugin-cc` replaces OMO as the cross-model lane | User-directed; official + Apache-2.0, and it closes the `bin/omo-agent` orphan |
+| DEC-024 | The codex lane replaces OMO as the cross-model backend | User-directed; probed live 2026-08-06, and it closes the `bin/omo-agent` orphan; plugin half dropped by DEC-026 |
 | DEC-025 | agy removed entirely; **codex → same-model** is the only chain | User-directed; deletes the second bespoke binary and cancels the envelope harvest |
+| DEC-026 | Zero plugin dependencies; thin `x-delegate` drives both CLIs | One envelope for both channels; the plugin field is unofficial, tiny or stale |
+| DEC-027 | Reviewer roster is user config; x-review runs all lanes in parallel | Third-family coverage at config cost; kills the hardcoded-roster churn class |
 
 ## Contracts
 
@@ -170,7 +176,7 @@ ReviewFindings → union              # DEC-014, agent-side, zero human cost
   cues[]       : user-utterance-span
   questions[]  : Question           # unioned + deduped with primary's, never reconciled
   downgraded[] : OBSERVED → INFERRED
-  reviewer     : same-model | cross-model:<cli>    # DEC-015 — machine channel only
+  reviewer     : same-model | <backend>/<model>    # DEC-015/027 — recorded per lane
   overlap      : |same| / |union|   # same iff eliminates: strings match; >=0.80 narrows DEC-014
 
 ConsultArtifact → x-record          # the gate x-record checks on disk
@@ -196,7 +202,9 @@ RunArtifacts   .x-skills/run/<slug>/               # gitignored; one dir per con
 
 CapabilityManifest                  # additions only; schema lives in capability-loading.md
   mcp.gitnexus  : { pinned, indexed, fresh, commitsBehind, ownCoverage }   # DEC-017
-  crossModelCli : string | null     # DEC-015 two-role gate
+  tool.codex    : bool              # DEC-024/026 — binary-only pins; no plugin pin exists
+  tool.opencode : bool              # DEC-026
+  roster        : models.json       # user file, project override wins (DEC-027)
 ```
 
 Manifests are per situation, cheapest disqualifier first: **new-requirement** (user + trigger,
@@ -207,7 +215,8 @@ started).
 
 ## Disposition — all 19 dirs, and what S6 actually does
 
-**End state: 3 new skills + 9 kept + `x-shared/` = 13 dirs** (x-review joined the kept set
+**End state: 3 chain skills + `x-delegate` + 9 kept + `x-shared/` = 14 dirs** (x-delegate added
+2026-08-06 — DEC-026; x-review joined the kept set
 2026-07-30, user-directed — DEC-023; x-qa kept + wired in S7, DEC-021; three kept rows are
 **rewrite passes**, not string-strips — see the table. The "6 kept / 10 dirs" this line carried
 until 2026-07-29 contradicted both the headline and this section's own table). Round 3 never stated this
@@ -222,11 +231,11 @@ by omission `[R4 §2]`. Reuse verdicts and the assets behind them are in `[R4 §
 | x-do | absorbed + harvest | x-implement (`01-slice`); bounded-escalation branch → `02-gates`; `iteration-patterns.md:17-29`'s progress-signal counter is 02-gates' stagnation base — **one merged ladder** with x-bugfix's, thresholds bound to the countable definition `[R6 §3.5]`; status-flip + never-revert-on-abort invariant (`SKILL.md:216-224`) → x-implement close-out; archival `git mv` NOT ported (DEC-009) |
 | x-bugfix | absorbed + harvest | intake → `manifests/prod-bug.md`; 3-Strike/Instrumentation Pivot → `02-gates` — **merged into x-do's ladder, one threshold set survives** `[R6 §3.5]`; regression-gate proof (test FAILS pre-fix / PASSES post-fix, `prevention-gate.md:9-11`) → `02-gates` prod-bug path; `backward-tracing.md` near-verbatim (strip its `prevention-gate.md:55` pointer) |
 | x-verify | absorbed | `gates.sh` + `validate-emit.sh` — its model-asserted verdicts are what DEC-007 inverts |
-| x-review | **kept + harvest** (DEC-023) | standalone multi-model review stays; `03-review` harvests inline: Scope Contract, `scope-guard.md` SCOPE body, verify-each-finding, the synthesis-side scope **filter** (`step-03:11-36`) + >30% unreliability threshold (`:49`); Impact-line fixtures (`:120-132`) → `emit-contract.md` altitude calibration; reviewer roster re-pointed to the codex lane (DEC-024) |
+| x-review | **kept + harvest** (DEC-023) | standalone multi-model review stays; `03-review` harvests inline: Scope Contract, `scope-guard.md` SCOPE body, verify-each-finding, the synthesis-side scope **filter** (`step-03:11-36`) + >30% unreliability threshold (`:49`); Impact-line fixtures (`:120-132`) → `emit-contract.md` altitude calibration; reviewer roster externalized to `models.json` and every lane dispatched in parallel (DEC-027) |
 | x-research | absorbed + harvest | MCP rows: **dedupe against `mcp-toolbox.md`** — 02-scout carries only rows it lacks, plus cheapest-first ordering and the primary-first HARD GATE (`SKILL.md:71,:83`) `[R6 §3.6]`; `synthesis-rules.md` → `templates/research.md` |
 | x-backlog | absorbed | x-record — `references/template.md` CORE skeleton is the backlog template; `slug:`/`type:` frontmatter survives **verbatim** — kept x-worktree derives `<type>/<slug>` branches from it (`doc-naming.md:19`) `[R6 §4.6]`; the batch-once blocker checkpoint (`SKILL.md:78-91`) → `01-questions` + the DEC-022 trigger |
 | x-mindful | absorbed + harvest | `extraction-prompts.md` → `01-questions`/`03-debate` **carrying `item-schema.md:65-83` and `step-02-extract.md:58-64`'s cross-cutting heuristics — the prompts are non-functional without them** `[R6 §4.10]`; reversibility + severity rubric → `00-triage` (scale sourced from kept `severity-guide.md`, never restated). **Do not port the per-item walkthrough** |
-| x-omo · x-gemini · x-team | **deleted** | harvest first: `prompt-blocks.md` → dispatch prompts; the agy envelope harvest is **cancelled** — agy leaves v3 entirely, and `bin/agy-agent` + `bin/setup` §1h die with `bin/omo-agent` (DEC-025); `blocker-escalation.md` sanitizer + `monitor-loop.md:7-24`'s validate-before-act schema + `worker-preamble.md:42-46,:73-75` two-phase-write rules → `emit-contract.md`/`validate-emit.sh` (DEC-018, DEC-022, `[R6 §4.3, §4.5]`); worker preamble's QA loop → the DEC-021 chain; the options render sources from **x-review** (DEC-023), not x-team's thin copy. x-omo's deletion includes `bin/omo-agent` + `bin/setup` §1 + the `find-plugin-dir` branch — codex-plugin-cc takes the job (DEC-024) |
+| x-omo · x-gemini · x-team | **deleted** | harvest first: `prompt-blocks.md` → dispatch prompts; the agy envelope harvest is **cancelled** — agy leaves v3 entirely, and `bin/agy-agent` + `bin/setup` §1h die with `bin/omo-agent` (DEC-025); `blocker-escalation.md` sanitizer + `monitor-loop.md:7-24`'s validate-before-act schema + `worker-preamble.md:42-46,:73-75` two-phase-write rules → `emit-contract.md`/`validate-emit.sh` (DEC-018, DEC-022, `[R6 §4.3, §4.5]`); worker preamble's QA loop → the DEC-021 chain; the options render sources from **x-review** (DEC-023), not x-team's thin copy. x-omo's deletion includes `bin/omo-agent` + `bin/setup` §1 + the `find-plugin-dir` branch — the codex lane takes the job (DEC-024/026) |
 | x-worktree · x-guide · x-api-pentest | **kept + rewrite pass** (R6) | not string-strips: x-worktree dispatches deleted x-do (`SKILL.md:152`) and `caller-integration.md:3,:45,:99` names three dead callers — retarget to x-implement or rewrite for direct invocation; x-guide's `step-02-ingest.md:45-82` are dispatch procedures into deleted skills and `routing-matrix.md:9` leaves the advertised `vague` input route-less (plus `config.json:2-4`, invisible to a `.md` scrub); x-api-pentest's references contradict its already-fixed steps (`--base-url`/`--report-format json` vs `--url`/`--report ndjson` — gotchas V2) and the `[F]` menu bullet at `step-06-report.md:99` loses its target |
 | x-worktree-isolate · x-skill-improve · x-design · x-upstream | **kept** + scrub/fix | x-worktree-isolate: the prefix scrub is a provable no-op — instead fix two doc contradictions (`gotchas.md:89-91` vs `SKILL.md:95-96`; `detection-heuristics.md:27` vs `:87`) + the hardcoded `/Users/randytran` path (`SKILL.md:24`); x-skill-improve: re-key 14 dead refs incl. `config.json:3-8` and `analysis-rubric.md:13-14` (its checks would flag correct v3 behavior); x-design: 6 dead refs (`SKILL.md:20,:21,:78,:80,:128`, `gotchas.md:39`) — round-4's "no known dirt" was false; x-upstream: clean `[R6 §2]` |
 | x-qa | **kept + wired** | S7 (DEC-021): x-implement DONE chains in; scout armed on the branch/pr path; `references/change-derivation.md` added; TEST_PLAN persisted; real-QA contract untouched; the scrub pass still applies; runner dispatch re-pointed from agy to the codex lane, same-model fallback (DEC-025) |
@@ -237,7 +246,8 @@ without this `[R4 §4]`.** The scrub is also **wider than two prefixes** `[R6 §
 name sweep over the 9 kept dirs returns **95 hits across 33 files**, none matching either
 framework prefix — including two `config.json` files and four x-qa shell scripts — so S6 carries
 a second, tracking-aware assertion over dead names covering `.json`/`.sh`, and x-review joins the
-scrub with 20 framework strings across 4 files plus its roster re-point (DEC-023/024).
+scrub with 20 framework strings across 4 files plus its roster externalization to `models.json`
+(DEC-023/027).
 DEC-025 adds a third sweep: `agy` strings over the kept dirs + surviving x-shared files —
 baseline **61 case-insensitive hits across 21 files**, x-qa's two eval `.sh` scripts included
 — → 0.
@@ -279,6 +289,10 @@ skills/
                                     #   acceptance freeze (DEC-006); stub scan (DEC-011); N/A rows;
                                     #   from x-qa/scripts/lib/verdict.sh (DEC-019)
     # run dir: .x-skills/run/<slug>/ — progress.md, metrics.md, dispatch/, attempt-1/ (Contracts)
+  x-delegate/                       # NEW (DEC-026) — thin human channel for the cross-model lane:
+    SKILL.md                        #   review | ask | delegate, --backend codex|opencode, wrapping
+                                    #   capability-loading.md's canonical invocations; roster from
+                                    #   models.json (DEC-027); disable-model-invocation: true
   x-shared/                         # 14 files today -> 8; every one has a verdict (DEC-013)
     emit-contract.md                # NEW — DEC-007/008/018/022 one place: x-team sanitizer +
                                     #   monitor-loop validate-before-act schema + two-phase-write
@@ -290,8 +304,10 @@ skills/
     lint-chain.sh                   # NEW — reachability, enumerated chain edges, live-ref budget,
                                     #   phase-file wc -l, bootstrap line total, one-level-deep refs
     capability-loading.md           # MODIFIED — drop plugin.omc/superpowers + agy_cli + dead
-                                    #   consumer list; add ownCoverage + plugin.codex/tool.codex
-                                    #   (DEC-024); agy envelope harvest cancelled (DEC-025)
+                                    #   consumer list; add ownCoverage + tool.codex/tool.opencode
+                                    #   + both canonical invocations + the models.json roster
+                                    #   schema (DEC-024/026/027); plugin.codex never ships;
+                                    #   agy envelope harvest cancelled (DEC-025)
     mcp-toolbox.md                  # MODIFIED — home of DEC-013/016/017 contracts; rewrite every
                                     #   OMO/agy fallback cell to codex → same-model, DEC-025 (was absent from this outline)
     completion-cascade.md           # MODIFIED -> harvested into gates.sh, then DELETED
@@ -311,8 +327,8 @@ skills/
   bin/setup  hooks/inject-capabilities.sh     # MODIFIED — ownCoverage + codex probe (S3); DELETE
                                     #   setup §1 omo-agent binding + find-plugin-dir branch +
                                     #   bin/omo-agent itself (DEC-024) + the §1h agy binding +
-                                    #   bin/agy-agent (DEC-025); print the codex-plugin-cc
-                                    #   marketplace install as an optional step
+                                    #   bin/agy-agent (DEC-025); no marketplace-install print —
+                                    #   no plugin dependency remains (DEC-026); probe tool.opencode
   x-omo/ x-gemini/ x-team/          # DELETED as bootstrap deps (DEC-013), after harvest —
                                     #   including bin/omo-agent (DEC-024) + bin/agy-agent (DEC-025)
   x-worktree/ x-worktree-isolate/ x-qa/ x-api-pentest/ x-skill-improve/ x-design/ x-guide/
@@ -331,15 +347,17 @@ Slices in order. **No slice starts before its predecessor's checkpoint passes.**
 | S3 | x-implement on that doc, serial slices + gitnexus lane | Every gate prints command + exit code; status derived; the **backlog doc's** verification list extends the floor cascade; sha256 freeze fires; N/A rows print their reason; a code-touching slice with zero runnable gates derives NEEDS-INPUT, never DONE (SCOPE-GATE discriminator exempts docs-only/only-reads, printed) `[R6 §4.2]`; stub scan labelled over 10 real diffs; gitnexus prints `commitsBehind` when stale and prints the skip when it withholds |
 | S4 | prod-bug manifest + intent-blind scout | Every dispatch prompt lands in `dispatch/` **before** dispatch; the lint finds no pre-judging phrase and no hypothesis marker in the `02-scout` prompt; research doc is fact-only |
 | S5 | Tier 3 full chain + plan doc + `lint-plan.sh` | A plan with a phase naming no end-to-end validation is rejected; one missing a per-phase success criterion, exact file paths or an out-of-scope statement is rejected; a fully-validated plan passes |
-| S6 | Cutover — delete + harvest per the Disposition table, **scrub/rewrite the 9 kept skills** | `git grep -l 'superpowers:\|oh-my-claudecode:' -- skills/ \| wc -l` → 0 **including x-qa, x-api-pentest and x-review**; the dead-name sweep (`git grep -nE 'x-(do\|bugfix\|verify\|research\|backlog\|mindful\|omo\|gemini\|team)'` over the 9 kept dirs, `.json`/`.sh` included) → 0, from a 95-hit/33-file baseline `[R6 §1]`; `lint-chain.sh` green on the whole tree; bootstrap line count down ≥1,500; DEC-020 trigger eval passes at ≥0.5; the agy sweep → 0 from a 61-hit/21-file baseline (DEC-025); a fresh `bin/setup` run succeeds with neither omo-agent nor agy-agent present (DEC-024/025) |
+| S6 | Cutover — delete + harvest per the Disposition table, **scrub/rewrite the 9 kept skills** | `git grep -l 'superpowers:\|oh-my-claudecode:' -- skills/ \| wc -l` → 0 **including x-qa, x-api-pentest and x-review**; the dead-name sweep (`git grep -nE 'x-(do\|bugfix\|verify\|research\|backlog\|mindful\|omo\|gemini\|team)'` over the 9 kept dirs, `.json`/`.sh` included) → 0, from a 95-hit/33-file baseline `[R6 §1]`; `lint-chain.sh` green on the whole tree; bootstrap line count down ≥1,500; DEC-020 trigger eval passes at ≥0.5; the agy sweep → 0 from a 61-hit/21-file baseline (DEC-025); a fresh `bin/setup` run succeeds with neither omo-agent nor agy-agent present (DEC-024/025); x-delegate ships thin (`disable-model-invocation: true`, `lint-chain.sh` green) and one x-review run on a 3-entry roster launches every lane in parallel with per-lane `reviewer:` recorded (DEC-026/027) |
 | S7 | Wire the QA chain into kept x-qa (DEC-021) + mid-run decision recording (DEC-022) | One real chained run: x-implement DONE derives `chain{x-qa}`; acceptance examples arrive as `severity: required` obligations and the coverage gate **arms on the branch/pr path**; `QA_VERDICT=fail` re-enters as `FAILED-GATE{gate: qa}`; a pass appends verdict + coverage counters to the backlog doc; one reversible decision self-decided with a `Decision:` line, one costly decision emitting NEEDS-INPUT whose options carry implications at human altitude; the fail edge re-points x-qa's `/x-skills:x-bugfix` offers to x-implement's prod-bug intake and the machine-caller identity to the chain (DEC-021 as amended); the runner lane dispatches via DEC-024's canonical invocation, same-model when codex is absent (DEC-025) |
 
 ## Scope & Non-Goals
 
-**In scope:** the three skills, the shared emit contract + validator, the three doc templates, the
-DEC-014 review dispatch, the DEC-015 capability-gated two-role cross-model path (now backed by the
-DEC-024 codex lane), the DEC-013 deletions (including `bin/omo-agent` and `bin/agy-agent` — DEC-024/025), the DEC-021 QA chain (S7),
-the DEC-022 blocker decision brief, the DEC-023 x-review scrub + roster re-point, and retiring the
+**In scope:** the three chain skills + the `x-delegate` thin wrapper (DEC-026), the shared emit
+contract + validator, the three doc templates, the
+DEC-014 review dispatch, the DEC-015 capability-gated two-role cross-model path (now backed by
+the plugin-free codex + opencode lanes, DEC-024/026, with the DEC-027 roster), the DEC-013 deletions (including `bin/omo-agent` and `bin/agy-agent` — DEC-024/025), the DEC-021 QA chain (S7),
+the DEC-022 blocker decision brief, the DEC-023 x-review scrub + DEC-027 roster externalization,
+and retiring the
 v2 skills the Disposition deletes.
 
 **Non-goals:** `x-worktree`, `x-api-pentest`, `x-worktree-isolate`, `x-skill-improve`,
@@ -347,8 +365,8 @@ and — added round 4, previously unstated anywhere — `x-design`, `x-guide`, `
 (orthogonal, invoked by name; see the Disposition table), plus — added 2026-07-30 — `x-review`
 internals beyond the S6 scrub + roster re-point (DEC-023). `x-qa` left this list on 2026-07-29:
 S7 wires it without touching its internals or its real-QA contract (DEC-021). Cross-model as a
-**general** dispatch layer (DEC-015 permits exactly
-two roles). Hook-based enforcement of consult-first. Parallel code mutation. Human stops at slice
+**general** dispatch layer (DEC-015 permits exactly two *machine* roles; human-invoked
+x-review/x-delegate sit outside that limit — DEC-026/027). Hook-based enforcement of consult-first. Parallel code mutation. Human stops at slice
 boundaries (DEC-011, decided against — DEC-022's reversibility gate governs mid-run *decision*
 interrupts, not slice boundaries). Notification/delivery infrastructure for blocked envelopes
 (terminal + run-dir file only, DEC-022). Change-scoped test selection in place of the per-task
@@ -372,6 +390,10 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
 - [ ] The agy sweep returns 0 over the 9 kept dirs + surviving x-shared files (tracking-aware,
       case-insensitive). Baseline 2026-08-06: 61 hits across 21 files, incl. two x-qa eval `.sh`
       scripts; `bin/agy-agent` is deleted and `bin/setup` carries no §1h (DEC-025).
+- [ ] x-review reads the roster (project override > user file > per-available-backend default),
+      launches every entry in parallel, records `reviewer: <backend>/<model>` per lane, and
+      prints the skip for any absent backend; an all-absent roster degrades to same-model,
+      recorded (DEC-026/027).
 - [ ] `validate-emit.sh` rejects a DONE whose gate list is entirely N/A unless the run is
       SCOPE-GATE-exempt (only-reads / docs-only / no-code-tree / placeholder-test-script);
       `gates.sh` short-circuits those cases to a legitimate DONE with the printed reason
@@ -452,7 +474,7 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
   is generous *and names a destination*, fails when it is tight and names none `[OSS §5]`. Both
   halves are now fixed in DEC-009 — the budget is **per phase file**, this doc's destination is
   `docs/research/`, and the number is asserted by `wc -l` or deleted. This doc stays long because it
-  is the review surface for a 25-decision design; the phase files are what must stay small.
+  is the review surface for a 27-decision design; the phase files are what must stay small.
 - **Read before S3:** HumanLayer's `rpi` plugin v0.18.1 (16 skills) — **not** the pre-QRSPI
   `create_plan.md` set, which prescribes the exact horizontal ordering DEC-010 bans `[FOUND §6]`.
   Cite behaviour; do not vendor text (All Rights Reserved). The `implementer-agent` prompt — the
