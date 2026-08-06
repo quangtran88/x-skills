@@ -427,7 +427,9 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
   scope vs dismissed. Also: DEC-006's sweep and DEC-014 hunt the same omission class and may
   overlap more than their individual effect sizes suggest.
 - **Accepted risk — no human reads the diff (DEC-011).** Success metric now rests entirely on the
-  upstream artifacts. Falsifier: rework attributable to code the human never read.
+  upstream artifacts. Falsifier: rework attributable to code the human never read. Re-confirmed by
+  the user 2026-08-06 at the pre-build review (offered slice-boundary and Tier-3-only pauses;
+  declined both).
 - **Open:** DEC-003 gates artifact-internal completeness only. Nothing in this design closes
   "the requirement nobody thought of" when it lives outside both your words and the codebase —
   and three inspection studies say a topic checklist does not close it either. Stated, not solved.
@@ -465,12 +467,13 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
 - **Gotcha — the installed capability manifest is one version stale.** `~/.config/x-skills/
   capabilities.json` reports `plugin_version 2.3.0` against the repo's 2.4.0, and it is what gates
   both kept dependencies. Re-run `/x-skills:setup` before trusting a capability-gated path `[R4 §1]`.
-- **Open — DEC-015 has no read-only flag.** Neither `agy` nor `bin/agy-agent` documents one, so the
-  DEC-018 requirement that the cross-model CLI run read-only currently has no implementation. Verify
-  before S2 or weaken it to a tool-allowlist constraint `[R4 §4]`. **2026-07-30: the question
-  transfers to the codex lane** — probe the installed `codex` binary's read-only/sandbox mode and
-  `codex exec` stdin semantics before S2; until probed, DEC-024's machine channel is spec, not
-  capability `[R6 §5]`.
+- **Resolved 2026-08-06 — the read-only question, open since R4 and inherited by the codex lane.**
+  Neither `agy` nor `bin/agy-agent` ever documented a read-only flag `[R4 §4]`; the installed
+  `codex-cli 0.145.0` does, and a live probe proved it **enforced** (write attempt → `DENIED`,
+  no file created), non-interactive (`approval: never`), and stdin-fed (`-` argument, DEC-018).
+  DEC-024's machine channel is capability, not spec; the canonical invocation and measured
+  `--ignore-user-config` overhead saving live in DEC-024's 2026-08-06 amendment. What remains for
+  S2 is only exercising a *failure* case before trusting the exit code (DEC-015's agy lesson).
 - **Assumed — exploratory testing transfers from human testers to agent-run charters.** Every ET
   measurement is human-subject; the agent-native mitigation is x-qa's existing bounded-probe +
   independent-triage hunt. Falsifier: `EXPLORE_CONFIRMED` per probe budget across 5 chained runs
@@ -480,7 +483,9 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
   tune on S0's fixtures, revisit at the S3 checkpoint.
 - **Open — DEC-020's trigger eval has no harness.** Official guidance supplies the protocol
   (~20 prompts per side, ~3 runs, 0.5 threshold) and `skill-creator` automates it, but v3 ships no
-  implementation. It is the one instrument round 4 added that is unbuilt `[R4 §6]`.
+  implementation. It is the one instrument round 4 added that is unbuilt `[R4 §6]`. 2026-08-06:
+  user-confirmed at the pre-build review — the harness is a **committed S6 deliverable** (the
+  manual-spot-check and defer options were declined); the ≥0.5 acceptance row stands unchanged.
 - **Not verifiable, stated so it is not mistaken for evidence `[R4 §6]`.** No controlled study
   isolates spec-driven from plan-free agent workflows (the critique corpus is retrospectives plus
   one adjacent RCT); no end-to-end A/B exists for a coding agent with vs without a cross-session

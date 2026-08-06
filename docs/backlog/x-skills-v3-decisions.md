@@ -1064,5 +1064,19 @@ present (DEC-009). IDs keep resolving.
   read-only/sandbox mode and `codex exec` stdin semantics before S2 — until probed, the lane is
   spec, not capability. Falsifier: if the S2 probe finds no non-interactive read-only invocation,
   the machine channel drops to agy-else-same-model and the plugin stays human-channel only.
+- **Amended 2026-08-06 — the probe ran early and the falsifier is discharged; the lane is
+  capability, not spec.** Live-probed `codex-cli 0.145.0` (three runs, all exit 0): the prompt
+  arrives on stdin via the `-` argument (DEC-018 satisfied); `codex exec` runs `approval: never`
+  (fully non-interactive); `--sandbox read-only` is **enforced, not merely accepted** — a
+  write-attempt probe reported `DENIED` and the target file was never created — which also
+  resolves DEC-015's inherited read-only question *without* weakening it to a tool-allowlist.
+  Canonical machine invocation:
+  `codex exec --sandbox read-only --ephemeral --ignore-user-config --skip-git-repo-check --color never -o <answer-file> -`
+  — `--ephemeral` skips session persistence, `--ignore-user-config` retains auth while skipping
+  the user's hooks/skills (measured 12,186 vs 20,897 tokens on the same trivial prompt, and no
+  hook interference), and `-o/--output-last-message` yields the bare final answer so no stdout
+  scraping is needed. `--json` (JSONL events) and `--output-schema <file>` exist for the
+  structured-output path. The exit code is real (no agy-style exit-0 masking observed), but
+  DEC-015's re-derivation rule stays until S2 exercises a failure case.
 - **Status:** accepted
 
