@@ -4,13 +4,13 @@ slug: x-skills-v3-decisions
 type: refactor
 status: ready
 created: 2026-07-28
-updated: 2026-07-30
+updated: 2026-08-06
 related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit, v2-skill-reuse-audit]
 ---
 
 # x-skills v3 — decision record
 
-The twenty-four accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
+The twenty-five accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
 Alternatives / Consequences + a status line), append-only, addressed by stable `DEC-00n` IDs.
 
 **Split out of the design doc on 2026-07-28**, at 1,114 lines. The design doc's own settled rule
@@ -667,6 +667,12 @@ present (DEC-009). IDs keep resolving.
   `reviewer: same-model` recorded. The open read-only question transfers to the codex binary:
   verify a read-only/sandbox mode on the installed `codex` before S2, or constrain via the
   prompt's tool allowlist.
+- **Amended 2026-08-06 (DEC-025):** agy is removed from v3 entirely — no longer a fallback
+  backend, and the full-envelope harvest this block ordered on 2026-07-30 is **cancelled**; with
+  no agy consumer left, the envelope has nothing to govern. The chain is **codex → same-model**.
+  The exit-code re-derivation + serialization discipline survives, re-keyed to the codex lane
+  (DEC-024's amendment): re-derive from empty output + log tail until S2 exercises a real
+  failure case.
 - **Status:** accepted
 
 ### DEC-016 — basic-memory for cross-repo transferables only
@@ -1078,5 +1084,40 @@ present (DEC-009). IDs keep resolving.
   scraping is needed. `--json` (JSONL events) and `--output-schema <file>` exist for the
   structured-output path. The exit code is real (no agy-style exit-0 masking observed), but
   DEC-015's re-derivation rule stays until S2 exercises a failure case.
+- **Amended 2026-08-06 (DEC-025):** "agy remains the Gemini lane for kept x-qa" no longer holds —
+  agy is removed entirely. x-qa's runner lane re-points to this DEC's canonical invocation with
+  same-model fallback, and `bin/agy-agent` + `bin/setup` §1h die alongside `bin/omo-agent`.
+- **Status:** accepted
+
+### DEC-025 — agy removed entirely; codex → same-model is the only chain
+- **Choice:** The agy (Antigravity / Gemini) backend leaves v3 completely. `bin/agy-agent` and
+  `bin/setup` §1h (plus the §1 symlink binding at `setup:16,:23`) are deleted alongside
+  `bin/omo-agent` — DEC-024's treatment, applied to the second bespoke binary; the `agy_cli`
+  capability pin is dropped from the manifest; and DEC-015's full-envelope harvest into
+  `capability-loading.md` is **cancelled** — with no agy consumer, the envelope of workarounds
+  (600s timeout floor, buffer truncation, `--add-dir` hang, auth-noise, quota fallback, aliases)
+  has nothing left to govern. Every fallback chain collapses to **codex → same-model**: DEC-015's
+  two roles, x-review's reviewer roster, 02-gates' fresh-perspective rung, and x-qa's cheap
+  test-runner lane (S7 re-points its runner dispatch to DEC-024's canonical invocation;
+  same-model when codex is absent).
+- **Why:** User-directed 2026-08-06 at the pre-build review. "agy remains the Gemini lane for
+  kept x-qa" predates the user's backend flip (codex-agent is now their default headless backend,
+  and the 2026-08-06 review offered codex-first-agy-fallback); the user chose removal outright.
+  Keeping agy as a fallback would have kept the whole operational envelope alive — a page of
+  workarounds maintained for a backend trusted with no primary role.
+- **Alternatives:** codex → agy → same-model (one chain, agy as fallback) — offered, declined.
+  agy-first for x-qa only (the prior spec) — declined. Both preserve the envelope-harvest
+  obligation for a path that would rarely run.
+- **Consequences:** S6 gains a third sweep: `agy` strings (tracking-aware, case-insensitive) over
+  the 9 kept dirs + surviving x-shared files. Baseline 2026-08-06: **61 hits across 21 files** —
+  x-qa 30/8 (incl. two eval `.sh` scripts, the `.json`/`.sh`-carrier lesson again `[R6 §1]`),
+  x-shared 13/5 (three of those files die anyway), x-review 12/4, x-guide 5/3,
+  x-worktree-isolate 1/1 — → 0 after scrub. A fresh `bin/setup` must succeed with **neither**
+  omo-agent nor agy-agent present. x-gemini's deletion loses its harvest clause — nothing is
+  carried out of it. **Accepted risk:** when codex is absent there is now no cross-model
+  diversity anywhere; every consumer runs same-model with `reviewer: same-model` recorded
+  (DEC-015), and the DEC-014 overlap metric is the instrument that will price that loss if it
+  matters. Falsifier: if overlap on same-model runs persistently exceeds ~26% while codex-backed
+  runs sit below it, the second backend earned its keep and this decision gets revisited.
 - **Status:** accepted
 
