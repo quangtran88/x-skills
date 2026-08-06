@@ -401,7 +401,10 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
 - [ ] `bin/setup` discovers the model inventory per backend and offers the pick that seeds
       `models.json`: opencode via `opencode models` captured to a variable — never piped — with
       `opencode.json` as fallback; codex from `~/.codex/config.toml`'s default (no enumeration
-      command exists); claude static. A roster entry absent from the last discovery warns and
+      command exists); claude static. The menu caps at **5 per backend** (roster entries first,
+      then the configured default, then the per-backend heuristic) with the total printed and a
+      manual free-form option last; re-running setup rescans and re-seeds `models.json` after a
+      timestamped `.bak`. A roster entry absent from the last discovery warns and
       still runs; the inventory is never persisted into `capabilities.json` (DEC-027 as amended).
 - [ ] `validate-emit.sh` rejects a DONE whose gate list is entirely N/A unless the run is
       SCOPE-GATE-exempt (only-reads / docs-only / no-code-tree / placeholder-test-script);

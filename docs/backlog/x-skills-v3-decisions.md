@@ -1204,7 +1204,15 @@ present (DEC-009). IDs keep resolving.
   default and roster entries stay free-form, optionally verified by a one-token `codex exec -m`
   probe at setup (opt-in — it spends quota); **claude** is the static harness set, nothing to
   detect. The 629-entry inventory is **not** persisted into `capabilities.json` (manifest stays
-  small) — discovery runs at setup time and the pick lands in `models.json`. Roster validation
+  small) — discovery runs at setup time and the pick lands in `models.json`. The pick menu is
+  **capped at 5 per backend**, ranked deterministically: entries already in the roster first,
+  then the backend's configured default, then the remainder by a per-backend heuristic
+  (opencode: the zero-config-cost Zen `opencode/*` tier first) — with the total printed
+  ("showing 5 of 629", never a silent cap) and **manual free-form entry as the standing last
+  option**, so no model is unreachable. **Re-running setup rescans**: a newly released model
+  reaches the menu on the next `/x-skills:setup` run (setup is already idempotent by contract),
+  and re-picking overwrites `models.json` after writing a timestamped `.bak` — setup's existing
+  convention for user config. Roster validation
   at read time warns on an entry absent from the last discovery and still attempts it (discovery
   goes stale); only an absent *backend* skips a lane.
 - **Status:** accepted
