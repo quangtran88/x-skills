@@ -1193,5 +1193,19 @@ present (DEC-009). IDs keep resolving.
   degrades to same-model with `reviewer: same-model` recorded. **Falsifier, extending
   DEC-014's:** per-lane unique-finding rate in x-review's synthesis — a lane contributing zero
   unique findings across 10 runs is dead weight and leaves the default roster.
+- **Amended 2026-08-06 — setup discovers the per-backend model inventory (user-directed).**
+  `bin/setup` gains a discovery step and offers an interactive pick to seed `models.json`:
+  **opencode** via `opencode models` (629 entries live, `provider/model` form, free Zen tier
+  included) — output **captured to a variable, never piped** (the documented ~64KB pipe
+  truncation, same lesson as setup's existing `opencode agent list` handling), with
+  `~/.config/opencode/opencode.json` provider config as the fallback truth source when capture
+  comes back empty or truncated; **codex** has **no enumeration command** (probed 2026-08-06 —
+  only `-m` and the config default), so discovery reads `~/.codex/config.toml`'s `model` as the
+  default and roster entries stay free-form, optionally verified by a one-token `codex exec -m`
+  probe at setup (opt-in — it spends quota); **claude** is the static harness set, nothing to
+  detect. The 629-entry inventory is **not** persisted into `capabilities.json` (manifest stays
+  small) — discovery runs at setup time and the pick lands in `models.json`. Roster validation
+  at read time warns on an entry absent from the last discovery and still attempts it (discovery
+  goes stale); only an absent *backend* skips a lane.
 - **Status:** accepted
 

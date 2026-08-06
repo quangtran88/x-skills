@@ -328,7 +328,11 @@ skills/
                                     #   setup §1 omo-agent binding + find-plugin-dir branch +
                                     #   bin/omo-agent itself (DEC-024) + the §1h agy binding +
                                     #   bin/agy-agent (DEC-025); no marketplace-install print —
-                                    #   no plugin dependency remains (DEC-026); probe tool.opencode
+                                    #   no plugin dependency remains (DEC-026); probe tool.opencode;
+                                    #   per-backend model discovery + models.json seeding — opencode
+                                    #   via `opencode models` captured-to-var (64KB pipe truncation)
+                                    #   with opencode.json fallback, codex via config.toml default
+                                    #   (no enumeration exists), claude static (DEC-027 as amended)
   x-omo/ x-gemini/ x-team/          # DELETED as bootstrap deps (DEC-013), after harvest —
                                     #   including bin/omo-agent (DEC-024) + bin/agy-agent (DEC-025)
   x-worktree/ x-worktree-isolate/ x-qa/ x-api-pentest/ x-skill-improve/ x-design/ x-guide/
@@ -394,6 +398,11 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
       launches every entry in parallel, records `reviewer: <backend>/<model>` per lane, and
       prints the skip for any absent backend; an all-absent roster degrades to same-model,
       recorded (DEC-026/027).
+- [ ] `bin/setup` discovers the model inventory per backend and offers the pick that seeds
+      `models.json`: opencode via `opencode models` captured to a variable — never piped — with
+      `opencode.json` as fallback; codex from `~/.codex/config.toml`'s default (no enumeration
+      command exists); claude static. A roster entry absent from the last discovery warns and
+      still runs; the inventory is never persisted into `capabilities.json` (DEC-027 as amended).
 - [ ] `validate-emit.sh` rejects a DONE whose gate list is entirely N/A unless the run is
       SCOPE-GATE-exempt (only-reads / docs-only / no-code-tree / placeholder-test-script);
       `gates.sh` short-circuits those cases to a legitimate DONE with the printed reason
