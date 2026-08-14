@@ -4,15 +4,16 @@ slug: x-skills-v3
 type: refactor
 status: ready
 created: 2026-07-27
-updated: 2026-08-06
-related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit, v3-qa-escalation, v2-skill-reuse-audit]
+updated: 2026-08-14
+related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit, v3-qa-escalation, v2-skill-reuse-audit, v3-memory-store-research]
 ---
 
 # x-skills v3 — consult / record / implement
 
 Collapse 18 plugin skills into **4 new + 9 kept**, with zero runtime dependency on
 `obra/superpowers` or `yeachan-heo/oh-my-claudecode` — and **zero plugin dependencies**
-(DEC-026). Two MCP dependencies are kept deliberately — basic-memory and gitnexus — plus two
+(DEC-026). Two MCP dependencies are kept deliberately — basic-memory (re-verified against the
+2026 field and builtin memory, `[MEM]`) and gitnexus — plus two
 optional user-supplied CLI backends driven directly, `codex` and `opencode`:
 **codex → opencode → same-model is v3's cross-model chain** (DEC-024/025/026), with a
 user-configurable reviewer roster that x-review dispatches in parallel (DEC-027).
@@ -24,7 +25,7 @@ twenty-seven decisions and their warrants live in
 decided. Facts and citations live in `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
 `[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`,
-`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`.
+`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`, `[MEM]` = `2026-08-13-v3-memory-store-research.md`.
 
 **Six audit/research rounds.** R1 established the design; **R2** falsified much of it and added DEC-014/015;
 **R3** surveyed eight OSS skill frameworks, changed the dependency scope to keep basic-memory and
@@ -47,7 +48,13 @@ review** discharged the codex probe early (DEC-024 as amended), re-confirmed DEC
 the DEC-020 harness, and removed agy entirely on the user's direction (DEC-025); after a
 plugin-field survey (no official OpenCode plugin; community 0–88★), the user then dropped the
 plugin dependency for an in-repo thin wrapper over both CLIs (DEC-026) and made x-review's
-reviewer roster user config, dispatched in parallel (DEC-027).
+reviewer roster user config, dispatched in parallel (DEC-027). The **2026-08-13 memory-store
+research** (user-directed; 4 research lanes + judge + 3 adversarial verifiers) re-verified
+DEC-016's keep from outside: builtin Claude Code memory refuted for cross-repo recall (per-git-repo
+scope, no supported sharing), the 2026 OSS field refuted on shape (its growth pattern is
+auto-capture into databases — DEC-016's named anti-pattern), and basic-memory confirmed healthy —
+kept with pin-era query rules, a formalized flat-store fallback and a gated v0.23 upgrade
+(DEC-016 as amended) `[MEM]`.
 
 ## Context & Problem
 
@@ -149,6 +156,8 @@ Claim
   #   file:line | commit-sha | doc-anchor | repo-bound command+output   -> docs/
   #   repo-INDEPENDENT invariant (incl. command+output that survives a checkout) -> basic-memory
   #   user-utterance-span -> the consult artifact itself; MEMORY.md is never written by x-skills
+  #   mcp.basic_memory absent -> rg/Read/Write over ~/basic-memory, file-path citations
+  #     (DEC-016 as amended [MEM §7] — possible because the store is file-first markdown)
 
 SlotRow
   name     : string
@@ -406,6 +415,12 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
       manual free-form option last; re-running setup rescans and re-seeds `models.json` after a
       timestamped `.bak`. A roster entry absent from the last discovery warns and
       still runs; the inventory is never persisted into `capabilities.json` (DEC-027 as amended).
+- [ ] Recall follows DEC-016's pin-era query rules: `search_notes` queries carry ≥3 plain
+      distinctive terms or explicit `OR` (a 2-word query is pure AND with no fallback at the
+      0.22.1 pin); tag filters are never used; an empty result is treated as inconclusive and
+      retried as `rg` over `~/basic-memory` before the chain concludes "no prior knowledge".
+      When `mcp.basic_memory` is absent, recall/write degrade to native `rg`/Read/Write over the
+      store with file-path citations (DEC-016 as amended, `[MEM §5–7]`).
 - [ ] `validate-emit.sh` rejects a DONE whose gate list is entirely N/A unless the run is
       SCOPE-GATE-exempt (only-reads / docs-only / no-code-tree / placeholder-test-script);
       `gates.sh` short-circuits those cases to a legitimate DONE with the printed reason

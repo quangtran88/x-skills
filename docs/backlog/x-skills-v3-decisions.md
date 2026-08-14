@@ -4,8 +4,8 @@ slug: x-skills-v3-decisions
 type: refactor
 status: ready
 created: 2026-07-28
-updated: 2026-08-06
-related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit, v2-skill-reuse-audit]
+updated: 2026-08-14
+related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit, v2-skill-reuse-audit, v3-memory-store-research]
 ---
 
 # x-skills v3 — decision record
@@ -24,7 +24,7 @@ statement, the disposition table, the contracts, the build order and the accepta
 the review surface. Citations resolve to `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
 `[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`,
-`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`.
+`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`, `[MEM]` = `2026-08-13-v3-memory-store-research.md`.
 
 Superseded blocks move to a **Superseded** section at the foot of this file, never inline —
 content marked as excluded still biases readers at roughly twice the rate of obsolete items
@@ -739,6 +739,42 @@ present (DEC-009). IDs keep resolving.
   design's own diagnosis is that prose contracts do not self-enforce. Falsifier: after S2/S3, diff
   every note under `decisions/x-skills/` against the doc it cites — any note carrying >~40
   contiguous duplicated words means the rule failed and the overlap check must become a write-time lint.
+- **Re-verified 2026-08-13 (user-directed adversarial research; full record `[MEM]`) — the keep is
+  CONFIRMED from three independent directions.** Builtin Claude Code memory is per-git-repository
+  with no supported cross-repo scope (binary-verified; the `autoMemoryDirectory` share is an
+  undocumented hack funneling every repo through one 200-line/25KB index; the subagent
+  `memory: user` scope is subagent-only with no search API; anthropics/claude-code#39195 still
+  open; `--bare`/headless disables auto-memory entirely) — 0 of 3 contract verbs `[MEM §2]`. The
+  2026 OSS field fails on **shape, not quality**: its growth architecture is hook-driven
+  auto-capture into databases (claude-mem 90.6k★, mem0 63.2k★ — an LLM API key just to *write*,
+  cognee 30k★, Zep/Graphiti 29.9k★ with Zep CE discontinued) — this DEC's named anti-pattern; the
+  best external candidate (engram: MIT, single-binary FTS5) scored 4/10 on DB-internal storage
+  `[MEM §3]`. Judge ranking: keep 9, flat-store 7.5, everything else ≤4 `[MEM §6]`. Four
+  amendments adopted `[MEM §7]`:
+  1. **Pin-era query rules** (x-shared recall guidance, lands S2): `search_notes` queries carry
+     ≥3 plain distinctive terms or explicit `OR` — the v0.22.1 tag applies strict AND per
+     multi-word query with a relaxed-OR retry gated at ≥3 plain tokens (adjudicated by direct
+     tag-source read after two verifiers disagreed `[MEM §5]`); a 2-word query is pure AND with
+     no fallback; an **empty result is INCONCLUSIVE**, retried as `rg` over `~/basic-memory` —
+     never read as "no prior knowledge". The "never tags" rule above is now bug-corroborated,
+     not just probe-corroborated (#354: silent-empty tag search, open nine months, fix
+     unreleased at the 0.22.1 pin). Until v0.23: prefer `rg` for exhaustive recall over notes
+     >6KB (#1065 — FTS blind past ~6,000 chars, 83/1,102 live notes affected) and after any
+     direct-file write (#1016 — watcher writes invisible to semantic search until reindex),
+     reserving `search_notes` for ranked topical lookup.
+  2. **Flat-store fallback formalized:** when `mcp.basic_memory` is absent, recall/write degrade
+     to native `rg`/Read/Write over `~/basic-memory` with file-path citations — possible only
+     because the store is file-first markdown. Measured lock-in is near-zero (0/1,102 notes
+     carry `memory://` links; permalinks live in frontmatter, rg-resolvable), which lowers the
+     risk of keeping, not the case for it `[MEM §5]`.
+  3. **The v0.23 upgrade is a gated migration, not a drop-in:** beta FastMCP 4.0, five automatic
+     DB migrations, three MCP tools removed, breaking `edit_note` semantics; its reranker is
+     opt-in, default-off, and needs an ONNX cross-encoder or a paid reranker API at ~26× search
+     latency `[MEM §4]`.
+  4. **Risk ledger:** bus factor ~1 (one maintainer ≈83% of commits), AGPL-3.0 (use-not-vendor,
+     fine over MCP stdio). **Exit ramp** if the maintainer goes dark 6+ months: flat-store first
+     (zero cost), a ~200-line MIT FTS5-over-markdown MCP second — the substrate outlives the
+     tool `[MEM §7]`.
 - **Status:** accepted
 
 ### DEC-017 — gitnexus is advisory, never a gate
