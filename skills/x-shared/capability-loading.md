@@ -25,6 +25,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
   "generated_at": "ISO-8601",
   "plugin_dir": "/abs/path",
   "omo_agent": "/abs/path/bin/omo-agent",
+  "review_models": ["openai/gpt-5.6-sol", "openai/qwen3.7-max"],
   "capabilities": {
     "opencode": true,
     "omo_plugin": "partial|full|false",
@@ -61,6 +62,14 @@ Project overrides are **subtractive only**: a project file can disable a capabil
 ```
 
 `capabilities.*` is the boolean lookup map (skill-friendly), the single canonical source. `version` is the manifest schema version; `plugin_version` mirrors `plugin.json` and drives `check-version.sh` freshness detection.
+
+### `review_models` (user preference, not a detected capability)
+
+An array of full opencode model IDs, chosen interactively during `bin/setup` and **preserved across re-runs** (setup seeds the prompt with the current value; a blank answer keeps it). Unlike `capabilities.*`, this is a preference the user set, not something setup probed for — never overwrite it from detection logic.
+
+Consumer: **x-review only.** It launches one `omo-agent --model <id>` reviewer lane per entry, in parallel, same prompt each. Empty or absent → x-review falls back to a single `oracle` agent lane. Capped at 4 entries by setup (each lane is a full model pass with its own 600s budget).
+
+Entries are full IDs (`openai/qwen3.7-max`), not omo-agent aliases — setup validates each against `opencode models` at pick time. A model can still disappear later (provider drops it, key revoked); consumers report the failed lane by ID and point the user at `bin/setup`, and never silently substitute another model. A project-level `.x-skills/capabilities.json` may override the list for one repo, same precedence as everything else here.
 
 ## Skill Bootstrap Pattern
 

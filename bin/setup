@@ -854,6 +854,126 @@ check_tool "spectral"        "npm install -g @stoplight/spectral-cli"
 check_tool "interactsh-client" "go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
 
 # ============================================================
+# x-review reviewer models
+# ============================================================
+
+header "5b. x-review reviewer models (optional)"
+
+# Models x-review fans out to, one `omo-agent --model <id>` lane each.
+# Empty => x-review falls back to the single `oracle` agent lane.
+# Preserved across re-runs: the current value becomes the default.
+REVIEW_MODELS_JSON="[]"
+if command -v jq &>/dev/null && [[ -f "$CAPS_FILE" ]]; then
+  REVIEW_MODELS_JSON=$(jq -c '.review_models // []' "$CAPS_FILE" 2>/dev/null) || REVIEW_MODELS_JSON="[]"
+  [[ -z "$REVIEW_MODELS_JSON" ]] && REVIEW_MODELS_JSON="[]"
+fi
+
+REVIEW_MODELS_MAX=4
+
+configure_review_models() {
+  local current
+  current=$(jq -r '.[]' <<<"$REVIEW_MODELS_JSON" 2>/dev/null | paste -sd, -)
+  if [[ -n "$current" ]]; then
+    ok "Current: $current"
+  else
+    info "Current: none — x-review uses the single 'oracle' agent lane"
+  fi
+
+  # Only prompt in an interactive setup run. --check never mutates; --fix and
+  # non-tty runs keep whatever is already saved.
+  [[ "$MODE" == "setup" && -t 0 ]] || { info "Keeping saved selection"; return 0; }
+
+  if ! command -v opencode &>/dev/null || ! command -v jq &>/dev/null; then
+    warn "opencode or jq unavailable — cannot validate model IDs, skipping"
+    return 0
+  fi
+
+  local all_models
+  all_models=$(opencode models 2>/dev/null)
+  [[ -z "$all_models" ]] && { warn "'opencode models' returned nothing — skipping"; return 0; }
+
+  # Suggest the models this user already runs elsewhere: whatever their
+  # oh-my-openagent.json agents are pinned to. Proven-working beats a
+  # 600-line dump of every provider model.
+  # OMO_CFG is only set when opencode was detected earlier — resolve our own.
+  local omo_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
+  local -a suggestions=()
+  if [[ -f "$omo_cfg" ]]; then
+    while IFS= read -r m; do
+      [[ -n "$m" ]] && suggestions+=("$m")
+    done < <(jq -r '[.agents[]? | .model // empty] | unique | .[]' "$omo_cfg" 2>/dev/null)
+  fi
+
+  echo
+  info "x-review can run several models in parallel, one lane per model."
+  info "Blank keeps the current selection. Type 'none' for the single-oracle default."
+  if ((${#suggestions[@]})); then
+    echo "  Models already configured for your OMO agents:"
+    local i=1
+    for m in "${suggestions[@]}"; do
+      printf "    %d) %s\n" "$i" "$m"
+      i=$((i + 1))
+    done
+  fi
+  echo "  Enter numbers and/or full model IDs, comma-separated (e.g. '1,3' or 'openai/qwen3.7-max')."
+  printf "  Models for x-review [max %d]: " "$REVIEW_MODELS_MAX"
+
+  local reply=""
+  read -r reply </dev/tty 2>/dev/null || reply=""
+  [[ -z "$reply" ]] && { info "Unchanged"; return 0; }
+
+  if [[ "$reply" == "none" ]]; then
+    REVIEW_MODELS_JSON="[]"
+    ok "Cleared — x-review will use the single 'oracle' agent lane"
+    return 0
+  fi
+
+  local -a picked=()
+  local raw entry
+  # Split on commas; each field is either an index into suggestions or a full ID.
+  while IFS= read -r raw; do
+    entry=$(printf '%s' "$raw" | tr -d '[:space:]')
+    [[ -z "$entry" ]] && continue
+    if [[ "$entry" =~ ^[0-9]+$ ]]; then
+      if ((entry >= 1 && entry <= ${#suggestions[@]})); then
+        entry="${suggestions[$((entry - 1))]}"
+      else
+        warn "Ignoring '$entry' — no such suggestion"
+        continue
+      fi
+    fi
+    if ! grep -qxF -- "$entry" <<<"$all_models"; then
+      warn "Ignoring '$entry' — not in 'opencode models'"
+      continue
+    fi
+    # Dedup: a model listed twice would just burn tokens twice.
+    # `if` form, not `((seen)) && continue` — the latter returns 1 when seen=0
+    # and `set -e` would abort the whole setup run.
+    local seen=0 p
+    for p in ${picked[@]+"${picked[@]}"}; do
+      [[ "$p" == "$entry" ]] && seen=1
+    done
+    if ((seen)); then continue; fi
+    if ((${#picked[@]} >= REVIEW_MODELS_MAX)); then
+      warn "Ignoring '$entry' — max $REVIEW_MODELS_MAX models"
+      continue
+    fi
+    picked+=("$entry")
+    # Trailing newline is load-bearing: without it `read` drops the last field.
+  done < <(printf '%s\n' "$reply" | tr ',' '\n')
+
+  if ((${#picked[@]} == 0)); then
+    warn "No valid models picked — selection unchanged"
+    return 0
+  fi
+
+  REVIEW_MODELS_JSON=$(printf '%s\n' "${picked[@]}" | jq -R . | jq -cs .)
+  ok "x-review lanes: $(printf '%s, ' "${picked[@]}" | sed 's/, $//')"
+}
+
+configure_review_models
+
+# ============================================================
 # Capability manifest
 # ============================================================
 
@@ -889,6 +1009,7 @@ manifest = {
     "generated_at": "$GEN_AT",
     "plugin_dir": $(printf '%s' "$PLUGIN_DIR" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'),
     "omo_agent":  $(printf '%s' "$OMO_AGENT_SRC" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'),
+    "review_models": json.loads(r'''$REVIEW_MODELS_JSON'''),
     "capabilities": {
         "opencode":           cap("$(cap_get opencode)"),
         "omo_plugin":         cap("$(cap_get omo_plugin)"),
