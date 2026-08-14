@@ -139,11 +139,22 @@ The second command lists models the user already runs elsewhere — proven-worki
 
 ### 2. Ask with `AskUserQuestion`
 
-One question, `multiSelect: true`, up to 4 options — which matches the 4-lane cap exactly. Pick the 4 strongest reviewers from the candidates; "Other" is added automatically and accepts free-form IDs.
+One question, `multiSelect: true`, up to 4 options — which matches the 4-lane cap exactly. Pick the 3 strongest reviewers from the candidates, and **always spend one option on the default**:
 
-Write a real `description` per option: what the model is, what it costs in wall-clock, and anything you know about its behavior as a reviewer. "A model" is not a description. Say if one is already configured.
+> **Keep the default (single `oracle` lane)** — x-review runs one non-Claude reviewer, on whatever model your OMO config pins `oracle` to. This is the behavior from before multi-model lanes existed: one lane, lowest cost, no stagger needed.
 
-If the user's answer selects nothing, or asks for something else entirely, **leave `review_models` untouched** and move on.
+The default must be a visible choice, not something the user reaches by declining. State in the question text which mode is currently active, so "keep what I have" is one click.
+
+Write a real `description` per model option: what it is, what it costs in wall-clock, and anything you know about its behavior as a reviewer. "A model" is not a description. Say if one is already configured.
+
+Resolving the answer:
+
+| Answer | Write |
+|---|---|
+| One or more models | those IDs (validated, max 4) |
+| The default option | `[]` — the single-`oracle` fallback |
+| Default **and** models together | the models; the default is not additive, say so in your report |
+| Nothing selected, or the user redirects the conversation | nothing — leave `review_models` exactly as it was |
 
 ### 3. Validate before writing
 

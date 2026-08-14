@@ -25,7 +25,9 @@ Read `review_models` from the capability manifest pinned at bootstrap (`~/.confi
 | `review_models` | OMO lanes to launch |
 |---|---|
 | Non-empty (N entries, max 4) | **N lanes**, one per entry: `<omo_agent> --model <id> "<prompt>"` |
-| Empty / absent / manifest missing | **1 lane**: `<omo_agent> oracle "<prompt>"` (model comes from the user's OMO agent config) |
+| Empty / absent / manifest missing | **1 lane (the default)**: `<omo_agent> oracle "<prompt>"` (model comes from the user's OMO agent config) |
+
+The single-`oracle` row is a deliberate default, not a degraded mode: it is the shipped behavior for anyone who never opens the picker, and it needs no stagger, no per-lane budget, and no `review_models` key to exist. Never warn the user that they "should" configure models — offer it, don't nag.
 
 Every lane gets the SAME prompt — the scope guard plus the target-appropriate framing below. The point is N independent models answering one question, not N different questions.
 
