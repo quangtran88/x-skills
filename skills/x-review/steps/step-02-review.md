@@ -20,6 +20,8 @@ In the prompt examples below, `<SCOPE_GUARD>` is shorthand for the full block fr
 
 ## OMO Lanes — resolved from `review_models`
 
+`review_models` customizes ONLY the opencode (OMO) slot. The Claude `code-reviewer`, agy, and `requesting-code-review` lanes are fixed — they always run (agy subject to its capability pin) no matter what `review_models` contains.
+
 Read `review_models` from the capability manifest pinned at bootstrap (`~/.config/x-skills/capabilities.json`, project override `.x-skills/capabilities.json` wins). It is an array of full model IDs the user chose during `bin/setup`, e.g. `["openai/gpt-5.6-sol", "openai/qwen3.7-max", "openai/deepseek-v4-pro"]`.
 
 | `review_models` | OMO lanes to launch |

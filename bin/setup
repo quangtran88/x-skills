@@ -477,7 +477,7 @@ configure_review_models() {
   fi
 
   echo
-  info "x-review can run several models in parallel, one lane per model."
+  info "x-review always runs Claude + Gemini lanes; this picks extra opencode lanes, one per model."
   info "Blank keeps the current selection. Type 'none' for the single-oracle default."
   if ((${#suggestions[@]})); then
     echo "  Models already configured for your OMO agents:"

@@ -125,6 +125,8 @@ After installing anything:
 
 `bin/setup`'s own section 5b only prompts when it has a terminal, and you run it through a tool — so it never asks. **Do not hand the user a shell command to run instead.** You have `AskUserQuestion`, which renders a native picker and needs no TTY. Drive the whole thing here.
 
+**Scope of this picker:** it configures ONLY x-review's opencode (OMO) lane. The Claude code-reviewer, Gemini (agy), and requesting-code-review lanes are fixed and always run regardless — say so in the question text so the user knows they are choosing an addition, not replacing the review panel.
+
 Run this on EVERY invocation of this skill, whether or not `review_models` is already set — the user may want to change it.
 
 ### 1. Read the current value and the candidates
@@ -141,7 +143,7 @@ The second command lists models the user already runs elsewhere — proven-worki
 
 One question, `multiSelect: true`, up to 4 options — which matches the 4-lane cap exactly. Pick the 3 strongest reviewers from the candidates, and **always spend one option on the default**:
 
-> **Keep the default (single `oracle` lane)** — x-review runs one non-Claude reviewer, on whatever model your OMO config pins `oracle` to. This is the behavior from before multi-model lanes existed: one lane, lowest cost, no stagger needed.
+> **Keep the default (single `oracle` lane)** — the opencode slot stays one `oracle` call, on whatever model your OMO config pins `oracle` to. Claude and Gemini lanes run either way. This is the behavior from before multi-model lanes existed: one opencode lane, lowest cost, no stagger needed.
 
 The default must be a visible choice, not something the user reaches by declining. State in the question text which mode is currently active, so "keep what I have" is one click.
 
