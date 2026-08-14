@@ -121,26 +121,51 @@ After installing anything:
 "$PLUGIN_DIR/bin/setup"
 ```
 
-## Step 5b: ALWAYS surface the x-review model picker
+## Step 5b: Run the x-review model picker YOURSELF (every run)
 
-`bin/setup` asks which models x-review should fan out to (section 5b), but **it can only ask when it has a terminal** — and you are running it through a tool, so it never prompts and the selection stays whatever it was.
+`bin/setup`'s own section 5b only prompts when it has a terminal, and you run it through a tool — so it never asks. **Do not hand the user a shell command to run instead.** You have `AskUserQuestion`, which renders a native picker and needs no TTY. Drive the whole thing here.
 
-Every run of this skill MUST tell the user how to configure it, whether or not it is already set. Read the current value:
+Run this on EVERY invocation of this skill, whether or not `review_models` is already set — the user may want to change it.
+
+### 1. Read the current value and the candidates
 
 ```bash
 jq -c '.review_models // []' ~/.config/x-skills/capabilities.json
+jq -r '[.agents[]?.model // empty] | unique | .[]' ~/.config/opencode/oh-my-openagent.json
+opencode models
 ```
 
-Then report it and give them the command verbatim — `!` runs it in their own shell, which is what makes the prompt reachable:
+The second command lists models the user already runs elsewhere — proven-working on this machine, and the best default candidates. The third is the full validation set (600+ entries; never show this list to the user).
 
+### 2. Ask with `AskUserQuestion`
+
+One question, `multiSelect: true`, up to 4 options — which matches the 4-lane cap exactly. Pick the 4 strongest reviewers from the candidates; "Other" is added automatically and accepts free-form IDs.
+
+Write a real `description` per option: what the model is, what it costs in wall-clock, and anything you know about its behavior as a reviewer. "A model" is not a description. Say if one is already configured.
+
+If the user's answer selects nothing, or asks for something else entirely, **leave `review_models` untouched** and move on.
+
+### 3. Validate before writing
+
+Every ID — especially anything typed into "Other" — must appear verbatim in `opencode models`:
+
+```bash
+opencode models | grep -qxF -- "<id>" || echo "INVALID: <id>"
 ```
-! $PLUGIN_DIR/bin/setup --models
+
+Drop invalid IDs, tell the user which and why, and keep the valid remainder. Cap at 4.
+
+### 4. Write it
+
+```bash
+tmp=$(mktemp); jq --argjson rm '["<id>","<id>"]' '.review_models = $rm' \
+  ~/.config/x-skills/capabilities.json > "$tmp" && mv "$tmp" ~/.config/x-skills/capabilities.json
+jq -c '.review_models' ~/.config/x-skills/capabilities.json   # confirm
 ```
 
-- **Empty `[]`** → x-review runs a single `oracle` lane. Say so, and that `--models` lets them pick up to 4 models to review in parallel.
-- **Non-empty** → list the models. Mention `--models` re-picks them (blank keeps, `none` clears).
+Report back what was saved, and that x-review now runs one parallel lane per model (empty = single `oracle` lane).
 
-`--models` skips all dependency detection and patches only `review_models`, so it is fast and safe to re-run.
+**`bin/setup --models` still exists** for anyone driving setup outside Claude Code — mention it only if the user asks how to change this without you.
 
 ## Step 6: Report final state
 

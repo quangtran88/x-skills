@@ -65,7 +65,7 @@ Project overrides are **subtractive only**: a project file can disable a capabil
 
 ### `review_models` (user preference, not a detected capability)
 
-An array of full opencode model IDs, chosen interactively during `bin/setup` (or `bin/setup --models`, which re-picks them without re-running detection) and **preserved across re-runs** (setup seeds the prompt with the current value; a blank answer keeps it). Unlike `capabilities.*`, this is a preference the user set, not something setup probed for — never overwrite it from detection logic.
+An array of full opencode model IDs, chosen interactively — via the `/x-skills:setup` skill's picker inside Claude Code, or `bin/setup` / `bin/setup --models` from a terminal and **preserved across re-runs** (setup seeds the prompt with the current value; a blank answer keeps it). Unlike `capabilities.*`, this is a preference the user set, not something setup probed for — never overwrite it from detection logic.
 
 Consumer: **x-review only.** It launches one `omo-agent --model <id>` reviewer lane per entry, in parallel, same prompt each. Empty or absent → x-review falls back to a single `oracle` agent lane. Capped at 4 entries by setup (each lane is a full model pass with its own 600s budget).
 
