@@ -121,6 +121,27 @@ After installing anything:
 "$PLUGIN_DIR/bin/setup"
 ```
 
+## Step 5b: ALWAYS surface the x-review model picker
+
+`bin/setup` asks which models x-review should fan out to (section 5b), but **it can only ask when it has a terminal** — and you are running it through a tool, so it never prompts and the selection stays whatever it was.
+
+Every run of this skill MUST tell the user how to configure it, whether or not it is already set. Read the current value:
+
+```bash
+jq -c '.review_models // []' ~/.config/x-skills/capabilities.json
+```
+
+Then report it and give them the command verbatim — `!` runs it in their own shell, which is what makes the prompt reachable:
+
+```
+! $PLUGIN_DIR/bin/setup --models
+```
+
+- **Empty `[]`** → x-review runs a single `oracle` lane. Say so, and that `--models` lets them pick up to 4 models to review in parallel.
+- **Non-empty** → list the models. Mention `--models` re-picks them (blank keeps, `none` clears).
+
+`--models` skips all dependency detection and patches only `review_models`, so it is fast and safe to re-run.
+
 ## Step 6: Report final state
 
 Summarize concisely:

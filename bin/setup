@@ -421,10 +421,136 @@ check_omo_mode_all() {
 }
 
 # --- Parse args ---
+# Models x-review fans out to, one `omo-agent --model <id>` lane each.
+# Empty => x-review falls back to the single `oracle` agent lane.
+# Preserved across re-runs: the current value becomes the default.
+REVIEW_MODELS_JSON="[]"
+if command -v jq &>/dev/null && [[ -f "$CAPS_FILE" ]]; then
+  REVIEW_MODELS_JSON=$(jq -c '.review_models // []' "$CAPS_FILE" 2>/dev/null) || REVIEW_MODELS_JSON="[]"
+  [[ -z "$REVIEW_MODELS_JSON" ]] && REVIEW_MODELS_JSON="[]"
+fi
+
+REVIEW_MODELS_MAX=4
+
+configure_review_models() {
+  local current
+  current=$(jq -r '.[]' <<<"$REVIEW_MODELS_JSON" 2>/dev/null | paste -sd, -)
+  if [[ -n "$current" ]]; then
+    ok "Current: $current"
+  else
+    info "Current: none — x-review uses the single 'oracle' agent lane"
+  fi
+
+  # Prompt on every interactive setup/--models run. --check never mutates.
+  # A non-tty run (agent-driven, CI) cannot ask, so it keeps the saved value
+  # and points at the command that CAN ask — otherwise the picker is invisible
+  # to anyone whose setup is always run for them by a tool.
+  if [[ "$MODE" != "setup" && "$MODE" != "models" && "$MODE" != "fix" ]]; then
+    info "Keeping saved selection"
+    return 0
+  fi
+  if [[ ! -t 0 ]]; then
+    info "Not a terminal — keeping saved selection"
+    info "  To pick models, run in your own shell: $SCRIPT_DIR/setup --models"
+    return 0
+  fi
+
+  if ! command -v opencode &>/dev/null || ! command -v jq &>/dev/null; then
+    warn "opencode or jq unavailable — cannot validate model IDs, skipping"
+    return 0
+  fi
+
+  local all_models
+  all_models=$(opencode models 2>/dev/null)
+  [[ -z "$all_models" ]] && { warn "'opencode models' returned nothing — skipping"; return 0; }
+
+  # Suggest the models this user already runs elsewhere: whatever their
+  # oh-my-openagent.json agents are pinned to. Proven-working beats a
+  # 600-line dump of every provider model.
+  # OMO_CFG is only set when opencode was detected earlier — resolve our own.
+  local omo_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
+  local -a suggestions=()
+  if [[ -f "$omo_cfg" ]]; then
+    while IFS= read -r m; do
+      [[ -n "$m" ]] && suggestions+=("$m")
+    done < <(jq -r '[.agents[]? | .model // empty] | unique | .[]' "$omo_cfg" 2>/dev/null)
+  fi
+
+  echo
+  info "x-review can run several models in parallel, one lane per model."
+  info "Blank keeps the current selection. Type 'none' for the single-oracle default."
+  if ((${#suggestions[@]})); then
+    echo "  Models already configured for your OMO agents:"
+    local i=1
+    for m in "${suggestions[@]}"; do
+      printf "    %d) %s\n" "$i" "$m"
+      i=$((i + 1))
+    done
+  fi
+  echo "  Enter numbers and/or full model IDs, comma-separated (e.g. '1,3' or 'openai/qwen3.7-max')."
+  printf "  Models for x-review [max %d]: " "$REVIEW_MODELS_MAX"
+
+  local reply=""
+  read -r reply </dev/tty 2>/dev/null || reply=""
+  [[ -z "$reply" ]] && { info "Unchanged"; return 0; }
+
+  if [[ "$reply" == "none" ]]; then
+    REVIEW_MODELS_JSON="[]"
+    ok "Cleared — x-review will use the single 'oracle' agent lane"
+    return 0
+  fi
+
+  local -a picked=()
+  local raw entry
+  # Split on commas; each field is either an index into suggestions or a full ID.
+  while IFS= read -r raw; do
+    entry=$(printf '%s' "$raw" | tr -d '[:space:]')
+    [[ -z "$entry" ]] && continue
+    if [[ "$entry" =~ ^[0-9]+$ ]]; then
+      if ((entry >= 1 && entry <= ${#suggestions[@]})); then
+        entry="${suggestions[$((entry - 1))]}"
+      else
+        warn "Ignoring '$entry' — no such suggestion"
+        continue
+      fi
+    fi
+    if ! grep -qxF -- "$entry" <<<"$all_models"; then
+      warn "Ignoring '$entry' — not in 'opencode models'"
+      continue
+    fi
+    # Dedup: a model listed twice would just burn tokens twice.
+    # `if` form, not `((seen)) && continue` — the latter returns 1 when seen=0
+    # and `set -e` would abort the whole setup run.
+    local seen=0 p
+    for p in ${picked[@]+"${picked[@]}"}; do
+      [[ "$p" == "$entry" ]] && seen=1
+    done
+    if ((seen)); then continue; fi
+    if ((${#picked[@]} >= REVIEW_MODELS_MAX)); then
+      warn "Ignoring '$entry' — max $REVIEW_MODELS_MAX models"
+      continue
+    fi
+    picked+=("$entry")
+    # Trailing newline is load-bearing: without it `read` drops the last field.
+  done < <(printf '%s\n' "$reply" | tr ',' '\n')
+
+  if ((${#picked[@]} == 0)); then
+    warn "No valid models picked — selection unchanged"
+    return 0
+  fi
+
+  REVIEW_MODELS_JSON=$(printf '%s\n' "${picked[@]}" | jq -R . | jq -cs .)
+  ok "x-review lanes: $(printf '%s, ' "${picked[@]}" | sed 's/, $//')"
+}
+
+
 MODE="setup"
+# Parsed below; the models fast-path runs right after so it never pays for
+# full dependency detection.
 case "${1:-}" in
   --check)     MODE="check" ;;
   --fix)       MODE="fix" ;;
+  --models)    MODE="models" ;;
   --uninstall) MODE="uninstall" ;;
   --help|-h)
     cat <<'EOF'
@@ -434,6 +560,7 @@ Usage:
   ./bin/setup              Full setup (install binding + detect deps)
   ./bin/setup --check      Check-only mode (no modifications)
   ./bin/setup --fix        Setup + offer to install missing CLI dependencies
+  ./bin/setup --models     Re-pick x-review's reviewer models only (fast, interactive)
   ./bin/setup --uninstall  Remove omo-agent binding
 
 What it does:
@@ -490,6 +617,29 @@ if [[ "$MODE" == "uninstall" ]]; then
   if [[ -f "$CAPS_FILE" ]]; then
     rm "$CAPS_FILE"
     ok "Removed capabilities file"
+  fi
+  exit 0
+fi
+
+# --- --models: re-pick x-review's reviewer lanes, nothing else ---
+# Patches only .review_models into the existing manifest. A full setup run
+# would work too, but this skips every detection probe so it costs a second.
+if [[ "$MODE" == "models" ]]; then
+  header "x-review reviewer models"
+  if [[ ! -f "$CAPS_FILE" ]]; then
+    fail "No capability manifest at $CAPS_FILE — run '$SCRIPT_DIR/setup' first"
+    exit 1
+  fi
+  command -v jq &>/dev/null || { fail "jq required for --models"; exit 1; }
+  configure_review_models
+  tmp_caps=$(mktemp "${CAPS_FILE}.tmp.XXXXXX") || { fail "could not mktemp"; exit 1; }
+  if jq --argjson rm "$REVIEW_MODELS_JSON" '.review_models = $rm' "$CAPS_FILE" > "$tmp_caps" && [[ -s "$tmp_caps" ]]; then
+    mv "$tmp_caps" "$CAPS_FILE"
+    ok "Saved to $CAPS_FILE"
+  else
+    rm -f "$tmp_caps"
+    fail "failed to write $CAPS_FILE — unchanged"
+    exit 1
   fi
   exit 0
 fi
@@ -573,10 +723,29 @@ if command -v gitnexus &>/dev/null; then
   ok "gitnexus CLI on PATH (${gitnexus_ver:-version unknown})"
   cap_set cli_gitnexus true
 elif command -v npx &>/dev/null; then
-  info "gitnexus not installed globally — install with 'npm install -g gitnexus' to enable (npx not currently wired into routing)"
-  cap_set cli_gitnexus false
-  missing_add "cli" "gitnexus" "Code knowledge graph (impact / context / rename)" \
-    "npm install -g gitnexus"
+  # nvm installs global packages per node version, so switching node hides a
+  # perfectly good install. Say which node it is under instead of "not
+  # installed" — the remedy is different (re-install on the current version,
+  # or nvm use) and the MCP server may still work off an absolute path.
+  gitnexus_elsewhere=""
+  for gn in "${NVM_DIR:-$HOME/.nvm}"/versions/node/*/bin/gitnexus; do
+    [[ -x "$gn" ]] || continue
+    gitnexus_elsewhere="$gn"
+    break
+  done
+  if [[ -n "$gitnexus_elsewhere" ]]; then
+    gitnexus_node=$(sed -E 's|.*/versions/node/([^/]+)/bin/gitnexus|\1|' <<<"$gitnexus_elsewhere")
+    info "gitnexus installed under node $gitnexus_node but not on the current PATH ($(node --version 2>/dev/null || echo 'node unknown'))"
+    info "  the gitnexus MCP server can still work if it points at an absolute path — only the CLI is affected"
+    cap_set cli_gitnexus false
+    missing_add "cli" "gitnexus" "Code knowledge graph CLI — installed under node $gitnexus_node, not the active version" \
+      "npm install -g gitnexus   # re-install on the active node, or: nvm use $gitnexus_node"
+  else
+    info "gitnexus not installed globally — install with 'npm install -g gitnexus' to enable (npx not currently wired into routing)"
+    cap_set cli_gitnexus false
+    missing_add "cli" "gitnexus" "Code knowledge graph (impact / context / rename)" \
+      "npm install -g gitnexus"
+  fi
 else
   warn "gitnexus CLI not on PATH and npx unavailable — gitnexus integration disabled"
   cap_set cli_gitnexus false
@@ -858,118 +1027,6 @@ check_tool "interactsh-client" "go install -v github.com/projectdiscovery/intera
 # ============================================================
 
 header "5b. x-review reviewer models (optional)"
-
-# Models x-review fans out to, one `omo-agent --model <id>` lane each.
-# Empty => x-review falls back to the single `oracle` agent lane.
-# Preserved across re-runs: the current value becomes the default.
-REVIEW_MODELS_JSON="[]"
-if command -v jq &>/dev/null && [[ -f "$CAPS_FILE" ]]; then
-  REVIEW_MODELS_JSON=$(jq -c '.review_models // []' "$CAPS_FILE" 2>/dev/null) || REVIEW_MODELS_JSON="[]"
-  [[ -z "$REVIEW_MODELS_JSON" ]] && REVIEW_MODELS_JSON="[]"
-fi
-
-REVIEW_MODELS_MAX=4
-
-configure_review_models() {
-  local current
-  current=$(jq -r '.[]' <<<"$REVIEW_MODELS_JSON" 2>/dev/null | paste -sd, -)
-  if [[ -n "$current" ]]; then
-    ok "Current: $current"
-  else
-    info "Current: none — x-review uses the single 'oracle' agent lane"
-  fi
-
-  # Only prompt in an interactive setup run. --check never mutates; --fix and
-  # non-tty runs keep whatever is already saved.
-  [[ "$MODE" == "setup" && -t 0 ]] || { info "Keeping saved selection"; return 0; }
-
-  if ! command -v opencode &>/dev/null || ! command -v jq &>/dev/null; then
-    warn "opencode or jq unavailable — cannot validate model IDs, skipping"
-    return 0
-  fi
-
-  local all_models
-  all_models=$(opencode models 2>/dev/null)
-  [[ -z "$all_models" ]] && { warn "'opencode models' returned nothing — skipping"; return 0; }
-
-  # Suggest the models this user already runs elsewhere: whatever their
-  # oh-my-openagent.json agents are pinned to. Proven-working beats a
-  # 600-line dump of every provider model.
-  # OMO_CFG is only set when opencode was detected earlier — resolve our own.
-  local omo_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
-  local -a suggestions=()
-  if [[ -f "$omo_cfg" ]]; then
-    while IFS= read -r m; do
-      [[ -n "$m" ]] && suggestions+=("$m")
-    done < <(jq -r '[.agents[]? | .model // empty] | unique | .[]' "$omo_cfg" 2>/dev/null)
-  fi
-
-  echo
-  info "x-review can run several models in parallel, one lane per model."
-  info "Blank keeps the current selection. Type 'none' for the single-oracle default."
-  if ((${#suggestions[@]})); then
-    echo "  Models already configured for your OMO agents:"
-    local i=1
-    for m in "${suggestions[@]}"; do
-      printf "    %d) %s\n" "$i" "$m"
-      i=$((i + 1))
-    done
-  fi
-  echo "  Enter numbers and/or full model IDs, comma-separated (e.g. '1,3' or 'openai/qwen3.7-max')."
-  printf "  Models for x-review [max %d]: " "$REVIEW_MODELS_MAX"
-
-  local reply=""
-  read -r reply </dev/tty 2>/dev/null || reply=""
-  [[ -z "$reply" ]] && { info "Unchanged"; return 0; }
-
-  if [[ "$reply" == "none" ]]; then
-    REVIEW_MODELS_JSON="[]"
-    ok "Cleared — x-review will use the single 'oracle' agent lane"
-    return 0
-  fi
-
-  local -a picked=()
-  local raw entry
-  # Split on commas; each field is either an index into suggestions or a full ID.
-  while IFS= read -r raw; do
-    entry=$(printf '%s' "$raw" | tr -d '[:space:]')
-    [[ -z "$entry" ]] && continue
-    if [[ "$entry" =~ ^[0-9]+$ ]]; then
-      if ((entry >= 1 && entry <= ${#suggestions[@]})); then
-        entry="${suggestions[$((entry - 1))]}"
-      else
-        warn "Ignoring '$entry' — no such suggestion"
-        continue
-      fi
-    fi
-    if ! grep -qxF -- "$entry" <<<"$all_models"; then
-      warn "Ignoring '$entry' — not in 'opencode models'"
-      continue
-    fi
-    # Dedup: a model listed twice would just burn tokens twice.
-    # `if` form, not `((seen)) && continue` — the latter returns 1 when seen=0
-    # and `set -e` would abort the whole setup run.
-    local seen=0 p
-    for p in ${picked[@]+"${picked[@]}"}; do
-      [[ "$p" == "$entry" ]] && seen=1
-    done
-    if ((seen)); then continue; fi
-    if ((${#picked[@]} >= REVIEW_MODELS_MAX)); then
-      warn "Ignoring '$entry' — max $REVIEW_MODELS_MAX models"
-      continue
-    fi
-    picked+=("$entry")
-    # Trailing newline is load-bearing: without it `read` drops the last field.
-  done < <(printf '%s\n' "$reply" | tr ',' '\n')
-
-  if ((${#picked[@]} == 0)); then
-    warn "No valid models picked — selection unchanged"
-    return 0
-  fi
-
-  REVIEW_MODELS_JSON=$(printf '%s\n' "${picked[@]}" | jq -R . | jq -cs .)
-  ok "x-review lanes: $(printf '%s, ' "${picked[@]}" | sed 's/, $//')"
-}
 
 configure_review_models
 
