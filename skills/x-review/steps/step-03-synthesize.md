@@ -53,7 +53,7 @@ For MEDIUM/LOW findings: spot-check at least 2-3 representative ones. If any are
 1. **Deduplicate** — merge overlapping findings from different reviewers
 2. **Rank by severity** — CRITICAL > HIGH > MEDIUM > LOW (see `../../x-shared/severity-guide.md`)
 3. **Flag contradictions** — when reviewers disagree, present both perspectives for user decision
-4. **Cite sources** — attribute each finding to its reviewer (Claude, GPT, Gemini, etc.)
+4. **Cite sources** — attribute each finding to its reviewer by lane name (Claude, oracle, Gemini, etc.) — not by model name, since oracle's model is config-driven
 5. **Mark verified** — indicate which findings were confirmed against actual code
 6. **Tag NEEDS_DIRECTION** — mark any finding that requires user input before fixing (see criteria below)
 7. **Persist lesson** (only when `mcp.basic_memory` pinned): for each CRITICAL or HIGH finding ONLY (the severity filter IS this beat's durability gate — see § Memory Reflex), one `mcp__basic-memory__write_note({ title: "<severity>: <finding summary>", directory: "lessons/<project-slug>", content: "<finding summary> → <recommendation>\n\nFiles: <files cited in finding>", tags: ["<project-slug>", "x-review", "<severity>", "<area>"] })` call (placement and *Update over duplicate* — same-kind only — per `../../x-shared/mcp-toolbox.md § Memory Reflex` / § Consumer rules). Skip MEDIUM and LOW findings. Skip silently when not pinned.
@@ -265,8 +265,8 @@ Do not bury this inside an option's con list. It is its own bug class.
 | # | Severity | Finding | Source | Verified | NEEDS_DIRECTION |
 |---|----------|---------|--------|----------|-----------------|
 | 1 | CRITICAL | ... | Claude | ✓ | — |
-| 2 | HIGH | ... | GPT | ✓ | ✓ |
-| 3 | MEDIUM | ... | Claude + GPT | ✓ | — |
+| 2 | HIGH | ... | oracle | ✓ | ✓ |
+| 3 | MEDIUM | ... | Claude + oracle | ✓ | — |
 ```
 
 If any row has `NEEDS_DIRECTION = ✓`, draft the DECIDE blocks internally (using the "Draft Clarification Block" template above) but do **NOT** display them here. Step 4 surfaces them one at a time using `../../x-shared/done-format.md § Shape 3 — DECIDE`. The findings table is the only user-facing output from this step.

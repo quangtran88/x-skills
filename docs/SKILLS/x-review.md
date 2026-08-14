@@ -1,7 +1,7 @@
 # x-review — Review Orchestrator
 
 > **Role:** `reviewer`  
-> **Purpose:** Code/plan/PR review orchestrator — cross-model review with Claude + GPT perspectives, structured verdicts.
+> **Purpose:** Code/plan/PR review orchestrator — cross-model review with Claude + your configured OMO models, structured verdicts.
 
 ---
 
@@ -33,18 +33,18 @@ Step 1: Prepare (step-01-prepare.md)
 Step 2: Review (step-02-review.md)
   ├─ **Target A (Plan/Spec):** Launch 3 reviewers in ONE MESSAGE:
   │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
-  │   2. Bash tool: omo-agent --model gpt "<plan blocker-finder prompt>" — GPT-5.5 blocker-finder (OKAY/REJECT verdict). Replaces UNAVAILABLE `momus` role agent.
+  │   2. Bash tool: one `omo-agent --model <id>` lane per `review_models` entry (staggered 3s), same blocker-finder prompt each — OKAY/REJECT verdict. Empty list → single `omo-agent oracle` lane. Replaces UNAVAILABLE `momus` role agent.
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
-  │   (Optional 4th: omo-agent oracle for architecture-sensitive plans)
+  │   (Architecture-sensitive plans: extend the oracle prompt — no extra lane)
   ├─ **Targets B/C/D (Code/Files/Diff):** Launch 3 reviewers in ONE MESSAGE:
   │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
-  │   2. Bash tool: omo-agent oracle "<review prompt with diff/file content>" — GPT perspective
+  │   2. Bash tool: one `omo-agent --model <id>` lane per `review_models` entry (staggered 3s), same review prompt each. Empty list → single `omo-agent oracle` lane.
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
   ├─ Wait for ALL background notifications
   └─ Collect all results before proceeding
   ├─ Launch 3 reviewers in ONE MESSAGE (all tool calls in single response):
   │   1. Agent tool: subagent_type="oh-my-claudecode:code-reviewer", model="opus" — Claude perspective
-  │   2. Bash tool: omo-agent oracle "<review prompt>" — GPT perspective
+  │   2. Bash tool: one `omo-agent --model <id>` lane per `review_models` entry (staggered 3s). Empty list → single `omo-agent oracle` lane.
   │   3. Skill tool: superpowers:requesting-code-review — structured review workflow
   ├─ Wait for ALL background notifications
   └─ Collect all results before proceeding
@@ -68,7 +68,8 @@ The **one-message launch** is critical for compliance. All 3 reviewers must be d
 
 ```
 Tool: Agent(subagent_type="oh-my-claudecode:code-reviewer", model="opus", run_in_background=true)
-Tool: Bash(command="omo-agent oracle '...'", run_in_background=true, timeout=600000)
+Tool: Bash(command="omo-agent --model <review_models[0]> '...'", run_in_background=true, timeout=600000)
+Tool: Bash(command="sleep 3 && omo-agent --model <review_models[1]> '...'", run_in_background=true, timeout=600000)
 Tool: Skill(skill="superpowers:requesting-code-review")
 ```
 
@@ -76,6 +77,6 @@ Tool: Skill(skill="superpowers:requesting-code-review")
 
 ## Dependencies
 
-- **x-omo** — bootstrap + oracle agent for GPT perspective
+- **x-omo** — bootstrap + `oracle` agent for the non-Claude perspective (model set by the user's OMO config)
 - **x-shared** — severity-guide, invocation-guide, context-envelope, workflow-chains
 - **superpowers** — code-reviewer, requesting-code-review, receiving-code-review, verification-before-completion, finishing-a-development-branch

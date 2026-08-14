@@ -216,13 +216,13 @@ x-review uses a **step-file architecture** — load ONE step at a time, complete
 
 ### Cross-Model Review
 
-By default, x-review runs cross-model review (Claude + GPT perspectives):
+By default, x-review runs cross-model review (Claude + every model in `review_models`):
 
 **Target A (Plan/Spec review):**
 1. **OMC `code-reviewer`** (Claude perspective) via `Agent` tool
-2. **`--model gpt`** (GPT-5.5 blocker-finder perspective) via `omo-agent` Bash — OKAY/REJECT verdict. Replaces UNAVAILABLE `momus` role agent.
+2. **One OMO lane per `review_models` entry** (`omo-agent --model <id>`, staggered 3s, same blocker-finder prompt each) — OKAY/REJECT verdict. Empty list → single `oracle` lane. Replaces UNAVAILABLE `momus` role agent.
 3. **`superpowers:requesting-code-review`** (third perspective) via `Skill` tool
-(Optional 4th: OMO `oracle` for architecture-sensitive plans)
+(Architecture-sensitive plans: extend the oracle prompt — no extra lane)
 
 **Targets B/C/D (Code/Files/Diff review):**
 1. **OMC `code-reviewer`** (Claude perspective) via `Agent` tool
@@ -231,10 +231,10 @@ By default, x-review runs cross-model review (Claude + GPT perspectives):
 
 All three are launched in **ONE message** (`assign` primitive). Wait for ALL results before synthesizing.
 
-By default, x-review runs cross-model review (Claude + GPT perspectives):
+By default, x-review runs cross-model review (Claude + every model in `review_models`):
 
 1. **OMC `code-reviewer`** (Claude perspective) via `Agent` tool
-2. **`--model gpt`** (GPT-5.5 perspective) via `omo-agent` Bash
+2. **One OMO lane per `review_models` entry** (`omo-agent --model <id>`, staggered 3s) — empty list → single `oracle` lane
 3. **`superpowers:requesting-code-review`** (third perspective) via `Skill` tool
 
 All three are launched in **ONE message** (`assign` primitive). Wait for ALL results before synthesizing.

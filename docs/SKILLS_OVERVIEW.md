@@ -17,7 +17,7 @@ Every skill in x-skills follows the **router principle**: it classifies, it rout
 |-------|---------------|-------------|
 | **x-do** | `router` | Universal execution router — classifies tasks into modes (new feature, bugfix, quick edit, refactor, plan execution) and dispatches to the right workflow |
 | **x-research** | *(not declared)* | Universal research router — classifies questions by information-source signal and routes to optimal tools/agents |
-| **x-review** | `reviewer` | Code/plan/PR review orchestrator — cross-model review with Claude + GPT perspectives, structured verdicts |
+| **x-review** | `reviewer` | Code/plan/PR review orchestrator — cross-model review with Claude + your configured OMO models, structured verdicts |
 | **x-bugfix** | *(not declared)* | Structured debugging — routes through investigation, hypothesis testing, and verified fix with evidence collection |
 | **x-mindful** | *(not declared)* | Pre-implementation architect-review gate — walks the user through the tradeoffs AI silently picked, assumptions baked in, blind spots, over/under-engineering, and future-debt at architect level (never code-level) |
 | **x-design** | *(not declared)* | Visual design system integration — resolves brand references to curated DESIGN.md files |

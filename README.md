@@ -33,7 +33,7 @@ The plugin's SessionStart hook detects stale capabilities and reminds you, but y
 |-------|--------|-------------|
 | **x-do** | `/x-skills:x-do` | Universal execution router — classifies tasks into modes (new feature, bugfix, quick edit, refactor, plan execution) and dispatches to the right workflow |
 | **x-research** | `/x-skills:x-research` | Universal research router — classifies questions and routes to optimal agents (codebase search, external docs, architecture review, OSS internals, pre-planning) |
-| **x-review** | `/x-skills:x-review` | Code/plan/PR review orchestrator — cross-model review with Claude + GPT perspectives, structured verdicts |
+| **x-review** | `/x-skills:x-review` | Code/plan/PR review orchestrator — cross-model review with Claude + your configured OMO models, structured verdicts |
 | **x-verify** | `/x-skills:x-verify` | Completion-cascade dispatcher — answers "am I done?" for long-running skills with mandatory fallback to prevent silent success claims |
 | **x-bugfix** | `/x-skills:x-bugfix` | Structured debugging — routes through investigation, hypothesis testing, and verified fix with evidence collection |
 | **x-mindful** | `/x-skills:x-mindful` | Pre-implementation architect-review gate — walks the user through the tradeoffs AI silently picked, assumptions it baked in, blind spots, over/under-engineering, and future-debt at architect level (never code-level), one item at a time |
