@@ -5,12 +5,12 @@ type: refactor
 status: ready
 created: 2026-07-28
 updated: 2026-08-14
-related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit, v2-skill-reuse-audit, v3-memory-store-research]
+related: [x-skills-v3, x-skills-v3-foundations, oss-skill-framework-survey, v3-round4-audit, v2-skill-reuse-audit, v3-memory-store-research, v3-federated-memory-research]
 ---
 
 # x-skills v3 — decision record
 
-The twenty-seven accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
+The twenty-eight accepted decisions behind `x-skills-v3.md`, in Nygard form (Choice / Why /
 Alternatives / Consequences + a status line), append-only, addressed by stable `DEC-00n` IDs.
 
 **Split out of the design doc on 2026-07-28**, at 1,114 lines. The design doc's own settled rule
@@ -24,7 +24,8 @@ statement, the disposition table, the contracts, the build order and the accepta
 the review surface. Citations resolve to `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
 `[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`,
-`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`, `[MEM]` = `2026-08-13-v3-memory-store-research.md`.
+`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`, `[MEM]` = `2026-08-13-v3-memory-store-research.md`,
+`[FED]` = `2026-08-14-v3-federated-memory-research.md`.
 
 Superseded blocks move to a **Superseded** section at the foot of this file, never inline —
 content marked as excluded still biases readers at roughly twice the rate of obsolete items
@@ -38,6 +39,8 @@ present (DEC-009). IDs keep resolving.
   `basic-memory` (DEC-016) and `gitnexus` (DEC-017) — plus the capability-gated optional dispatch in
   DEC-015. All three stay behind `capability-loading.md` and degrade silently; "kept" means *wired
   and warranted*, not *assumed present*. The 101-call-site framework coupling still goes.
+  **Amended 2026-08-14 (DEC-028):** basic-memory is dropped entirely; `gitnexus` is the sole
+  remaining MCP dependency, joined by the optional `tool.qmd` CLI capability for federated recall.
 - **Why:** Coupling, not dependency count, is the cost driver.
 - **Alternatives:** Trim 19 → ~8. Rejected: leaves the O(n²) documentation tax intact.
 - **Consequences:** **Round 2 counter-evidence, recorded rather than resolved.** The reference
@@ -775,7 +778,16 @@ present (DEC-009). IDs keep resolving.
      fine over MCP stdio). **Exit ramp** if the maintainer goes dark 6+ months: flat-store first
      (zero cost), a ~200-line MIT FTS5-over-markdown MCP second — the substrate outlives the
      tool `[MEM §7]`.
-- **Status:** accepted
+- **Superseded in part by DEC-028 (2026-08-14, user-directed):** the cross-repo store branch of
+  the routing rule, the recall wiring (`search_notes`), the stub write, the RED→GREEN persist,
+  the write-time overlap lint, and the `memory://` pointer form for new claims are all deleted —
+  the user's telemetry (5.4% session touch, 8% recall follow-through, 2:1 write:read sink)
+  exercised this DEC's and DEC-022's ceremony falsifiers early `[FED §4]`. **What survives:** the
+  `docs/`-vs-memory routing division (repo-bound facts → `docs/`), the never-write-native-memory
+  rule (generalized: x-skills writes no memory store at all), the ASSUMED-grade/corroborate-to-
+  INFERRED treatment of recall hits, and the store's data — `~/basic-memory` remains on disk as a
+  read-only legacy corpus that DEC-028's federated index still searches.
+- **Status:** superseded in part by DEC-028 (was: accepted)
 
 ### DEC-017 — gitnexus is advisory, never a gate
 - **Choice:** Kept, and scoped to what it can actually do. `query` + `context` in `02-scout` for
@@ -1051,6 +1063,11 @@ present (DEC-009). IDs keep resolving.
   classifier is optimistic and the gate tightens to costly-by-default. **Falsifier for
   record+generalize:** if 03-debate recall never pre-answers a repeat blocker class across S3–S7,
   the write path is ceremony — drop the basic-memory half and keep the doc append.
+- **Amended 2026-08-14 (DEC-028):** the record+generalize falsifier fired early — on the user's
+  live telemetry rather than S3–S7 — and its prescribed remedy is applied verbatim: step 5's
+  durable-half routing loses its basic-memory branch; the backlog/plan **doc append is the only
+  durable record** of a blocker resolution. Prior resolutions still arrive pre-answered at the
+  next consult via DEC-028's federated recall (the docs are an indexed root).
 - **Status:** accepted
 
 ### DEC-023 — x-review is kept standalone; 03-review harvests it, not the other way round
@@ -1251,5 +1268,73 @@ present (DEC-009). IDs keep resolving.
   convention for user config. Roster validation
   at read time warns on an entry absent from the last discovery and still attempts it (discovery
   goes stale); only an absent *backend* skips a lane.
+- **Status:** accepted
+
+### DEC-028 — basic-memory dropped entirely; recall is a federated read-only index
+- **Choice (user-directed 2026-08-14, after two adversarial research rounds `[MEM]`/`[FED]`):**
+  basic-memory leaves v3 **entirely** — the `mcp.basic_memory` pin, `search_notes`/`write_note`,
+  the `memory://` pointer form for new claims, and every write path. **x-skills writes no memory
+  store at all**: the `docs/` append is the chain's only durable write, and Claude's native
+  auto-memory keeps its single writer (Claude's own curation — DEC-016's never-write rule
+  survives as the general principle: one writer per store). What DEC-016 called the flat-store
+  fallback is not promoted but *retired as a write target too*: `~/basic-memory` stays on disk as
+  the user's data and v3 treats it as a **read-only legacy corpus**.
+  Recall re-founds on a **federated read-only index** over three roots — `~/basic-memory`
+  (legacy), the current repo's `docs/`, and `~/.claude/projects/*/memory/` (native memory,
+  indexed READ-ONLY — writing it is contract-free churn `[FED §2]`, reading it is defensible) —
+  behind a new optional `tool.qmd` capability: a thin `bin/` shim (DEC-026 pattern) over
+  `tobi/qmd` (MIT, 28.9k★, hybrid BM25+vector+rerank, fully local, zero API keys, no daemon;
+  verified adoptable with caveats `[FED §1]`). Degradation ladder: qmd hybrid (warm) → qmd
+  BM25-only (**the headless default** — `--no-rerank`, zero models required) → `rg` over the same
+  roots when `tool.qmd` is absent → no recall, chain proceeds. Advisory at every tier, never a
+  gate. **Read-forward is mandatory**: a hit becomes a Claim only after its full body is read
+  (`qmd get` / Read, top 1–2 hits) — a snippet is never evidence; this is the mechanical attack
+  on the measured 8% follow-through baseline `[MEM §8-class telemetry]`. A recall hit is never
+  `OBSERVED`; it upgrades from `ASSUMED` to `INFERRED` only once the scout corroborates —
+  unchanged from DEC-016. Freshness: a session-start `qmd update` hook keeps the BM25 lane
+  current (qmd has no watch mode; `qmd embed` is a separate warm-only policy `[FED §1]`).
+- **Why:** the user's two reasons hold under scrutiny. (1) *No second store to maintain* — and no
+  second content pipeline: the v2-era global capture stack (session hooks, bm-curator) is being
+  retired, so the store v3 would bet on is freezing regardless. (2) *One writer per store* — the
+  double-write burden lived in the global setup, not in v3's routing, but the coherence principle
+  is right and v3 now embodies it. The telemetry killed the governed write path's warrant: 5.4%
+  session touch, 8% recall follow-through, 2:1 write:read sink — a store that is mostly ceremony.
+  DEC-022 §5's own falsifier ("if 03-debate recall never pre-answers a repeat blocker class, the
+  write path is ceremony — drop the basic-memory half and keep the doc append") is exercised
+  **early, on evidence**, instead of awaiting S3–S7. Prior art converged on exactly this shape:
+  sources stay normal files, the index is a disposable cache, and no major harness ships memory
+  search natively — the gap is filled by thin overlays `[FED §3]`; benchmarks favor
+  files+full-reads over curated stores (LoCoMo 74.0 vs 68.5; LongMemEval-V2 72.5 vs 48.5,
+  suggestive external validity `[FED §3]`).
+- **Alternatives:** ~~E — keep `~/basic-memory` as the governed global *write* target (the
+  judge's 9.1/10 winner)~~ — declined by the user: it preserves a store whose content pipeline is
+  being retired and keeps x-skills in the memory-writing business. Recorded as the **reversal
+  path**: the folder is still on disk, so E is one falsifier away (below). ~~D — keep the MCP and
+  add the engine~~ — strictly dominated: two unreconciled search systems over the same corpus
+  (6.2/10). ~~A — status quo~~ — sound but leaves `docs/` and native memory unsearchable and the
+  8% follow-through unfixed (6.0/10). ~~B-strict with native-memory writes~~ — curation
+  collision on a substrate with 6+ format changes Mar–Jul 2026 and a deletion bug until v2.1.228
+  (3.0/10) `[FED §2][FED §4]`.
+- **Consequences:** DEC-016 is superseded in part (its block records what survives); DEC-022 §5
+  loses its basic-memory branch (doc append only). The S2 build loses the stub-write, the
+  RED→GREEN persist, the write-time overlap lint, and the slug-normalizer port — a net deletion.
+  CapabilityManifest: `mcp.basic_memory` pin removed, `tool.qmd : bool` added. Claim pointer:
+  `memory://` retired for new claims, replaced by `recall:<path>#<line>`; **legacy `memory://`
+  citations in existing docs keep resolving** — 1,157/1,157 legacy notes carry `permalink:`
+  frontmatter, greppable without the MCP `[FED §4]`. S6 sweep extends: no `mcp__basic-memory`
+  reference in shipped skills (baseline 2026-08-14: **66 hits across 27 tracked files**, incl.
+  x-do/x-team/x-mindful Memory Reflex beats and `x-shared/mcp-toolbox.md`). qmd shim pins the
+  npm build (v2.5.3; main is ~2.5 months ahead — CLI churn risk), defaults `QMD_FORCE_CPU` on
+  Metal-affected hardware, and prefers stdio-per-session over the shared HTTP daemon `[FED §1]`.
+- **Accepted risks, each with a falsifier and owner:** (1) **Ambient-capture dependence** — a
+  transferable invariant now persists only if Claude's native memory happens to keep it (or a
+  human records it in some repo's `docs/`). Falsifier: an S3–S7 run re-derives an invariant that
+  a prior run's transcript demonstrably surfaced but no indexed root retained → reinstate the
+  minimal global append-only folder (alternative E) — owner: S7 `metrics.md`. (2) **Substrate
+  drift** — `--bare` becoming the `-p` default would blind headless runs to native memory reads;
+  layout churn can break the index root. Falsifier: any Claude Code release breaking a root →
+  re-pin roots, drop the affected root to best-effort — owner: the shim's absence probe.
+  (3) **Engine health** — qmd bus factor ≈1. The `rg` tier is the insurance; the corpus is plain
+  markdown, so **the folder outlives any engine choice** — the deepest reason the drop is safe.
 - **Status:** accepted
 

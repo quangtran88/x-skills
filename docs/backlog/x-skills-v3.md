@@ -5,27 +5,30 @@ type: refactor
 status: ready
 created: 2026-07-27
 updated: 2026-08-14
-related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit, v3-qa-escalation, v2-skill-reuse-audit, v3-memory-store-research]
+related: [x-skills-v3-decisions, x-skills-v3-foundations, v3-round4-audit, v3-qa-escalation, v2-skill-reuse-audit, v3-memory-store-research, v3-federated-memory-research]
 ---
 
 # x-skills v3 — consult / record / implement
 
 Collapse 18 plugin skills into **4 new + 9 kept**, with zero runtime dependency on
 `obra/superpowers` or `yeachan-heo/oh-my-claudecode` — and **zero plugin dependencies**
-(DEC-026). Two MCP dependencies are kept deliberately — basic-memory (re-verified against the
-2026 field and builtin memory, `[MEM]`) and gitnexus — plus two
+(DEC-026). One MCP dependency is kept deliberately — gitnexus; **basic-memory was dropped
+entirely by DEC-028** after two adversarial research rounds `[MEM]`/`[FED]`, replaced by a
+federated read-only recall index (optional `qmd` engine, `rg` fallback) over the legacy store,
+repo `docs/`, and native memory. Alongside sit two
 optional user-supplied CLI backends driven directly, `codex` and `opencode`:
 **codex → opencode → same-model is v3's cross-model chain** (DEC-024/025/026), with a
 user-configurable reviewer roster that x-review dispatches in parallel (DEC-027).
 
 **This doc is the human review surface. Read it end to end.** It carries the problem statement, the
 disposition of every v2 skill, the contracts, the build order and the acceptance list. The
-twenty-seven decisions and their warrants live in
+twenty-eight decisions and their warrants live in
 **[`x-skills-v3-decisions.md`](x-skills-v3-decisions.md)** — read a block before changing what it
 decided. Facts and citations live in `../research/`: `[FOUND]` =
 `2026-07-27-x-skills-v3-foundations.md`, `[OSS]` = `2026-07-28-oss-skill-framework-survey.md`,
 `[R4]` = `2026-07-28-v3-round4-audit.md`, `[R5]` = `2026-07-29-v3-qa-escalation.md`,
-`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`, `[MEM]` = `2026-08-13-v3-memory-store-research.md`.
+`[R6]` = `2026-07-30-v2-skill-reuse-audit.md`, `[MEM]` = `2026-08-13-v3-memory-store-research.md`,
+`[FED]` = `2026-08-14-v3-federated-memory-research.md`.
 
 **Six audit/research rounds.** R1 established the design; **R2** falsified much of it and added DEC-014/015;
 **R3** surveyed eight OSS skill frameworks, changed the dependency scope to keep basic-memory and
@@ -54,7 +57,13 @@ DEC-016's keep from outside: builtin Claude Code memory refuted for cross-repo r
 scope, no supported sharing), the 2026 OSS field refuted on shape (its growth pattern is
 auto-capture into databases — DEC-016's named anti-pattern), and basic-memory confirmed healthy —
 kept with pin-era query rules, a formalized flat-store fallback and a gated v0.23 upgrade
-(DEC-016 as amended) `[MEM]`.
+(DEC-016 as amended) `[MEM]`. The **2026-08-14 federated-memory round** reversed that keep on
+the user's direction and new evidence — live telemetry (5.4% session touch, 8% recall
+follow-through, write-sink behavior) plus a second 8-agent adversarial workflow: basic-memory
+is **dropped entirely**, x-skills writes no memory store (the `docs/` append is the chain's
+only durable write), and recall re-founds on a federated read-only index — optional `tool.qmd`
+(verified adoptable, MIT, fully local) over the legacy `~/basic-memory` corpus + repo `docs/` +
+native memory dirs, `rg` fallback, mandatory read-forward (DEC-028) `[FED]`.
 
 ## Context & Problem
 
@@ -107,7 +116,7 @@ it is not a substitute for reading a block before changing what it decided.
 | DEC-013 | Delete, don't port (~2,200–2,400 bootstrap lines) | Lines the model reads at bootstrap and cannot act on |
 | DEC-014 | Interview-review dispatch, **unioned** not reconciled | A second independent reader roughly doubles yield at ~26–29% overlap |
 | DEC-015 | Cross-model for exactly two roles, capability-gated | Critic *strength* is the active ingredient; also the monomethod fix |
-| DEC-016 | basic-memory for **cross-repo transferables only** | The one job `docs/` structurally cannot do; ungoverned stores measure worse than none |
+| DEC-016 | basic-memory for **cross-repo transferables only** *(superseded in part by DEC-028)* | The one job `docs/` structurally cannot do; ungoverned stores measure worse than none |
 | DEC-017 | gitnexus is **advisory, never a gate**; three deterministic states | 1.4% own-coverage and 7/8 repos stale make a freshness gate decorative |
 | DEC-018 | Every ingested payload is fenced as untrusted data | DEC-011 removed the human who would have noticed a poisoned instruction |
 | DEC-019 | Every enforcement script is wired and self-tested, or it does not ship | The corpus's dominant failure; this repo has already built two nobody runs |
@@ -119,6 +128,7 @@ it is not a substitute for reading a block before changing what it decided.
 | DEC-025 | agy removed entirely; **codex → same-model** is the only chain | User-directed; deletes the second bespoke binary and cancels the envelope harvest |
 | DEC-026 | Zero plugin dependencies; thin `x-delegate` drives both CLIs | One envelope for both channels; the plugin field is unofficial, tiny or stale |
 | DEC-027 | Reviewer roster is user config; x-review runs all lanes in parallel | Third-family coverage at config cost; kills the hardcoded-roster churn class |
+| DEC-028 | basic-memory dropped entirely; recall = federated read-only index (qmd → rg) | User-directed on live telemetry; one writer per store; x-skills writes no memory store |
 
 ## Contracts
 
@@ -151,13 +161,17 @@ TerminalEmit                        # first token, derived — never model-compo
 Claim
   grade   : OBSERVED | INFERRED | ASSUMED
   pointer : file:line | command+output | commit-sha | doc-anchor | user-utterance-span
-          | memory://<permalink>     # DEC-016 — never OBSERVED; INFERRED only once scouted
-  # pointer form routes the store (DEC-016):
-  #   file:line | commit-sha | doc-anchor | repo-bound command+output   -> docs/
-  #   repo-INDEPENDENT invariant (incl. command+output that survives a checkout) -> basic-memory
-  #   user-utterance-span -> the consult artifact itself; MEMORY.md is never written by x-skills
-  #   mcp.basic_memory absent -> rg/Read/Write over ~/basic-memory, file-path citations
-  #     (DEC-016 as amended [MEM §7] — possible because the store is file-first markdown)
+          | recall:<path>#<line>     # DEC-028 — federated recall hit; never OBSERVED;
+                                     #   INFERRED only once the scout corroborates
+  # pointer form routes the store (DEC-016 as superseded by DEC-028):
+  #   file:line | commit-sha | doc-anchor | ANY command+output -> docs/ — the chain's ONLY
+  #     durable write; no v3 skill writes any memory store (one writer per store)
+  #   user-utterance-span -> the consult artifact itself; MEMORY.md stays Claude's alone
+  #   recall is federated + READ-ONLY: qmd over ~/basic-memory (legacy, frozen) + repo docs/ +
+  #     native memory dirs; read-forward mandatory (full body of top 1-2 hits before a hit
+  #     becomes a Claim); tool.qmd absent -> rg over the same roots; both absent -> no recall
+  #   legacy memory://<permalink> citations in existing docs resolve via the notes'
+  #     permalink: frontmatter (grep/qmd) — the form is retired for NEW claims (DEC-028)
 
 SlotRow
   name     : string
@@ -213,6 +227,8 @@ CapabilityManifest                  # additions only; schema lives in capability
   mcp.gitnexus  : { pinned, indexed, fresh, commitsBehind, ownCoverage }   # DEC-017
   tool.codex    : bool              # DEC-024/026 — binary-only pins; no plugin pin exists
   tool.opencode : bool              # DEC-026
+  tool.qmd      : bool              # DEC-028 — optional federated recall engine; rg fallback;
+                                    #   mcp.basic_memory pin REMOVED (no skill may reference it)
   roster        : models.json       # user file, project override wins (DEC-027)
 ```
 
@@ -356,11 +372,11 @@ Slices in order. **No slice starts before its predecessor's checkpoint passes.**
 |---|---|---|
 | S0 | `emit-contract.md` + `validate-emit.sh` | 3 good / 5 bad emits (missing status token, composed status, OBSERVED claim with no pointer, BLOCKED without a Question, code-level identifier in a question/option — DEC-022) → correct verdict on all 8; `--selftest` hard-fails; wired to `npm run check` and a deliberately-broken run goes red (DEC-019) |
 | S1 | x-consult Tier 0 ANSWER, end to end | Real read-only question about this repo → derived status, every claim pointered, terminates without offering implementation |
-| S2 | x-consult Tier 2 + x-record backlog doc + DEC-014 review | Doc lands at immutable path with `DEC-`/`AC-` IDs, a Structure Outline section, an acceptance-examples block and a per-phase verification list; **overlap rate written to `metrics.md`** with `reviewer:` recorded; basic-memory write-time overlap lint rejects a >40-word restatement; validator passes |
+| S2 | x-consult Tier 2 + x-record backlog doc + DEC-014 review | Doc lands at immutable path with `DEC-`/`AC-` IDs, a Structure Outline section, an acceptance-examples block and a per-phase verification list; **overlap rate written to `metrics.md`** with `reviewer:` recorded; validator passes (the basic-memory write-time lint died with the write path — DEC-028) |
 | S3 | x-implement on that doc, serial slices + gitnexus lane | Every gate prints command + exit code; status derived; the **backlog doc's** verification list extends the floor cascade; sha256 freeze fires; N/A rows print their reason; a code-touching slice with zero runnable gates derives NEEDS-INPUT, never DONE (SCOPE-GATE discriminator exempts docs-only/only-reads, printed) `[R6 §4.2]`; stub scan labelled over 10 real diffs; gitnexus prints `commitsBehind` when stale and prints the skip when it withholds |
 | S4 | prod-bug manifest + intent-blind scout | Every dispatch prompt lands in `dispatch/` **before** dispatch; the lint finds no pre-judging phrase and no hypothesis marker in the `02-scout` prompt; research doc is fact-only |
 | S5 | Tier 3 full chain + plan doc + `lint-plan.sh` | A plan with a phase naming no end-to-end validation is rejected; one missing a per-phase success criterion, exact file paths or an out-of-scope statement is rejected; a fully-validated plan passes |
-| S6 | Cutover — delete + harvest per the Disposition table, **scrub/rewrite the 9 kept skills** | `git grep -l 'superpowers:\|oh-my-claudecode:' -- skills/ \| wc -l` → 0 **including x-qa, x-api-pentest and x-review**; the dead-name sweep (`git grep -nE 'x-(do\|bugfix\|verify\|research\|backlog\|mindful\|omo\|gemini\|team)'` over the 9 kept dirs, `.json`/`.sh` included) → 0, from a 95-hit/33-file baseline `[R6 §1]`; `lint-chain.sh` green on the whole tree; bootstrap line count down ≥1,500; DEC-020 trigger eval passes at ≥0.5; the agy sweep → 0 from a 61-hit/21-file baseline (DEC-025); a fresh `bin/setup` run succeeds with neither omo-agent nor agy-agent present (DEC-024/025); x-delegate ships thin (`disable-model-invocation: true`, `lint-chain.sh` green) and one x-review run on a 3-entry roster launches every lane in parallel with per-lane `reviewer:` recorded (DEC-026/027) |
+| S6 | Cutover — delete + harvest per the Disposition table, **scrub/rewrite the 9 kept skills** | `git grep -l 'superpowers:\|oh-my-claudecode:' -- skills/ \| wc -l` → 0 **including x-qa, x-api-pentest and x-review**; the dead-name sweep (`git grep -nE 'x-(do\|bugfix\|verify\|research\|backlog\|mindful\|omo\|gemini\|team)'` over the 9 kept dirs, `.json`/`.sh` included) → 0, from a 95-hit/33-file baseline `[R6 §1]`; `lint-chain.sh` green on the whole tree; bootstrap line count down ≥1,500; DEC-020 trigger eval passes at ≥0.5; the agy sweep → 0 from a 61-hit/21-file baseline (DEC-025); a fresh `bin/setup` run succeeds with neither omo-agent nor agy-agent present (DEC-024/025); x-delegate ships thin (`disable-model-invocation: true`, `lint-chain.sh` green) and one x-review run on a 3-entry roster launches every lane in parallel with per-lane `reviewer:` recorded (DEC-026/027); the basic-memory sweep → 0 (no `mcp__basic-memory` reference in shipped skills, from a 66-hit/27-file baseline 2026-08-14 — DEC-028) |
 | S7 | Wire the QA chain into kept x-qa (DEC-021) + mid-run decision recording (DEC-022) | One real chained run: x-implement DONE derives `chain{x-qa}`; acceptance examples arrive as `severity: required` obligations and the coverage gate **arms on the branch/pr path**; `QA_VERDICT=fail` re-enters as `FAILED-GATE{gate: qa}`; a pass appends verdict + coverage counters to the backlog doc; one reversible decision self-decided with a `Decision:` line, one costly decision emitting NEEDS-INPUT whose options carry implications at human altitude; the fail edge re-points x-qa's `/x-skills:x-bugfix` offers to x-implement's prod-bug intake and the machine-caller identity to the chain (DEC-021 as amended); the runner lane dispatches via DEC-024's canonical invocation, same-model when codex is absent (DEC-025) |
 
 ## Scope & Non-Goals
@@ -415,12 +431,15 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
       manual free-form option last; re-running setup rescans and re-seeds `models.json` after a
       timestamped `.bak`. A roster entry absent from the last discovery warns and
       still runs; the inventory is never persisted into `capabilities.json` (DEC-027 as amended).
-- [ ] Recall follows DEC-016's pin-era query rules: `search_notes` queries carry ≥3 plain
-      distinctive terms or explicit `OR` (a 2-word query is pure AND with no fallback at the
-      0.22.1 pin); tag filters are never used; an empty result is treated as inconclusive and
-      retried as `rg` over `~/basic-memory` before the chain concludes "no prior knowledge".
-      When `mcp.basic_memory` is absent, recall/write degrade to native `rg`/Read/Write over the
-      store with file-path citations (DEC-016 as amended, `[MEM §5–7]`).
+- [ ] Recall is federated and READ-ONLY (DEC-028): the recall step queries qmd collections over
+      `~/basic-memory` (legacy, frozen), the current repo's `docs/`, and native memory dirs;
+      **read-forward is mandatory** — the full body of the top 1–2 hits is read (`qmd get` /
+      Read) before any hit becomes a Claim, a snippet is never evidence; headless default is
+      BM25-only (`--no-rerank`, zero models); `tool.qmd` absent → `rg` over the same roots; an
+      empty result at one tier is retried at the next before the chain concludes "no prior
+      knowledge". **No v3 skill calls any `mcp__basic-memory__*` tool or writes to any memory
+      store**; `~/basic-memory` is never written; the `docs/` append is the chain's only durable
+      write (`[FED]`).
 - [ ] `validate-emit.sh` rejects a DONE whose gate list is entirely N/A unless the run is
       SCOPE-GATE-exempt (only-reads / docs-only / no-code-tree / placeholder-test-script);
       `gates.sh` short-circuits those cases to a legitimate DONE with the printed reason
@@ -501,7 +520,7 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
   is generous *and names a destination*, fails when it is tight and names none `[OSS §5]`. Both
   halves are now fixed in DEC-009 — the budget is **per phase file**, this doc's destination is
   `docs/research/`, and the number is asserted by `wc -l` or deleted. This doc stays long because it
-  is the review surface for a 27-decision design; the phase files are what must stay small.
+  is the review surface for a 28-decision design; the phase files are what must stay small.
 - **Read before S3:** HumanLayer's `rpi` plugin v0.18.1 (16 skills) — **not** the pre-QRSPI
   `create_plan.md` set, which prescribes the exact horizontal ordering DEC-010 bans `[FOUND §6]`.
   Cite behaviour; do not vendor text (All Rights Reserved). The `implementer-agent` prompt — the
@@ -511,9 +530,13 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
 - **Assumed — gitnexus earns its place.** Measured own-coverage is 1.4% and 7 of 8 repos are stale,
   so both lanes are near-dead exactly where DEC-017 gates them in. Falsifier: 10 x-implement slices
   in a real code repo with zero `impact` calls that beat `Grep` → cut it to a human-invoked tool.
-- **Assumed — the basic-memory durability gate binds.** It is already being ignored in the live
-  store (a green-run note the contract bans; ~18 session notes). DEC-016 replaces model discretion
-  with a derived precondition. Falsifier: >1 non-durable note in 6 across S1–S6.
+- **Retired 2026-08-14 (DEC-028) — the basic-memory durability gate.** The gate died with the
+  write path: x-skills writes no memory store, so there is no write for the precondition to
+  govern. Its successor risk is **ambient-capture dependence** — a transferable invariant now
+  persists only if Claude's native memory keeps it or a human records it in some repo's `docs/`.
+  Falsifier (owner: S7 `metrics.md`): an S3–S7 run re-derives an invariant a prior run's
+  transcript demonstrably surfaced but no indexed root retained → reinstate the minimal global
+  append-only folder (`[FED §4]`, alternative E).
 - **Resolved 2026-07-28 — recall placement.** Round 3 logged this as open pending a falsifier;
   round 4 found DEC-004's evidence contradicts the old placement outright, so recall **moved to
   `03-debate`, after the scout**. No experiment was needed to decide a question the cited evidence
