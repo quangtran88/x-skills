@@ -1367,5 +1367,24 @@ present (DEC-009). IDs keep resolving.
   detached), collections `xs-docs-<slug>`/`xs-mem-<slug>`, and the `metrics.md` recall
   follow-through row — the successor instrument to the 8% baseline and the feeder for both this
   block's ambient-capture falsifier and DEC-022's ceremony falsifier over recall points.
+- **Amended 2026-08-15 (same session, user-directed): native-root derivation is
+  worktree-aware.** Claude Code keys native memory off the session *cwd path*, not the git repo
+  — verified on the author's machine: 100+ path-keyed dirs under `~/.claude/projects/`, dozens
+  of worktree slugs among them (`wt`'s `{{repo}}.{{branch}}` siblings, `--claude-worktrees-*`
+  agent trees), and **all 18 memory-bearing dirs sit at canonical checkout paths, zero at
+  worktree slugs**. Without a fix, a session in a linked worktree derives a different slug and
+  recall goes blind to the repo's memory by construction. The shim therefore resolves the repo
+  identity as the **canonical root** — the parent of
+  `git rev-parse --path-format=absolute --git-common-dir` (the checkout itself in the main
+  tree, the main checkout's path from any worktree) — so **every worktree queries the same
+  parent memory**; the cwd-derived dir is unioned when distinct and present (a worktree
+  session's own curation stays visible; the probe finds nothing today — near-free insurance).
+  The `docs/` root deliberately does NOT canonicalize: it stays the session's own tree, because
+  worktree branches diverge and the canonical checkout may sit on another branch — so qmd
+  collections (`xs-docs`/`xs-mem`, keyed by the canonical slug) register only from the
+  canonical checkout, a worktree session serves its docs tier via `rg` over its own tree, and
+  `xs-mem-<canonical-slug>` is path-stable and shared. Write-side unification across worktrees
+  stays user config (`autoMemoryDirectory`), never set by the plugin — reads are the plugin's
+  half, per this block's one-writer rule. S2 gains the linked-worktree fixture.
 - **Status:** accepted
 

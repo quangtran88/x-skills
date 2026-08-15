@@ -327,7 +327,8 @@ whole ladder; no reformulation loops; terms are 2–5 content-bearing nouns from
 decision's slots — never the bare repo or skill name, never the request as a sentence.
 `QMD_FORCE_CPU=1` exported on darwin/arm64 (#735); CLI/stdio only — the HTTP MCP is banned from
 the chain (#762; 9+ parallel sessions). DEC-019 in full at S2: fixtures (live hit, dead hit,
-no-roots, qmd-failure→rg, PATH-stripped rg proof) + `--selftest` wired to `npm run check`.
+no-roots, qmd-failure→rg, PATH-stripped rg proof, linked-worktree canonical-root resolution) +
+`--selftest` wired to `npm run check`.
 
 **Read-forward + promotion.** Before any hit informs a verdict, Question, or Claim, the full
 body of the top 1–2 hits is read; a snippet is never evidence. A used hit enters as
@@ -352,19 +353,34 @@ falsifier (owner: S7).
 
 ### Lifecycle
 
-Roots derive per invocation from the project root (same order as `inject-capabilities.sh`):
-`<root>/docs/` if present; native memory via `autoMemoryDirectory` (nearest settings scope) else
-the path-encoded `~/.claude/projects/<slug>/memory/` candidate — `[[ -d ]]` verified, absent ⇒
-silently dropped, never an error. No glob over `~/.claude/projects/*/` (cross-project noise is
-the measured failure; widening the root needs a DEC-028 amendment, not a phase edit). Drift
+Roots derive per invocation, **worktree-aware** — Claude Code keys native memory off the session
+*cwd path*, not the git repo (verified 2026-08-15 on the author's machine: 100+ path-keyed
+project dirs, dozens of worktree slugs among them; **all 18 memory-bearing dirs sit at canonical
+checkout paths, zero at worktree slugs**), so the repo identity is the **canonical root**: the
+parent of `git rev-parse --path-format=absolute --git-common-dir` — identical to cwd in the main
+checkout, the main checkout's path from any linked worktree. Every worktree of a repo therefore
+queries the **same parent memory**. Per root: `docs/` = the session's **own** tree if present
+(branch truth — the canonical checkout may sit on another branch); native memory via
+`autoMemoryDirectory` (nearest settings scope) else the path-encoded
+`~/.claude/projects/<canonical-slug>/memory/`, **plus** the cwd-derived dir when distinct and
+present (a worktree session's own curation stays visible; today that probe finds nothing —
+evidence above). Every candidate is `[[ -d ]]` verified, absent ⇒ silently dropped, never an
+error. No glob over `~/.claude/projects/*/` (cross-project noise is the measured failure;
+widening past canonical + cwd needs a DEC-028 amendment, not a phase edit). Write-side
+unification across worktrees is the user's own `autoMemoryDirectory` config — § Store routing
+may name it; no skill sets it. Drift
 posture (risk 2): the native dir is an opaque directory of markdown — the shim recurses `*.md`
 and parses nothing; MEMORY.md structure, caps and `memory/team/` semantics are never assumed, so
 a seventh format churn changes ranking at worst. No user-specific path appears anywhere;
 personal corpora are user-side qmd collections the shim never queries. **Setup (S3):**
 `bin/setup` probes `command -v qmd` + version against the 2.5.3 npm pin — mismatch warns, never
 gates (the rg floor makes a version gate ceremony); absent prints the install line. Collections
-`xs-docs-<slug>` / `xs-mem-<slug>` (one slug derivation serves both) are registered lazily and
-idempotently by the shim on first use per repo, with one bounded initial `qmd update`. Embed is
+`xs-docs-<slug>` / `xs-mem-<slug>` (slug = the **canonical** slug; one derivation serves both)
+are registered lazily and idempotently by the shim on first use per repo, with one bounded
+initial `qmd update` — and only from the canonical checkout: in a linked worktree
+(cwd ≠ canonical root) the docs tier serves via `rg` over the session's own `docs/` (no
+per-worktree collections — ephemeral trees would leak stale registrations), while
+`xs-mem-<canonical-slug>` is path-stable and shared by every worktree. Embed is
 user opt-in at setup only: default decline = BM25-only forever, zero downloads; accept prints
 ~2GB + the #897 caveat, runs `qmd embed` interactively — no hook or skill ever runs it — and
 records `tool.qmd_hybrid`. **Freshness:** new SessionStart hook `hooks/refresh-recall-index.sh`
@@ -537,8 +553,10 @@ skills/
                                     #   directory anywhere (DEC-028 risk 1)
   bin/recall                        # NEW — DEC-028 ladder shim: search/get/update; tier walk +
                                     #   empty-tier retry machine-derived (exit 0/3/4); rg fallback;
-                                    #   QMD_FORCE_CPU on darwin/arm64; lazy idempotent collection
-                                    #   registration; fixtures + --selftest on npm run check (DEC-019)
+                                    #   worktree-aware canonical-root derivation (git common dir —
+                                    #   all worktrees query the same parent memory); QMD_FORCE_CPU
+                                    #   on darwin/arm64; lazy idempotent collection registration;
+                                    #   fixtures + --selftest on npm run check (DEC-019)
   hooks/refresh-recall-index.sh     # NEW — SessionStart freshness: tool.qmd gate, 300s window,
                                     #   flock, detached qmd update (DEC-028)
   x-omo/ x-gemini/ x-team/          # DELETED as bootstrap deps (DEC-013), after harvest —
@@ -555,7 +573,7 @@ Slices in order. **No slice starts before its predecessor's checkpoint passes.**
 |---|---|---|
 | S0 | `emit-contract.md` + `validate-emit.sh` | 3 good / 5 bad emits (missing status token, composed status, OBSERVED claim with no pointer, BLOCKED without a Question, code-level identifier in a question/option — DEC-022) → correct verdict on all 8; `--selftest` hard-fails; wired to `npm run check` and a deliberately-broken run goes red (DEC-019); the DEC-018 sanitizer fixtures include a poisoned recall body — a planted directive surfaces as a pointered finding, never an executed instruction — and the recall fence form lands in `emit-contract.md` (DEC-028) |
 | S1 | x-consult Tier 0 ANSWER, end to end | Real read-only question about this repo → derived status, every claim pointered, terminates without offering implementation |
-| S2 | x-consult Tier 2 + x-record backlog doc + DEC-014 review | Doc lands at immutable path with `DEC-`/`AC-` IDs, a Structure Outline section, an acceptance-examples block and a per-phase verification list; **overlap rate written to `metrics.md`** with `reviewer:` recorded; validator passes (the basic-memory write-time lint died with the write path — DEC-028); `bin/recall` ships (fixtures incl. the PATH-stripped rg-tier proof; `--selftest` wired to `npm run check`; the deliberately-broken run goes red — DEC-019); one real `03-debate` recall over this repo's `docs/` prints its tier, evidences read-forward (a full-body read precedes any `recall:` claim) and writes the follow-through row to `metrics.md`; `validate-emit.sh` rejects a doctored `filesWritten[]` naming a native-memory path and a recall block whose hits carry an empty `read:` list; one x-record collision→read-forward→AMEND cycle demonstrated with no ritual dedup search run (DEC-028) |
+| S2 | x-consult Tier 2 + x-record backlog doc + DEC-014 review | Doc lands at immutable path with `DEC-`/`AC-` IDs, a Structure Outline section, an acceptance-examples block and a per-phase verification list; **overlap rate written to `metrics.md`** with `reviewer:` recorded; validator passes (the basic-memory write-time lint died with the write path — DEC-028); `bin/recall` ships (fixtures incl. the PATH-stripped rg-tier proof and the linked-worktree fixture — the canonical native root resolves via the git common dir; `--selftest` wired to `npm run check`; the deliberately-broken run goes red — DEC-019); one real `03-debate` recall over this repo's `docs/` prints its tier, evidences read-forward (a full-body read precedes any `recall:` claim) and writes the follow-through row to `metrics.md`; `validate-emit.sh` rejects a doctored `filesWritten[]` naming a native-memory path and a recall block whose hits carry an empty `read:` list; one x-record collision→read-forward→AMEND cycle demonstrated with no ritual dedup search run (DEC-028) |
 | S3 | x-implement on that doc, serial slices + gitnexus lane | Every gate prints command + exit code; status derived; the **backlog doc's** verification list extends the floor cascade; sha256 freeze fires; N/A rows print their reason; a code-touching slice with zero runnable gates derives NEEDS-INPUT, never DONE (SCOPE-GATE discriminator exempts docs-only/only-reads, printed) `[R6 §4.2]`; stub scan labelled over 10 real diffs; gitnexus prints `commitsBehind` when stale and prints the skip when it withholds; `bin/setup` probes `tool.qmd` (npm pin 2.5.3 — mismatch warns, never gates) and the embed opt-in records `tool.qmd_hybrid`; `hooks/refresh-recall-index.sh` lands (pin gate, 300s window, flock, detached update) with foreground cost <100ms asserted in all exit branches; one qmd-pinned recall prints which tier answered; one dead-hit run demonstrates drop → single bounded re-update → rg backstop (DEC-028) |
 | S4 | prod-bug manifest + intent-blind scout | Every dispatch prompt lands in `dispatch/` **before** dispatch; the lint finds no pre-judging phrase and no hypothesis marker in the `02-scout` prompt; research doc is fact-only |
 | S5 | Tier 3 full chain + plan doc + `lint-plan.sh` | A plan with a phase naming no end-to-end validation is rejected; one missing a per-phase success criterion, exact file paths or an out-of-scope statement is rejected; a fully-validated plan passes |
@@ -628,7 +646,11 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
       `bin/recall`, whose tier walk and empty-tier retry are machine-derived (exit codes 0/3/4);
       the normative text lives once in `x-shared/mcp-toolbox.md § Federated Recall`, phase files
       carrying only the step list + when-clause pointer; recall output reaches neither the
-      intent-blind scout (structural — it runs after) nor any review payload (DEC-014).
+      intent-blind scout (structural — it runs after) nor any review payload (DEC-014). Root
+      derivation is **worktree-aware**: a session in a linked worktree resolves the canonical
+      checkout's native memory dir (parent of the absolute git common dir) so every worktree
+      queries the same parent memory, while the `docs/` root stays the session's own tree —
+      verified against the linked-worktree fixture (DEC-028 as amended 2026-08-15).
 - [ ] Any recall body forwarded into a dispatched prompt is fenced per `emit-contract.md`'s
       DEC-018 sanitizer — BEGIN/END UNTRUSTED RECALL markers naming the `recall:<path>#<line>`
       source, control-strip except `\n\t`, ≤4,000-char excerpt, override-line strip; the
