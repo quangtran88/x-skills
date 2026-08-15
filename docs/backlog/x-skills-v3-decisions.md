@@ -785,8 +785,9 @@ present (DEC-009). IDs keep resolving.
   exercised this DEC's and DEC-022's ceremony falsifiers early `[FED §4]`. **What survives:** the
   `docs/`-vs-memory routing division (repo-bound facts → `docs/`), the never-write-native-memory
   rule (generalized: x-skills writes no memory store at all), the ASSUMED-grade/corroborate-to-
-  INFERRED treatment of recall hits, and the store's data — `~/basic-memory` remains on disk as a
-  read-only legacy corpus that DEC-028's federated index still searches.
+  INFERRED treatment of recall hits, and the store's data — `~/basic-memory` remains on disk as
+  the author's personal data, **out of plugin scope entirely** (DEC-028 as amended: not even an
+  indexed root — a distributed plugin carries no user-specific path).
 - **Status:** superseded in part by DEC-028 (was: accepted)
 
 ### DEC-017 — gitnexus is advisory, never a gate
@@ -1336,5 +1337,15 @@ present (DEC-009). IDs keep resolving.
   re-pin roots, drop the affected root to best-effort — owner: the shim's absence probe.
   (3) **Engine health** — qmd bus factor ≈1. The `rg` tier is the insurance; the corpus is plain
   markdown, so **the folder outlives any engine choice** — the deepest reason the drop is safe.
+- **Amended 2026-08-14 (same session, user-directed): the legacy-corpus root is removed.**
+  Recall roots are **repo `docs/` + native memory dirs only**. `~/basic-memory` is the author's
+  personal store, and x-skills ships to other users — a path in one user's home directory must
+  never appear in the plugin's recall contract. Personal corpora are user-side qmd collections
+  (config, not spec). Re-scoped consequences: the legacy `memory://`-resolution clause is
+  dropped (no shipped skill emits or resolves the form — a consumer machine has no store to
+  resolve it against); risk (1)'s reversal path becomes a minimal **plugin-owned** folder (e.g.
+  `~/.config/x-skills/memory/`), created only if the falsifier fires; risk (3)'s "folder"
+  argument now applies to whatever sources exist on the consumer's machine, not to any specific
+  store.
 - **Status:** accepted
 

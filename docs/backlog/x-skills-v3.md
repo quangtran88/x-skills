@@ -14,8 +14,8 @@ Collapse 18 plugin skills into **4 new + 9 kept**, with zero runtime dependency 
 `obra/superpowers` or `yeachan-heo/oh-my-claudecode` — and **zero plugin dependencies**
 (DEC-026). One MCP dependency is kept deliberately — gitnexus; **basic-memory was dropped
 entirely by DEC-028** after two adversarial research rounds `[MEM]`/`[FED]`, replaced by a
-federated read-only recall index (optional `qmd` engine, `rg` fallback) over the legacy store,
-repo `docs/`, and native memory. Alongside sit two
+federated read-only recall index (optional `qmd` engine, `rg` fallback) over repo `docs/` and
+native memory. Alongside sit two
 optional user-supplied CLI backends driven directly, `codex` and `opencode`:
 **codex → opencode → same-model is v3's cross-model chain** (DEC-024/025/026), with a
 user-configurable reviewer roster that x-review dispatches in parallel (DEC-027).
@@ -62,8 +62,10 @@ the user's direction and new evidence — live telemetry (5.4% session touch, 8%
 follow-through, write-sink behavior) plus a second 8-agent adversarial workflow: basic-memory
 is **dropped entirely**, x-skills writes no memory store (the `docs/` append is the chain's
 only durable write), and recall re-founds on a federated read-only index — optional `tool.qmd`
-(verified adoptable, MIT, fully local) over the legacy `~/basic-memory` corpus + repo `docs/` +
-native memory dirs, `rg` fallback, mandatory read-forward (DEC-028) `[FED]`.
+(verified adoptable, MIT, fully local) over repo `docs/` + native memory dirs, `rg` fallback,
+mandatory read-forward (DEC-028) `[FED]`; a same-day amendment removed the author's personal
+`~/basic-memory` from the roots — a distributed plugin carries no user-specific path in its
+recall contract, and personal corpora are user-side qmd collections.
 
 ## Context & Problem
 
@@ -167,11 +169,12 @@ Claim
   #   file:line | commit-sha | doc-anchor | ANY command+output -> docs/ — the chain's ONLY
   #     durable write; no v3 skill writes any memory store (one writer per store)
   #   user-utterance-span -> the consult artifact itself; MEMORY.md stays Claude's alone
-  #   recall is federated + READ-ONLY: qmd over ~/basic-memory (legacy, frozen) + repo docs/ +
-  #     native memory dirs; read-forward mandatory (full body of top 1-2 hits before a hit
-  #     becomes a Claim); tool.qmd absent -> rg over the same roots; both absent -> no recall
-  #   legacy memory://<permalink> citations in existing docs resolve via the notes'
-  #     permalink: frontmatter (grep/qmd) — the form is retired for NEW claims (DEC-028)
+  #   recall is federated + READ-ONLY: qmd over repo docs/ + native memory dirs; read-forward
+  #     mandatory (full body of top 1-2 hits before a hit becomes a Claim); tool.qmd absent ->
+  #     rg over the same roots; both absent -> no recall. Users MAY add personal corpora as
+  #     qmd collections (user config) — never spec'd roots: no user-specific path appears in
+  #     this contract (DEC-028 as amended)
+  #   memory://<permalink> is retired (DEC-028); no shipped skill emits or resolves it
 
 SlotRow
   name     : string
@@ -431,15 +434,15 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
       manual free-form option last; re-running setup rescans and re-seeds `models.json` after a
       timestamped `.bak`. A roster entry absent from the last discovery warns and
       still runs; the inventory is never persisted into `capabilities.json` (DEC-027 as amended).
-- [ ] Recall is federated and READ-ONLY (DEC-028): the recall step queries qmd collections over
-      `~/basic-memory` (legacy, frozen), the current repo's `docs/`, and native memory dirs;
+- [ ] Recall is federated and READ-ONLY (DEC-028 as amended): the recall step queries qmd
+      collections over the current repo's `docs/` and native memory dirs — **no user-specific
+      path appears in the recall contract** (personal corpora are user-side qmd config);
       **read-forward is mandatory** — the full body of the top 1–2 hits is read (`qmd get` /
       Read) before any hit becomes a Claim, a snippet is never evidence; headless default is
       BM25-only (`--no-rerank`, zero models); `tool.qmd` absent → `rg` over the same roots; an
       empty result at one tier is retried at the next before the chain concludes "no prior
       knowledge". **No v3 skill calls any `mcp__basic-memory__*` tool or writes to any memory
-      store**; `~/basic-memory` is never written; the `docs/` append is the chain's only durable
-      write (`[FED]`).
+      store**; the `docs/` append is the chain's only durable write (`[FED]`).
 - [ ] `validate-emit.sh` rejects a DONE whose gate list is entirely N/A unless the run is
       SCOPE-GATE-exempt (only-reads / docs-only / no-code-tree / placeholder-test-script);
       `gates.sh` short-circuits those cases to a legitimate DONE with the printed reason
@@ -535,8 +538,9 @@ full suite (deferred, DEC-021). Any ML on the rework tally.
   govern. Its successor risk is **ambient-capture dependence** — a transferable invariant now
   persists only if Claude's native memory keeps it or a human records it in some repo's `docs/`.
   Falsifier (owner: S7 `metrics.md`): an S3–S7 run re-derives an invariant a prior run's
-  transcript demonstrably surfaced but no indexed root retained → reinstate the minimal global
-  append-only folder (`[FED §4]`, alternative E).
+  transcript demonstrably surfaced but no indexed root retained → reinstate a minimal
+  **plugin-owned** global append-only folder (e.g. `~/.config/x-skills/memory/`) — never a
+  user's personal store (`[FED §4]`, alternative E re-scoped by DEC-028's amendment).
 - **Resolved 2026-07-28 — recall placement.** Round 3 logged this as open pending a falsifier;
   round 4 found DEC-004's evidence contradicts the old placement outright, so recall **moved to
   `03-debate`, after the scout**. No experiment was needed to decide a question the cited evidence

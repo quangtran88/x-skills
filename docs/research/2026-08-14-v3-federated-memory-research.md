@@ -111,3 +111,9 @@ no recall, chain proceeds (advisory, never a gate). Accepted risks, each with a 
 owner in the DEC: ambient-capture dependence (native memory is now the only place a transferable
 can land), substrate drift (`--bare`-default trajectory; layout churn), engine health (bus
 factor 1 — `rg` is the insurance; the folder, not the engine, is load-bearing).
+
+**Postscript (same day):** DEC-028 was amended hours after acceptance to remove the
+`~/basic-memory` legacy root from the recall contract — it is the author's personal store, and
+x-skills ships to other users; a user-specific home path must not appear in a distributed
+plugin's spec. Recall roots are repo `docs/` + native memory dirs only; personal corpora are
+user-side qmd collections (config, not spec). §5 above records the pre-amendment shape.
