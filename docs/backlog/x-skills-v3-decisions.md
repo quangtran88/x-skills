@@ -1347,5 +1347,25 @@ present (DEC-009). IDs keep resolving.
   `~/.config/x-skills/memory/`), created only if the falsifier fires; risk (3)'s "folder"
   argument now applies to whatever sources exist on the consumer's machine, not to any specific
   store.
+- **Amended 2026-08-15 (operational protocol specified — user-directed: "define instruction and
+  logic more details on how claude interact with those 2 source").** The spec gains
+  `x-skills-v3.md § Memory Interaction Protocol (DEC-028)` — the normative operational detail.
+  Two clauses of this block change with it. (1) **The native root narrows to the current repo's
+  native memory dir** — no glob over `~/.claude/projects/*/memory/`. The user had already scoped
+  the need ("per repo memory is enough for most of the usecase", 2026-08-13) and cross-project
+  noise is a measured failure of the store this decision retired; widening back is a future
+  amendment, never a phase-file edit. (2) **Corroboration generalizes from "the scout" to any
+  current-tree observation**: the scout's already-returned `file:line` facts are the canonical
+  channel, and a mechanical re-check of the recalled source (path + cited ID resolve, relied-on
+  `file:line`s re-read; native hits re-verified against the tree) also promotes ASSUMED →
+  INFERRED — never a re-dispatch of the scout with the hit in its prompt (DEC-004). The
+  protocol's operational surface, fixed here so later slices build one thing: `bin/recall`
+  shim (search/get/update, machine-derived exit 0/3/4, rg fallback), recall at exactly two
+  sites (x-consult `03-debate` ≤2 pre-registered queries; x-record's suspicion-gated
+  amend-vs-new ≤1), `tool.qmd_hybrid` manifest pin (embed is a setup-time opt-in; no hook or
+  skill ever runs `qmd embed`), `hooks/refresh-recall-index.sh` (flock-guarded, 300s window,
+  detached), collections `xs-docs-<slug>`/`xs-mem-<slug>`, and the `metrics.md` recall
+  follow-through row — the successor instrument to the 8% baseline and the feeder for both this
+  block's ambient-capture falsifier and DEC-022's ceremony falsifier over recall points.
 - **Status:** accepted
 
