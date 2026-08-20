@@ -6,7 +6,7 @@ How to invoke tools from any x-skill.
 |------|------|-------|
 | **Invoking a skill** (superpowers, oh-my-claudecode, x-*) | `Skill` tool | Never `Read` to *invoke* a skill — Skill tool loads it properly and runs its workflow |
 | **Loading a skill file as reference** (e.g., x-omo agent catalog during bootstrap) | `Read` tool | Allowed — reads the markdown for inline reference without triggering invocation |
-| **OMO agents** (explore, oracle, etc.) | `Bash` tool, timeout **600000** | Never Agent/Task tool — silently downgrades to Claude instead of using the target model |
+| **OMO agents** (explore, oracle, etc.) | `Bash` tool, timeout **600000** | Never Agent/Task tool — silently downgrades to Claude instead of using the target model. Background runs are bounded by the script-internal `OMO_TIMEOUT` (default 1800s), not the Bash timeout |
 | **OMC agents** (code-reviewer, executor, etc.) | `Agent` tool with `subagent_type` | e.g., `subagent_type="oh-my-claudecode:code-reviewer"` |
 
 ## OMO Agent Invocation

@@ -340,9 +340,11 @@ trap 'rm -f "$TMPFILE" "$CLEANFILE" "${CLEANFILE}."*; [[ -n "${MOMUS_TMP:-}" ]] 
 
 # Internal timeout (seconds). Prevents opencode from hanging indefinitely when
 # Claude Code's Bash timeout doesn't reliably kill background tasks.
-# Default 900s (15 min) — background tasks bypass the Bash tool's 600s cap,
+# Default 1800s (30 min) — background tasks bypass the Bash tool's 600s cap,
 # so the internal timeout is the effective limit for run_in_background calls.
-OMO_TIMEOUT="${OMO_TIMEOUT:-900}"
+# Slower reasoning models (deepseek-v4-pro, glm-5.3) need >900s on large diffs.
+# Override per-run: OMO_TIMEOUT=2400 omo-agent --model <id> "..."
+OMO_TIMEOUT="${OMO_TIMEOUT:-1800}"
 
 START_TIME=$(date +%s)
 echo "[omo-agent] started ${AGENT:-model} at $(date +%H:%M:%S) (timeout=${OMO_TIMEOUT}s)" >&2
