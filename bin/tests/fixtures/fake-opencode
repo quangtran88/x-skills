@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Test double for `opencode`. Enforces the part of each CLI contract that the
+# real binaries enforce, so a wrong argv fails here the way it does for real.
+#   FAKE_OC_VERSION   `--version` output (default 1.17.16; v2 prints "opencode v2.0.27")
+#   FAKE_OC_CONTRACT  1|2 — contract to speak (default: derived from the version)
+#   FAKE_OC_MODE      ok          -> `run` prints PONG, exit 0
+#                     cold:<n>    -> the first n `run`/`models` calls die with v2's
+#                                    plugin-activation error on stderr, later ones succeed
+#                     coldout:<n> -> same, with the error on stdout
+#                     noagent     -> `run` exits 1 with v2's "Agent not found" for
+#                                    the requested agent, whatever it is
+#                     nested      -> `run` starts the model, then fails on a
+#                                    different, nested agent
+#                     billedmiss  -> `run` starts the model, then reports the
+#                                    requested agent itself as not found
+#                     ansimiss    -> like billedmiss, with a colour-wrapped banner
+#                     bytemiss    -> like billedmiss: a non-UTF-8 byte, then a banner
+#                                    with a colour code between `>` and the agent
+#                     crmiss      -> like billedmiss, with a CR-prefixed CRLF banner
+#                     spacemiss   -> like billedmiss, with a multi-word agent name
+#                     billed      -> `run` starts the model, quotes the activation
+#                                    error in its answer, then exits 1
+#                     slow        -> `run` starts the model and outlives OMO_TIMEOUT
+#   FAKE_OC_NATIVE_AGENTS  space-separated agents that exist (default: every agent)
+#   FAKE_OC_BAD_MODEL      a `--model` value answered with v2's "Model unavailable"
+#   FAKE_OC_MODEL_FIRST    1 -> report the bad model before the missing agent
+#   FAKE_OC_LOG       append one line per invocation: the argv as <arg><arg>…,
+#                     so argument boundaries survive spaces
+#   FAKE_OC_STDIN     write the stdin of the last `run` here
+#   FAKE_OC_COUNT     counter file for cold:<n> / coldout:<n>
+ver="${FAKE_OC_VERSION:-1.17.16}"
+mode="${FAKE_OC_MODE:-ok}"
+contract="${FAKE_OC_CONTRACT:-}"
+if [[ -z "$contract" ]]; then
+  case "$ver" in *v2.*|2.*) contract=2 ;; *) contract=1 ;; esac
+fi
+if [[ -n "${FAKE_OC_LOG:-}" ]]; then
+  { [[ $# -gt 0 ]] && printf '<%s>' "$@"; printf '\n'; } >> "$FAKE_OC_LOG"
+fi
+
+ACTIVATION_ERR="ServiceUnavailableError: Location plugins did not finish activating"
+# v2 colours the prefix even when stderr is not a terminal (measured on 2.0.27).
+v2_error() { printf '\033[91m\033[1mError: \033[0m%s\n' "$1" >&2; }
+cold_gate() {
+  case "$mode" in cold:*|coldout:*) ;; *) return 0 ;; esac
+  local n="${mode#*:}" c=0
+  [[ -f "${FAKE_OC_COUNT:-}" ]] && c=$(cat "$FAKE_OC_COUNT")
+  c=$((c + 1)); echo "$c" > "$FAKE_OC_COUNT"
+  [[ "$c" -le "$n" ]] || return 0
+  case "$mode" in
+    coldout:*) echo "$ACTIVATION_ERR" ;;
+    *)         echo "$ACTIVATION_ERR" >&2 ;;
+  esac
+  exit 1
+}
+check_agent() {
+  [[ -n "${FAKE_OC_NATIVE_AGENTS:-}" ]] || return 0
+  case " $FAKE_OC_NATIVE_AGENTS " in *" $agent "*) return 0 ;; esac
+  v2_error "Agent not found: \"$agent\""
+  exit 1
+}
+check_model() {
+  [[ -n "${FAKE_OC_BAD_MODEL:-}" && "$model" == "$FAKE_OC_BAD_MODEL" ]] || return 0
+  v2_error "Model unavailable: $model"
+  exit 1
+}
+
+sub="${1:-}"; [[ $# -gt 0 ]] && shift
+case "$sub" in
+  --version) echo "$ver" ;;
+  models)
+    cold_gate
+    printf '%s\n' "openai/gpt-5.5" "openai/gpt-5.3-codex" "opencode/big-pickle"
+    ;;
+  run)
+    if [[ "${1:-}" == "--help" ]]; then
+      if [[ "$contract" == 2 ]]; then
+        echo "  --standalone    Run with a private server instead of the background service"
+      else
+        echo "  --dir           directory to run in"
+      fi
+      exit 0
+    fi
+    if [[ "$contract" == 2 ]]; then
+      for a in "$@"; do
+        case "$a" in
+          --pure|--dir) echo "ERROR"; echo "  Unrecognized flag: $a in command opencode run"; exit 1 ;;
+        esac
+      done
+    fi
+    if [[ -n "${FAKE_OC_STDIN:-}" ]]; then cat > "$FAKE_OC_STDIN"; else cat > /dev/null; fi
+    cold_gate
+    agent=""; model=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --agent) agent="${2:-}" ;;
+        --model) model="${2:-}" ;;
+      esac
+      shift
+    done
+    if [[ "${FAKE_OC_MODEL_FIRST:-0}" == 1 ]]; then check_model; check_agent; else check_agent; check_model; fi
+    case "$mode" in
+      noagent)    v2_error "Agent not found: \"$agent\""; exit 1 ;;
+      nested)     echo "> $agent · fake-model"; echo 'Error: Agent not found: "helper"' >&2; exit 1 ;;
+      billedmiss) echo "> $agent · fake-model"; echo "Error: Agent not found: \"$agent\"" >&2; exit 1 ;;
+      ansimiss)   printf '\033[1m> %s · fake-model\033[0m\n' "$agent"; echo "Error: Agent not found: \"$agent\"" >&2; exit 1 ;;
+      bytemiss)   printf 'caf\351\n\033[1m>\033[0m %s · fake-model\n' "$agent"; echo "Error: Agent not found: \"$agent\"" >&2; exit 1 ;;
+      crmiss)     printf '\r> %s · fake-model\r\n' "$agent"; echo "Error: Agent not found: \"$agent\"" >&2; exit 1 ;;
+      spacemiss)  echo "> Plan Critic ($agent) · fake-model"; echo "Error: Agent not found: \"$agent\"" >&2; exit 1 ;;
+      billed)     echo "> $agent · fake-model"; echo "the log says: $ACTIVATION_ERR"; exit 1 ;;
+      slow)       echo "> $agent · fake-model"; echo 'Error: Agent not found: "helper"'; exec sleep 30 ;;
+    esac
+    echo "PONG"
+    ;;
+esac
+exit 0

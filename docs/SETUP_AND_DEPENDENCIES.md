@@ -34,11 +34,10 @@ The setup script is the canonical entry point for configuring x-skills. It:
 - Detects `gemini` CLI and `timeout`/`gtimeout`
 
 #### 3. OpenCode CLI
-- Detects `opencode` binary
+- Detects `opencode` binary (`OPENCODE_BIN` overrides the name, e.g. `opencode2`) and its major version
 - Lists available models
-- Detects `oh-my-openagent` plugin via config and node_modules
-- Checks if role agents resolve (`opencode agent list`)
-- Audits `mode=all` in `oh-my-openagent.json`
+- OpenCode 1.x: detects `oh-my-openagent` plugin via config and node_modules, checks if role agents resolve (`opencode agent list`), audits `mode=all` in `oh-my-openagent.json`
+- OpenCode 2.x: v2 does not load v1 plugins, so the plugin checks are skipped. `omo_plugin` and `omo_mode_all` stay pinned because `omo-agent` runs each role agent on a native agent of that name if one exists, otherwise on v2's read-only `explore` agent, on the model `oh-my-openagent.json` pins for that role
 
 #### 4. MCP Servers
 - `perplexity` — web search + reasoning

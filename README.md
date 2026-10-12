@@ -78,9 +78,9 @@ Everything is optional. Setup detects what's available and skills adapt.
 
 | Dependency | What it enables | Install |
 |-----------|----------------|---------|
-| [OpenCode](https://github.com/opencode-ai/opencode) | Multi-model dispatch (GPT, Gemini, Codex) | `curl -fsSL https://opencode.ai/install \| bash` |
+| [OpenCode](https://github.com/opencode-ai/opencode) 1.x or 2.x | Multi-model dispatch (GPT, Gemini, Codex) | v1: `curl -fsSL https://opencode.ai/install \| bash` · v2: `curl -fsSL https://opencode.ai/v2/install \| bash` |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | Direct Gemini access for `x-gemini` (Google Search grounding, gemini-3.x) | `npm install -g @google/gemini-cli` |
-| [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) | Role agents (oracle, explore, librarian) | `opencode plugin oh-my-openagent` |
+| [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) | Role agents (oracle, explore, librarian) on OpenCode 1.x. OpenCode 2 does not load v1 plugins; there `omo-agent` runs each role on a native agent of that name if one exists, otherwise on v2's read-only `explore` agent, on the model `oh-my-openagent.json` pins for it | `opencode plugin oh-my-openagent` |
 | [oh-my-claudecode](https://github.com/Yeachan-Heo/oh-my-claudecode) | OMC agents (executor, code-reviewer, debugger) | `/plugin marketplace add Yeachan-Heo/oh-my-claudecode` |
 | [superpowers](https://github.com/obra/superpowers) | Workflow skills (brainstorming, TDD, writing-plans) | `/plugin marketplace add obra/superpowers-marketplace` |
 | MCP servers | perplexity, deepwiki, exa, context7 | Configure in `.mcp.json` |

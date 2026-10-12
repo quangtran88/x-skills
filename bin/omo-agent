@@ -11,6 +11,10 @@
 #   - Short aliases (gemini-pro, codex, gpt) → fuzzy match available models
 #   - Partial IDs (gpt-5.3-codex, gemini-3.1-pro) → grep match
 #   - Full IDs (openai/gpt-5.5) → passthrough
+#
+# Works with OpenCode 1.x and 2.x; the `opencode run` argv is built per major
+# version (see "OpenCode binary + CLI contract"). OPENCODE_BIN targets a
+# side-by-side install, e.g. OPENCODE_BIN=opencode2.
 
 set -uo pipefail
 
@@ -61,6 +65,10 @@ Role Agents:
   librarian         external docs, OSS research
   multimodal-looker visual/multimodal analysis
 
+  (These come from the oh-my-openagent plugin, which loads on OpenCode 1.x only.
+   On OpenCode 2 a role with no native agent of that name runs on v2's read-only
+   `explore` agent, on the model oh-my-openagent.json pins for that role.)
+
   (Other OMO agents — hephaestus, atlas, prometheus, metis, momus — are
    currently unavailable due to an opencode/oh-my-opencode plugin compat bug.
    Use `omo-agent --model gpt|codex|gemini-pro "<prompt>"` as a workaround.
@@ -73,9 +81,78 @@ Model Aliases (resolved via `opencode models`):
   gpt               GPT-5.5
   o3, o4-mini       Reasoning models
   Or any partial/full model ID (e.g., gpt-5.3-codex, openai/gpt-5.5)
+
+Environment:
+  OPENCODE_BIN      opencode binary to drive (default: opencode; 1.x and 2.x supported)
+  OMO_TIMEOUT       Seconds before the run is killed (default: 1800)
 EOF
   exit 1
 fi
+
+# --- OpenCode binary + CLI contract ---
+# OpenCode 2 (`@opencode/cli`) changed `opencode run`: --pure and --dir are gone
+# (both are hard "Unrecognized flag" errors) and the client talks to a shared
+# background service unless --standalone is passed. OC_MAJOR picks the argv
+# shape used below.
+OPENCODE_BIN="${OPENCODE_BIN:-opencode}"
+
+detect_opencode_major() {
+  local ver major
+  ver=$("$OPENCODE_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  major="${ver%%.*}"
+  if [[ -z "$major" || "$major" == "0" ]]; then
+    # Dev/snapshot builds report 0.0.0-<channel>-<n> on both release lines, so
+    # the version says nothing — ask the CLI which contract it speaks.
+    # Captured, not piped into `grep -q`: under pipefail an early grep exit can
+    # SIGPIPE the help printer and turn a match into a failed pipeline.
+    local help
+    help=$("$OPENCODE_BIN" run --help 2>&1)
+    if [[ "$help" == *"--standalone"* ]]; then
+      major=2
+    else
+      major=1
+    fi
+  fi
+  echo "$major"
+}
+OC_MAJOR=$(detect_opencode_major)
+
+# v2 gives plugins ~5s to activate on a private server. npm plugin packages
+# listed in the config but not cached yet are installed inside that window,
+# about one per attempt, so a cold start fails with this error until the cache
+# is warm (measured on 2.0.27: 2 uncached packages → 2 failures, then success).
+OC_ACTIVATION_ERR='Location plugins did not finish activating'
+OC_ACTIVATION_RETRIES=5
+
+# `opencode models` per contract. v2 takes --standalone for the same reason as
+# `run` (see the execute block).
+list_models() {
+  if [[ "$OC_MAJOR" -lt 2 ]]; then
+    "$OPENCODE_BIN" models 2>/dev/null
+    return
+  fi
+  local out try=0
+  MODELS_ERR=$(mktemp /tmp/omo-agent-models-XXXXXXXX)
+  # list_models only ever runs inside $(…), so this EXIT trap belongs to that
+  # subshell: it removes the temp file when the caller is interrupted mid-retry.
+  trap 'rm -f "$MODELS_ERR"' EXIT
+  while :; do
+    out=$("$OPENCODE_BIN" models --standalone 2>"$MODELS_ERR")
+    if [[ "$out" != *"$OC_ACTIVATION_ERR"* ]] && ! grep -qF "$OC_ACTIVATION_ERR" "$MODELS_ERR" 2>/dev/null; then
+      break
+    fi
+    out=""
+    try=$((try + 1))
+    [[ "$try" -gt "$OC_ACTIVATION_RETRIES" ]] && break
+    echo "[omo-agent] opencode v2 still activating plugins — retry ${try}/${OC_ACTIVATION_RETRIES}" >&2
+    sleep 2
+  done
+  if [[ -z "$out" && -s "$MODELS_ERR" ]]; then
+    echo "[omo-agent] 'opencode models --standalone' failed: $(head -1 "$MODELS_ERR")" >&2
+  fi
+  rm -f "$MODELS_ERR"
+  printf '%s\n' "$out"
+}
 
 # --- Resolve model alias via `opencode models` ---
 resolve_model() {
@@ -89,7 +166,7 @@ resolve_model() {
 
   # Fetch available models (cached for this invocation)
   local models
-  models=$(opencode models 2>/dev/null)
+  models=$(list_models)
   if [[ -z "$models" ]]; then
     echo "Error: 'opencode models' returned no results" >&2
     return 1
@@ -150,6 +227,33 @@ resolve_agent_name() {
   esac
 }
 
+# --- OpenCode 2 role agents ---
+# The four names above are registered by the oh-my-openagent v1 plugin, which
+# OpenCode 2 cannot load. On v2 a native agent of the same name wins when one
+# exists; otherwise the role runs on v2's built-in read-only `explore` agent.
+# Either way it keeps the model the user's OMO config pins for the role.
+role_summary() {
+  case "$1" in
+    oracle)            echo "architecture review, debugging, second opinion" ;;
+    librarian)         echo "external docs and OSS research" ;;
+    multimodal-looker) echo "visual and multimodal analysis" ;;
+    *)                 echo "deep codebase search" ;;
+  esac
+}
+
+# Model pinned for a role in oh-my-openagent.json, as v2's provider/model#variant.
+# Empty when the config, jq or the entry is missing or does not look like an ID.
+omo_role_model() {
+  local cfg="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json" m
+  [[ -f "$cfg" ]] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  m=$(jq -r --arg a "$1" '.agents[$a] // {}
+        | select((.model | type) == "string")
+        | .model + (if (.variant | type) == "string" then "#" + .variant else "" end)' "$cfg" 2>/dev/null)
+  [[ "$m" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9._:/#@+-]+$ ]] && echo "$m"
+  return 0
+}
+
 # Agents currently broken by the plugin/opencode compat bug. Kept as a
 # separate list (not in resolve_agent_name) so we can emit a helpful,
 # bug-specific error instead of a generic "Unknown agent" message.
@@ -164,6 +268,8 @@ is_broken_agent() {
 }
 
 # --- Validate agent or resolve model ---
+IS_ROLE_AGENT=0
+ROLE_MODEL=""
 if [[ -n "$MODEL_FLAG" ]]; then
   MODEL_ID=$(resolve_model "$MODEL_FLAG") || exit 1
   [[ -z "$MODEL_ID" ]] && exit 1
@@ -171,7 +277,10 @@ if [[ -n "$MODEL_FLAG" ]]; then
 elif [[ -n "$AGENT" ]]; then
   # Check known-broken agents first so users get the full compat explanation
   # instead of a generic "Unknown agent" error.
-  if is_broken_agent "$AGENT"; then
+  # v1 only: the broken list and the whitelist below both encode the v1 plugin's
+  # display-name bug. v2 fails hard on an unknown agent (no silent fallback),
+  # so there the name goes straight through and a miss is explained after the run.
+  if [[ "$OC_MAJOR" -lt 2 ]] && is_broken_agent "$AGENT"; then
     cat >&2 <<EOF
 Error: agent '$AGENT' is currently UNAVAILABLE due to a known opencode + oh-my-opencode
        plugin compatibility bug. The plugin
@@ -193,23 +302,33 @@ Workarounds:
 EOF
     exit 1
   fi
-  AGENT_DISPLAY=$(resolve_agent_name "$AGENT") || {
-    echo "Error: Unknown agent '$AGENT'" >&2
-    echo "Valid agents: oracle explore librarian multimodal-looker" >&2
-    echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
-    exit 1
-  }
+  if [[ "$OC_MAJOR" -ge 2 ]]; then
+    AGENT_DISPLAY="$AGENT"
+    if resolve_agent_name "$AGENT" >/dev/null; then
+      IS_ROLE_AGENT=1
+      ROLE_MODEL=$(omo_role_model "$AGENT")
+    fi
+  else
+    AGENT_DISPLAY=$(resolve_agent_name "$AGENT") || {
+      echo "Error: Unknown agent '$AGENT'" >&2
+      echo "Valid agents: oracle explore librarian multimodal-looker" >&2
+      echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
+      exit 1
+    }
+  fi
   RUN_MODE="agent"
 fi
 
 # --- Momus path workaround (CURRENTLY UNREACHABLE) ---
 # momus fails early via is_broken_agent until the oh-my-opencode compat bug is
 # fixed upstream. Kept for when the fix lands — DO NOT delete. See gotchas.md.
+# v1 only: it serves the v1 plugin's momus prompt, so it is skipped on v2, where
+# momus is not gated and the copy into .sisyphus/ would otherwise run.
 # Momus only accepts .sisyphus/plans/*.md paths (hard-coded in its system prompt).
 # If the prompt references a plan file outside that dir, auto-copy it there temporarily.
 # Uses ABSOLUTE paths to avoid CWD mismatches between omo-agent and opencode.
 MOMUS_TMP=""
-if [[ "$AGENT" == "momus" ]]; then
+if [[ "$AGENT" == "momus" && "$OC_MAJOR" -lt 2 ]]; then
   # Check if prompt already references .sisyphus/plans/
   if [[ "$PROMPT" != *".sisyphus/plans/"* ]]; then
     # Extract file path from prompt (first .md path found) or check EXTRA_FILES
@@ -347,7 +466,7 @@ trap 'rm -f "$TMPFILE" "$CLEANFILE" "${CLEANFILE}."*; [[ -n "${MOMUS_TMP:-}" ]] 
 OMO_TIMEOUT="${OMO_TIMEOUT:-1800}"
 
 START_TIME=$(date +%s)
-echo "[omo-agent] started ${AGENT:-model} at $(date +%H:%M:%S) (timeout=${OMO_TIMEOUT}s)" >&2
+echo "[omo-agent] started ${AGENT:-model} at $(date +%H:%M:%S) (timeout=${OMO_TIMEOUT}s, opencode=v${OC_MAJOR})" >&2
 
 
 # Prompt is piped via stdin instead of passed as a positional argv.
@@ -357,18 +476,102 @@ echo "[omo-agent] started ${AGENT:-model} at $(date +%H:%M:%S) (timeout=${OMO_TI
 # and works reliably for all prompt shapes. See gotchas.md for the full repro.
 if [[ "$RUN_MODE" == "model" ]]; then
   LABEL="model:$(basename "$MODEL_ID")"
-  # --pure bypasses external plugins (avoids the display-name bug that broke
-  # 5 named agents). --agent build pins the built-in "build" agent so opencode
-  # does NOT try to resolve a config-level default_agent (e.g. "sisyphus") that
-  # only exists inside the stripped plugin. Both flags together are required:
-  # --pure alone fails when ~/.config/opencode/opencode.json sets default_agent
-  # to a plugin-provided name.
-  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --pure --agent build --model "$MODEL_ID" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
 else
   LABEL="agent:$AGENT"
-  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" opencode run --agent "$AGENT_DISPLAY" --dir "$(pwd)" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
 fi
-EXIT_CODE=$?
+
+# Rebuilt whenever a v2 role fallback changes AGENT_DISPLAY or ROLE_MODEL.
+build_oc_args() {
+  if [[ "$RUN_MODE" == "model" ]]; then
+    # --pure bypasses external plugins (avoids the display-name bug that broke
+    # 5 named agents). --agent build pins the built-in "build" agent so opencode
+    # does NOT try to resolve a config-level default_agent (e.g. "sisyphus") that
+    # only exists inside the stripped plugin. Both flags together are required:
+    # --pure alone fails when ~/.config/opencode/opencode.json sets default_agent
+    # to a plugin-provided name.
+    # v1 only — v2 has no --pure and does not load v1 plugins in the first place.
+    OC_ARGS=(--agent build --model "$MODEL_ID")
+    [[ "$OC_MAJOR" -lt 2 ]] && OC_ARGS=(--pure "${OC_ARGS[@]}")
+  else
+    OC_ARGS=(--agent "$AGENT_DISPLAY")
+    [[ -n "$ROLE_MODEL" ]] && OC_ARGS+=(--model "$ROLE_MODEL")
+  fi
+  if [[ "$OC_MAJOR" -ge 2 ]]; then
+    # --standalone gives this run a private server instead of v2's shared
+    # background service. Through the service, killing the client (our timeout)
+    # leaves the session and its tool calls running server-side. v2 has no
+    # --dir: the working directory is the process cwd.
+    OC_ARGS=(--standalone "${OC_ARGS[@]}")
+  else
+    OC_ARGS+=(--dir "$(pwd)")
+  fi
+}
+
+run_opencode() {
+  printf '%s' "$PROMPT" | timeout "$OMO_TIMEOUT" "$OPENCODE_BIN" run "${OC_ARGS[@]}" ${FILE_ARGS[@]+"${FILE_ARGS[@]}"} > "$TMPFILE" 2>&1
+}
+
+# True when the last run died on $1 before the model was called. Every re-run
+# below goes through this: it must never repeat a billed run, so it needs the
+# error in the head of the output AND no `> agent · model` banner, which v2
+# prints once the model has started. A timeout (124) never qualifies.
+pre_model_error() {
+  [[ $EXIT_CODE -ne 0 && $EXIT_CODE -ne 124 ]] || return 1
+  local head_out
+  head_out=$(head -c 2000 "$TMPFILE" 2>/dev/null)
+  [[ "$head_out" == *"$1"* ]] || return 1
+  # Any line with `>` then `·` counts as a banner, so padding, colour codes, a
+  # CR or a multi-word agent name cannot hide it; v2's pre-model errors contain
+  # neither. A re-run needs the raw count to be exactly 0 (an empty count, e.g.
+  # an unreadable file, means "banner"); the ANSI-stripped count adds a colour
+  # code inside the `·` itself. LC_ALL=C: BSD sed aborts on a byte that is not
+  # valid UTF-8 and would drop the banner after it. `grep -c` reads to EOF, so
+  # pipefail cannot turn an early exit into "no banner".
+  local banner_re='>.*·' raw stripped
+  raw=$(LC_ALL=C grep -cE "$banner_re" "$TMPFILE" 2>/dev/null)
+  stripped=$(LC_ALL=C sed $'s/\x1b\\[[0-9;?:]*[a-zA-Z]//g' "$TMPFILE" 2>/dev/null | LC_ALL=C grep -cE "$banner_re")
+  [[ "${raw:-1}" == "0" && "${stripped:-1}" == "0" ]]
+}
+
+# One run, plus v2's cold-start retries (see OC_ACTIVATION_ERR).
+run_with_retries() {
+  run_opencode
+  EXIT_CODE=$?
+  [[ "$OC_MAJOR" -ge 2 ]] || return 0
+  local try=0
+  while [[ $try -lt $OC_ACTIVATION_RETRIES ]] && pre_model_error "$OC_ACTIVATION_ERR"; do
+    try=$((try + 1))
+    echo "[omo-agent] opencode v2 still activating plugins — retry ${try}/${OC_ACTIVATION_RETRIES}" >&2
+    sleep 2
+    run_opencode
+    EXIT_CODE=$?
+  done
+}
+
+build_oc_args
+run_with_retries
+
+# v2 role fallbacks, each at most once: no native agent of that name → v2's
+# read-only `explore` stands in; pinned model not served here → v2's default.
+if [[ "$OC_MAJOR" -ge 2 && "$RUN_MODE" == "agent" ]]; then
+  ROLE_FIXUPS=0
+  while [[ $ROLE_FIXUPS -lt 2 ]]; do
+    if [[ "$IS_ROLE_AGENT" -eq 1 && "$AGENT_DISPLAY" != "explore" ]] \
+       && pre_model_error "Agent not found: \"$AGENT\""; then
+      AGENT_DISPLAY="explore"
+      PROMPT="[ROLE: $AGENT — $(role_summary "$AGENT"). You are read-only: do not edit or create files.]"$'\n\n'"$PROMPT"
+      echo "[omo-agent] '$AGENT' is not an OpenCode 2 agent — running v2's read-only 'explore' agent as $AGENT" >&2
+    elif [[ -n "$ROLE_MODEL" ]] && pre_model_error "Model unavailable"; then
+      echo "[omo-agent] model '$ROLE_MODEL' (pinned for $AGENT in oh-my-openagent.json) is unavailable — using the OpenCode default model" >&2
+      ROLE_MODEL=""
+    else
+      break
+    fi
+    ROLE_FIXUPS=$((ROLE_FIXUPS + 1))
+    build_oc_args
+    run_with_retries
+  done
+fi
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
@@ -383,6 +586,29 @@ if [[ "$RUN_MODE" == "agent" ]] \
   echo "Error: OpenCode does not recognize agent '$AGENT' → '$AGENT_DISPLAY' (silent fallback detected)" >&2
   echo "Valid agents: oracle explore librarian multimodal-looker" >&2
   echo "Or use: omo-agent --model <alias> \"<prompt>\"" >&2
+  rm -f "$TMPFILE"
+  exit 1
+fi
+
+# --- v2: explain a missing agent (v2 exits 1 with `Error: Agent not found: "<name>"`) ---
+# Matched with the requested name: a nested agent the run failed to launch is
+# a different error.
+V2_AGENT_MISS=0
+if [[ "$OC_MAJOR" -ge 2 && "$RUN_MODE" == "agent" && $EXIT_CODE -ne 0 && $EXIT_CODE -ne 124 ]]; then
+  HEAD_OUT=$(head -c 2000 "$TMPFILE" 2>/dev/null)
+  [[ "$HEAD_OUT" == *"Agent not found: \"$AGENT\""* ]] && V2_AGENT_MISS=1
+fi
+if [[ "$V2_AGENT_MISS" -eq 1 ]]; then
+  cat >&2 <<EOF
+Error: agent '$AGENT' does not exist in this OpenCode 2 install.
+       OpenCode 2 does not load the oh-my-openagent v1 plugin. omo-agent stands in
+       for oracle, explore, librarian and multimodal-looker only.
+
+Options:
+  - omo-agent --model gpt "<prompt>" (or codex / gemini-pro) — model routing works on v2.
+  - Built-in v2 agents that run directly: build, plan, explore.
+  - Define the agent natively: ~/.config/opencode/agents/$AGENT.md
+EOF
   rm -f "$TMPFILE"
   exit 1
 fi
@@ -447,6 +673,7 @@ awk '
   /^> [a-z_-]+ · / { next }
   /^⚙ / { next }
   /^→ / { next }
+  /^✱ / { next }
   /^(fatal:|failed to run|✗ |Cloning into |Updating |Fast-forward)/ { next }
   /^(From github|   [a-f0-9].*->)/ { next }
   /^Error: Streamable/ { in_cmd = 1; next }

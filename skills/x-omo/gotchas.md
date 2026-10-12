@@ -2,6 +2,53 @@
 
 Known failure patterns and compatibility issues for the `omo-agent` wrapper.
 
+## OpenCode 2 — different `run` contract, emulated role agents (2026-10-12)
+
+**Versions:** verified on opencode 2.0.27 (`@opencode/cli`) next to 1.17.16. `omo-agent`
+detects the major version per invocation and builds the argv for it.
+
+| | OpenCode 1.x | OpenCode 2.x |
+|---|---|---|
+| Model mode | `run --pure --agent build --model <id> --dir <cwd>` | `run --standalone --agent build --model <id>` |
+| Agent mode | `run --agent <name> --dir <cwd>` | `run --standalone --agent <name> [--model <pinned>]` |
+| Model list | `opencode models` | `opencode models --standalone` |
+
+- **`--pure` and `--dir` are hard errors on v2** (`Unrecognized flag`, exit 1). The
+  working directory is the process cwd.
+- **`--standalone` is deliberate.** By default v2 clients attach to one shared
+  background service. Killing the client (our `OMO_TIMEOUT`) then leaves the session
+  running server-side — measured: a `sleep` started by the shell tool survived the
+  client kill through the service and died with it under `--standalone`.
+- **Role agents are emulated.** v2 does not load v1 plugins; its log shows
+  `failed to load plugin target=oh-my-openagent@latest … Plugin must export a default
+  definition`. So for `oracle`, `explore`, `librarian` and `multimodal-looker`:
+  1. `omo-agent` first asks v2 for an agent of that name — a native definition wins.
+  2. On `Error: Agent not found: "<name>"` it re-runs on v2's built-in read-only
+     `explore` agent with a one-line `[ROLE: …]` hint prepended (verified: `explore`
+     reads files and runs `git`, and refuses to create files).
+  3. Either way the model is the one `~/.config/opencode/oh-my-openagent.json` pins for
+     the role (`model` + `variant` → `provider/model#variant`). No config or no `jq` →
+     v2's default model; `Error: Model unavailable` → one re-run on the default model.
+
+  The stand-in answers from v2's generic `explore` prompt, not OMO's role prompt, and
+  costs one extra ~3s startup per call for the failed native lookup. `bin/setup` keeps
+  `omo_plugin`/`omo_mode_all` pinned on v2 because the roles stay callable. Other names
+  (`momus`, `atlas`, …) are passed through and fail with a v2-specific explanation; the
+  v1 whitelist, broken-agent gate and momus plan-path workaround are skipped on v2.
+- **Re-runs never repeat a billed run.** Every automatic re-run (cold start, missing
+  agent, unavailable model) requires the error in the first 2 KB of output and no
+  `> agent · model` banner, which v2 prints once the model has started.
+- **Cold-start race.** A private server gives plugins about 5s to activate. npm plugin
+  packages listed in the config but not cached yet are installed in that window, roughly
+  one per attempt, and the CLI dies with `ServiceUnavailableError: Location plugins did
+  not finish activating` before the model is called. `omo-agent` retries up to 5 times
+  on exactly that error.
+- **Side-by-side installs:** `OPENCODE_BIN=opencode2 omo-agent …` (same variable for
+  `bin/setup`).
+
+**Re-probe:** `opencode run --help | grep -E -- '--(pure|dir|standalone)'` shows which
+contract a binary speaks; `bash bin/tests/omo-agent.test.sh` checks the argv for both.
+
 ## Plugin compat bug — 5 parenthesized-display-name agents are unresolvable (2026-04-09)
 
 **Affected:** `hephaestus` `atlas` `prometheus` `metis` `momus`

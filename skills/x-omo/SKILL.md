@@ -182,7 +182,8 @@ These blocks are guidance for prompt construction — they do NOT replace the `[
 - Exit 0 = success, non-zero = failure
 - "agent not found" / "is a subagent" = agent name issue → use one of: oracle, explore, librarian, multimodal-looker
 - "Unknown agent" = not in valid list → see Agent Catalog above
-- "default agent not found" = plugin compat issue → model mode uses `--pure` to avoid this
+- "default agent not found" = plugin compat issue → model mode uses `--pure` (OpenCode 1.x) to avoid this
+- "does not exist in this OpenCode 2 install" = an agent other than oracle / explore / librarian / multimodal-looker was requested on OpenCode 2, which cannot load the oh-my-openagent plugin → use one of those four (emulated on v2) or `--model <alias>`
 - Timeout = prompt too broad → break into smaller prompts
 
 ### After Collecting Results

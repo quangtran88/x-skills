@@ -23,6 +23,8 @@ LINK_PATH="$LINK_DIR/omo-agent"
 AGY_LINK_PATH="$LINK_DIR/agy-agent"
 XWI_LINK_PATH="$LINK_DIR/x-worktree-isolate"
 XUP_LINK_PATH="$LINK_DIR/x-upstream"
+# opencode binary to probe — the same override bin/omo-agent honors.
+OC_BIN="${OPENCODE_BIN:-opencode}"
 
 # --- Colors ---
 RED='\033[0;31m'
@@ -73,6 +75,49 @@ sha_skill_file() {
 }
 # Track missing deps: type|name|description|install_command
 missing_add() { echo "$1|$2|$3|$4" >> "$MISSING_STORE"; }
+
+# --- OpenCode CLI contract (mirrors bin/omo-agent) ---
+# OpenCode 2 dropped `run --pure/--dir` and `agent list`, runs through a shared
+# background service unless --standalone is passed, and does not load v1 plugins.
+oc_major() {
+  local ver major
+  ver=$("$OC_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) || true
+  major="${ver%%.*}"
+  if [[ -z "$major" || "$major" == "0" ]]; then
+    # Dev/snapshot builds report 0.0.0-<channel>-<n> on both release lines.
+    # Captured, not piped into `grep -q` — see bin/omo-agent.
+    local help
+    help=$("$OC_BIN" run --help 2>&1) || true
+    if [[ "$help" == *"--standalone"* ]]; then major=2; else major=1; fi
+  fi
+  echo "$major"
+}
+# `opencode models` for the detected contract. v2: --standalone keeps a setup
+# run from spawning the background service; a cold start fails until
+# config-listed plugin packages are cached, so retry while that error persists.
+oc_models() {
+  if [[ "${OC_MAJOR:-1}" -lt 2 ]]; then
+    "$OC_BIN" models 2>/dev/null
+    return
+  fi
+  local out="" try=0 activating='Location plugins did not finish activating'
+  OC_MODELS_ERR=$(mktemp /tmp/x-skills-models-XXXXXX)
+  # oc_models only ever runs inside $(…), so this EXIT trap belongs to that
+  # subshell and does not replace the script's own.
+  trap 'rm -f "$OC_MODELS_ERR"' EXIT
+  while :; do
+    out=$("$OC_BIN" models --standalone 2>"$OC_MODELS_ERR") || true
+    if [[ "$out" != *"$activating"* ]] && ! grep -qF "$activating" "$OC_MODELS_ERR" 2>/dev/null; then
+      break
+    fi
+    out=""
+    try=$((try + 1))
+    [[ "$try" -gt 5 ]] && break
+    sleep 2
+  done
+  rm -f "$OC_MODELS_ERR"
+  printf '%s\n' "$out"
+}
 
 # Verify a binary is owned by the current user and not group/other-writable.
 # Refuses to symlink to anything in a world-writable directory. This bounds
@@ -147,7 +192,7 @@ run_install() {
       curl -fsSL https://opencode.ai/install | bash
       ;;
     oh-my-openagent)
-      opencode plugin oh-my-openagent
+      "$OC_BIN" plugin oh-my-openagent
       ;;
     oh-my-openagent-mode-all)
       "$SCRIPT_DIR/setup" --fix
@@ -455,13 +500,14 @@ configure_review_models() {
     return 0
   fi
 
-  if ! command -v opencode &>/dev/null || ! command -v jq &>/dev/null; then
+  if ! command -v "$OC_BIN" &>/dev/null || ! command -v jq &>/dev/null; then
     warn "opencode or jq unavailable — cannot validate model IDs, skipping"
     return 0
   fi
 
   local all_models
-  all_models=$(opencode models 2>/dev/null)
+  [[ -n "${OC_MAJOR:-}" ]] || OC_MAJOR=$(oc_major)
+  all_models=$(oc_models)
   [[ -z "$all_models" ]] && { warn "'opencode models' returned nothing — skipping"; return 0; }
 
   # Suggest the models this user already runs elsewhere: whatever their
@@ -792,71 +838,89 @@ fi
 # --- 2. OpenCode CLI ---
 header "2. OpenCode CLI"
 
-if command -v opencode &>/dev/null; then
-  OC_VERSION=$(opencode version 2>/dev/null) || true
+if command -v "$OC_BIN" &>/dev/null; then
+  # --version first: on OpenCode 2 a bare `version` is a directory argument.
+  OC_VERSION=$("$OC_BIN" --version 2>/dev/null | head -1) || true
   if [[ -z "$OC_VERSION" ]]; then
-    OC_VERSION=$(opencode --version 2>/dev/null) || true
+    OC_VERSION=$("$OC_BIN" version 2>/dev/null) || true
   fi
   [[ -z "$OC_VERSION" ]] && OC_VERSION="unknown"
+  OC_MAJOR=$(oc_major)
   ok "opencode found: $OC_VERSION"
   cap_set opencode true
 
-  # Detect oh-my-opencode/oh-my-openagent plugin:
-  # 1. Check opencode.json config for plugin registration
-  # 2. Check node_modules for the package
-  # 3. Check if role agents (oracle) appear in agent list
-  OC_HOME="${OPENCODE_HOME:-$HOME/.opencode}"
-  OC_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
-  OMO_FOUND=false
-
-  # Check opencode.json plugin array
-  if [[ -f "$OC_CONFIG" ]] && grep -qE '"oh-my-open(code|agent)(@[^"]*)?"' "$OC_CONFIG" 2>/dev/null; then
-    OMO_PKG=$(grep -oE '"oh-my-open(code|agent)(@[^"]*)?"' "$OC_CONFIG" | head -1 | tr -d '"')
-    ok "oh-my-openagent plugin configured ($OMO_PKG in opencode.json)"
-    OMO_FOUND=true
-  fi
-
-  # Check node_modules
-  if [[ "$OMO_FOUND" == "false" ]]; then
-    for pkg in oh-my-openagent oh-my-opencode; do
-      if [[ -d "$OC_HOME/node_modules/$pkg" ]]; then
-        OMO_VER=$(node -p "require('$OC_HOME/node_modules/$pkg/package.json').version" 2>/dev/null || echo "")
-        ok "$pkg plugin installed${OMO_VER:+ (v$OMO_VER)}"
-        OMO_FOUND=true
-        break
-      fi
-    done
-  fi
-
-  # Check if role agents actually work.
-  # `opencode agent list` truncates piped output (~64KB) non-deterministically,
-  # so a missing oracle line is inconclusive — fall back to the authoritative
-  # oh-my-openagent.json config (the same file the mode=all audit reads).
-  if [[ "$OMO_FOUND" == "true" ]]; then
-    OC_AGENTS=$(opencode agent list 2>/dev/null || true)
+  if [[ "$OC_MAJOR" -ge 2 ]]; then
+    # v1 plugins do not load in OpenCode 2, so oh-my-openagent's role agents do not
+    # exist there. omo-agent stands in for them with v2's built-in read-only
+    # `explore` agent, so the role capabilities stay pinned.
+    info "OpenCode 2: omo-agent drives it with 'run --standalone'"
+    ok "Role agents (oracle, explore, librarian, multimodal-looker) run on a native agent of that name, else v2's read-only explore agent"
     OMO_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
-    if grep -qE '^(oracle|explore|librarian|multimodal-looker)[[:space:]]' <<<"$OC_AGENTS" \
-       || { command -v jq &>/dev/null && [[ -f "$OMO_CFG" ]] && \
-            [[ "$(jq -r '[.agents.oracle.mode,.agents.explore.mode,.agents.librarian.mode,.agents["multimodal-looker"].mode] | map(. == "all") | all' "$OMO_CFG" 2>/dev/null)" == "true" ]]; }; then
-      ok "Role agents available (oracle, explore, librarian)"
-      cap_set omo_plugin true
+    if [[ -f "$OMO_CFG" ]] && command -v jq &>/dev/null; then
+      info "  Role models come from $OMO_CFG"
     else
-      warn "Plugin configured but role agents not resolved (known compat bug)"
-      info "Working agents: oracle, explore, librarian, multimodal-looker"
-      info "Broken agents: hephaestus, atlas, prometheus, metis, momus"
-      cap_set omo_plugin "partial"
+      info "  No oh-my-openagent.json (or no jq) — role agents use OpenCode's default model"
     fi
+    cap_set omo_plugin true
+    cap_set omo_mode_all true
   else
-    warn "oh-my-openagent plugin not detected"
-    info "Model routing (--model flag) still works without the plugin"
-    cap_set omo_plugin false
-    missing_add "cli" "oh-my-openagent" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin oh-my-openagent"
+    # Detect oh-my-opencode/oh-my-openagent plugin:
+    # 1. Check opencode.json config for plugin registration
+    # 2. Check node_modules for the package
+    # 3. Check if role agents (oracle) appear in agent list
+    OC_HOME="${OPENCODE_HOME:-$HOME/.opencode}"
+    OC_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
+    OMO_FOUND=false
+
+    # Check opencode.json plugin array
+    if [[ -f "$OC_CONFIG" ]] && grep -qE '"oh-my-open(code|agent)(@[^"]*)?"' "$OC_CONFIG" 2>/dev/null; then
+      OMO_PKG=$(grep -oE '"oh-my-open(code|agent)(@[^"]*)?"' "$OC_CONFIG" | head -1 | tr -d '"')
+      ok "oh-my-openagent plugin configured ($OMO_PKG in opencode.json)"
+      OMO_FOUND=true
+    fi
+
+    # Check node_modules
+    if [[ "$OMO_FOUND" == "false" ]]; then
+      for pkg in oh-my-openagent oh-my-opencode; do
+        if [[ -d "$OC_HOME/node_modules/$pkg" ]]; then
+          OMO_VER=$(node -p "require('$OC_HOME/node_modules/$pkg/package.json').version" 2>/dev/null || echo "")
+          ok "$pkg plugin installed${OMO_VER:+ (v$OMO_VER)}"
+          OMO_FOUND=true
+          break
+        fi
+      done
+    fi
+
+    # Check if role agents actually work.
+    # `opencode agent list` truncates piped output (~64KB) non-deterministically,
+    # so a missing oracle line is inconclusive — fall back to the authoritative
+    # oh-my-openagent.json config (the same file the mode=all audit reads).
+    if [[ "$OMO_FOUND" == "true" ]]; then
+      OC_AGENTS=$("$OC_BIN" agent list 2>/dev/null || true)
+      OMO_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/oh-my-openagent.json"
+      if grep -qE '^(oracle|explore|librarian|multimodal-looker)[[:space:]]' <<<"$OC_AGENTS" \
+         || { command -v jq &>/dev/null && [[ -f "$OMO_CFG" ]] && \
+              [[ "$(jq -r '[.agents.oracle.mode,.agents.explore.mode,.agents.librarian.mode,.agents["multimodal-looker"].mode] | map(. == "all") | all' "$OMO_CFG" 2>/dev/null)" == "true" ]]; }; then
+        ok "Role agents available (oracle, explore, librarian)"
+        cap_set omo_plugin true
+      else
+        warn "Plugin configured but role agents not resolved (known compat bug)"
+        info "Working agents: oracle, explore, librarian, multimodal-looker"
+        info "Broken agents: hephaestus, atlas, prometheus, metis, momus"
+        cap_set omo_plugin "partial"
+      fi
+    else
+      warn "oh-my-openagent plugin not detected"
+      info "Model routing (--model flag) still works without the plugin"
+      cap_set omo_plugin false
+      missing_add "cli" "oh-my-openagent" "OpenCode role agents (oracle, explore, librarian)" "opencode plugin oh-my-openagent"
+    fi
+
+    # Audit mode=all on every agent — prereq for `opencode run --agent <name>`
+    check_omo_mode_all
   fi
 
-  # Audit mode=all on every agent — prereq for `opencode run --agent <name>`
-  check_omo_mode_all
-
-  MODELS=$(opencode models 2>/dev/null || true)
+  MODELS=$(oc_models || true)
   if [[ -n "$MODELS" ]]; then
     MODEL_COUNT=$(echo "$MODELS" | wc -l | tr -d ' ')
     ok "$MODEL_COUNT models available"
